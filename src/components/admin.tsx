@@ -6,17 +6,19 @@ import { useT } from './I18n';
 import { Drawer, Field, PayChip, Bib, DeleteButton, useToast, useCopy } from './ui';
 import { RunnerFields, type RunnerForm } from './portal';
 import { money, fmtDate, fmtDT, splitCats, BRANDS } from '@/lib/format';
-import { raceStats, teamSlots, isHold } from '@/lib/stats';
+import { raceStats, teamSlots, isHold, regComplete } from '@/lib/stats';
+import { parseGroups, groupFor, categoryOf, fmtHalf, type StartGroup } from '@/lib/groups';
+import { LogoInput } from './LogoInput';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
-  removeRunner, addTeammate, removeTeammate, teamAddSlots, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
+  removeRunner, addTeammate, removeTeammate, teamAddSlots, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
 /* Shapes passed from server components (no password hashes). */
 export type ARace = {
   id: string; name: string; brand: string; status: string; race_date: string | null; location: string | null;
   team_price: number; runner_fee: number; team_size: number; capacity_teams: number; categories: string;
-  bib_start: number; waiver: string | null; team_sizes: string; hold_slots: number;
+  bib_start: number; waiver: string | null; team_sizes: string; hold_slots: number; start_groups: string;
 };
 export type APayment = {
   id: string; team_id: string | null; runner_id: string | null; kind: string; source: string; external_id: string | null; quantity: number;
@@ -30,6 +32,7 @@ export type ATeam = {
   id: string; race_id: string; name: string; category: string | null; captain_name: string; captain_email: string;
   captain_phone: string | null; amount: number; payment_status: string; payment_method: string | null; paid_at: string | null;
   claim_code: string; has_password: boolean; created_at: string; team_size: number | null; extra_slots: number; notes: string | null;
+  half_avg_min: number | null; reg_type: string; logo_v: string | null;
 };
 export type ARunner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string; email: string;
@@ -55,6 +58,17 @@ function useAct() {
   };
   return { act, pending };
 }
+
+export function GroupChip({ g }: { g: StartGroup | null }) {
+  const { t } = useT();
+  if (!g) return <span className="chip plain">{t('noGroup')}</span>;
+  return <span className="chip plain" style={{ background: g.color, color: '#fff' }}>{t('group')} {g.label}</span>;
+}
+export function CatChip({ c }: { c: string | null }) {
+  const { t } = useT();
+  return c ? <span className={'chip plain cat-' + c}>{t(c)}</span> : <span className="muted">—</span>;
+}
+const logoSrc = (x: { id: string; logo_v: string | null }) => (x.logo_v ? `/api/logo/${x.id}?v=${x.logo_v}` : null);
 
 /* ---------------- nav ---------------- */
 export function AdminNav({ races, mobile }: { races: { id: string; name: string }[]; mobile?: boolean }) {
@@ -145,6 +159,11 @@ export function RaceDetail({ race, teams, runners, payments }: { race: ARace; te
   const tabs: [string, string][] = [['summary', t('summary')], ['teams', `${t('teams')} · ${stats.teams}`], ['runners', `${t('runners')} · ${stats.runners}`],
     ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['import', t('importTab')]];
   // Hold races: a runner is "covered" when they fit inside the team's paid slots.
+  const groups = parseGroups(race.start_groups);
+  const info = (tm: ATeam) => {
+    const rs = runnersOfTeam(tm.id);
+    return { cat: categoryOf(rs.map((r) => r.gender)), group: groupFor(tm.half_avg_min, groups), complete: regComplete(teamSlots(tm, race).size, rs) };
+  };
   const covered = new Set<string>();
   if (isHold(race)) for (const tm of teams) runnersOfTeam(tm.id).slice(0, teamSlots(tm, race).paid).forEach((r) => covered.add(r.id));
   const setTab = (k: string) => { setSearch(''); router.replace(k === 'summary' ? `/admin/races/${race.id}` : `/admin/races/${race.id}?tab=${k}`, { scroll: false }); };
@@ -170,7 +189,7 @@ export function RaceDetail({ race, teams, runners, payments }: { race: ARace; te
         {tabs.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}</button>)}
       </div>
 
-      {tab === 'summary' && <Summary race={race} teams={teams} runners={runners} stats={stats} />}
+      {tab === 'summary' && <Summary race={race} teams={teams} runners={runners} stats={stats} info={info} groups={groups} />}
       {tab === 'teams' && (
         <>
           <div className="toolbar">
@@ -178,7 +197,7 @@ export function RaceDetail({ race, teams, runners, payments }: { race: ARace; te
             <button type="button" className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'teamForm' })}>+ {t('addTeam')}</button>
           </div>
           <TeamsTable race={race} teams={teams.filter((x) => !search || `${x.name} ${x.captain_name} ${x.captain_email} ${x.claim_code}`.toLowerCase().includes(search.toLowerCase()))}
-            count={(id) => runnersOfTeam(id).length} open={(id) => setModal({ type: 'team', id })} />
+            count={(id) => runnersOfTeam(id).length} open={(id) => setModal({ type: 'team', id })} info={info} />
         </>
       )}
       {tab === 'runners' && (
@@ -197,7 +216,7 @@ export function RaceDetail({ race, teams, runners, payments }: { race: ARace; te
       {modal?.type === 'race' && <RaceForm race={race} onClose={() => setModal(null)} />}
       {modal?.type === 'teamForm' && <TeamForm race={race} team={modal.id ? teamById(modal.id) : undefined} onClose={() => setModal(null)} onSaved={(id) => setModal({ type: 'team', id })} />}
       {modal?.type === 'team' && teamById(modal.id) && (
-        <TeamDrawer team={teamById(modal.id)!} race={race} runners={runnersOfTeam(modal.id)} payments={payments.filter((p) => p.team_id === modal.id)} onClose={() => setModal(null)}
+        <TeamDrawer team={teamById(modal.id)!} race={race} runners={runnersOfTeam(modal.id)} payments={payments.filter((p) => p.team_id === modal.id)} info={info(teamById(modal.id)!)} onClose={() => setModal(null)}
           onEdit={() => setModal({ type: 'teamForm', id: modal.id })} onRunner={(id) => setModal({ type: 'runner', id })} />
       )}
       {modal?.type === 'runner' && runners.find((r) => r.id === modal.id) && (
@@ -216,7 +235,62 @@ function StatusPill({ s }: { s: string }) {
 
 type Stats = ReturnType<typeof raceStats>;
 
-function Summary({ race, teams, runners, stats }: { race: ARace; teams: ATeam[]; runners: ARunner[]; stats: Stats }) {
+function GroupsCard({ race, teams, info, groups }: { race: ARace; teams: ATeam[]; info: Info; groups: StartGroup[] }) {
+  const { t } = useT();
+  const { act } = useAct();
+  const [edit, setEdit] = useState<{ label: string; max: string; color: string; start: string }[] | null>(null);
+  const counts = (g: StartGroup | null) => {
+    const ts = teams.filter((x) => (info(x).group?.label ?? null) === (g?.label ?? null));
+    return { n: ts.length, f: ts.filter((x) => info(x).cat === 'femenil').length, v: ts.filter((x) => info(x).cat === 'varonil').length, m: ts.filter((x) => info(x).cat === 'mixto').length };
+  };
+  const none = counts(null);
+  const rangeOf = (i: number, sorted: StartGroup[]) => {
+    const prev = i > 0 ? sorted[i - 1].max : null, g = sorted[i];
+    return g.max == null ? `${(prev ?? 0) + 1}+ min` : prev == null ? `≤ ${g.max} min` : `${prev + 1}–${g.max} min`;
+  };
+  const sorted = [...groups].sort((a, b) => (a.max ?? Infinity) - (b.max ?? Infinity));
+  return (
+    <div className="card stack" style={{ gridColumn: '1 / -1' }}>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <div><h3 style={{ textTransform: 'uppercase' }}>{t('startGroups')}</h3><p className="muted" style={{ fontSize: 14, marginTop: 4 }}>{t('startGroupsSub')}</p></div>
+        {!edit && <button type="button" className="btn btn-sm" onClick={() => setEdit(sorted.map((g) => ({ label: g.label, max: g.max == null ? '' : String(g.max), color: g.color, start: g.start })))}>{t('edit')}</button>}
+      </div>
+      {edit ? (
+        <form className="stack" style={{ gap: 10 }} onSubmit={async (e) => { e.preventDefault(); if (await act(() => saveGroups(race.id, edit))) setEdit(null); }}>
+          {edit.map((g, i) => (
+            <div key={i} className="row" style={{ alignItems: 'flex-end' }}>
+              <Field id={`g-l-${i}`} label={t('group')} value={g.label} onChange={(v) => setEdit(edit.map((x, j) => (j === i ? { ...x, label: v } : x)))} style={{ width: 70 }} />
+              <Field id={`g-m-${i}`} label={t('limitMin')} type="number" value={g.max} placeholder={t('noLimit')} onChange={(v) => setEdit(edit.map((x, j) => (j === i ? { ...x, max: v } : x)))} style={{ width: 110 }} />
+              <Field id={`g-c-${i}`} label={t('color')} type="color" value={g.color} onChange={(v) => setEdit(edit.map((x, j) => (j === i ? { ...x, color: v } : x)))} style={{ width: 60, padding: 2, height: 42 }} />
+              <Field id={`g-s-${i}`} label={t('startTime')} type="time" value={g.start} onChange={(v) => setEdit(edit.map((x, j) => (j === i ? { ...x, start: v } : x)))} />
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setEdit(edit.filter((_, j) => j !== i))}>×</button>
+            </div>
+          ))}
+          <div className="row">
+            <button type="button" className="btn btn-sm" onClick={() => setEdit([...edit, { label: String(edit.length + 1), max: '', color: '#5b6370', start: '' }])}>+ {t('addGroup')}</button>
+            <span style={{ flex: 1 }} />
+            <button type="button" className="btn btn-sm" onClick={() => setEdit(null)}>{t('cancel')}</button>
+            <button type="submit" className="btn btn-primary btn-sm">{t('save')}</button>
+          </div>
+        </form>
+      ) : (
+        <div className="tbl-wrap"><table>
+          <thead><tr><th>{t('group')}</th><th>Min</th><th>{t('startTime')}</th><th style={{ textAlign: 'right' }}>{t('teams')}</th><th style={{ textAlign: 'right' }}>{t('femenil')}</th><th style={{ textAlign: 'right' }}>{t('varonil')}</th><th style={{ textAlign: 'right' }}>{t('mixto')}</th></tr></thead>
+          <tbody>
+            {sorted.map((g, i) => { const c = counts(g); return (
+              <tr key={g.label + i}><td><GroupChip g={g} /></td><td className="num">{rangeOf(i, sorted)}</td><td className="num">{g.start || '—'}</td>
+                <td className="num" style={{ textAlign: 'right' }}><b>{c.n}</b></td><td className="num" style={{ textAlign: 'right' }}>{c.f}</td><td className="num" style={{ textAlign: 'right' }}>{c.v}</td><td className="num" style={{ textAlign: 'right' }}>{c.m}</td></tr>
+            ); })}
+            {none.n > 0 && <tr><td><GroupChip g={null} /></td><td>—</td><td>—</td><td className="num" style={{ textAlign: 'right' }}><b>{none.n}</b></td><td className="num" style={{ textAlign: 'right' }}>{none.f}</td><td className="num" style={{ textAlign: 'right' }}>{none.v}</td><td className="num" style={{ textAlign: 'right' }}>{none.m}</td></tr>}
+          </tbody>
+        </table></div>
+      )}
+    </div>
+  );
+}
+
+type Info = (tm: ATeam) => { cat: string | null; group: StartGroup | null; complete: boolean };
+function Summary({ race, teams, runners, stats, info, groups }: { race: ARace; teams: ATeam[]; runners: ARunner[]; stats: Stats; info: Info; groups: StartGroup[] }) {
   const { t, lang } = useT();
   const copy = useCopy();
   const [link] = useState(() => (typeof window !== 'undefined' ? window.location.origin : '') + `/r/${race.id}`);
@@ -234,10 +308,12 @@ function Summary({ race, teams, runners, stats }: { race: ARace; teams: ATeam[];
       <div className="split">
         <div className="card">
           <h3 style={{ textTransform: 'uppercase', marginBottom: 10 }}>{t('categories')}</h3>
-          {cats.length ? <div className="list">{cats.map((c) => <div className="it" key={c}><span>{c}</span><b className="num">{teams.filter((x) => x.category === c).length} {t('teams').toLowerCase()}</b></div>)}</div> : <p className="muted">—</p>}
+          <div className="list">{(['femenil', 'varonil', 'mixto'] as const).map((c) => <div className="it" key={c}><CatChip c={c} /><b className="num">{teams.filter((x) => info(x).cat === c).length} {t('teams').toLowerCase()}</b></div>)}</div>
+          {cats.length > 0 && <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>{cats.map((c) => `${c}: ${teams.filter((x) => x.category === c).length}`).join(' · ')}</div>}
           <h3 style={{ textTransform: 'uppercase', margin: '18px 0 10px' }}>{t('shirt')}</h3>
           {Object.keys(shirts).length ? <div className="row">{Object.entries(shirts).map(([k, n]) => <span key={k} className="chip plain">{k} · <b className="num">{n}</b></span>)}</div> : <p className="muted">—</p>}
         </div>
+        <GroupsCard race={race} teams={teams} info={info} groups={groups} />
         <div className="card stack">
           <div><h3 style={{ textTransform: 'uppercase' }}>{t('p_captainLink')}</h3><p className="muted" style={{ fontSize: 14, marginTop: 6 }}>{race.status === 'open' ? t('p_shareText') : t('race_closed')}</p></div>
           <div className="row"><span className="code" style={{ overflowWrap: 'anywhere' }}>{link}</span><button type="button" className="btn btn-sm" onClick={() => copy(link)}>{t('copy')}</button></div>
@@ -247,24 +323,28 @@ function Summary({ race, teams, runners, stats }: { race: ARace; teams: ATeam[];
   );
 }
 
-function TeamsTable({ race, teams, count, open }: { race: ARace; teams: ATeam[]; count: (id: string) => number; open: (id: string) => void }) {
+function TeamsTable({ race, teams, count, open, info }: { race: ARace; teams: ATeam[]; count: (id: string) => number; open: (id: string) => void; info: Info }) {
   const { t, lang } = useT();
   const hold = isHold(race);
   return (
     <div className="tbl-wrap">
       {teams.length ? (
         <table>
-          <thead><tr><th>{t('team')}</th><th>{t('captain')}</th><th>{t('members')}</th>{hold && <th>{t('paidSlots')}</th>}<th style={{ textAlign: 'right' }}>{t('balance')}</th><th>{t('teamPassword')}</th><th>{hold ? t('holdLabel') : t('payment')}</th></tr></thead>
+          <thead><tr><th>{t('team')}</th><th>{t('captain')}</th><th>{t('categories')}</th><th>{t('group')}</th><th>{t('members')}</th>{hold && <th>{t('paidSlots')}</th>}<th style={{ textAlign: 'right' }}>{t('balance')}</th><th>{t('regType')}</th><th>{t('logo')}</th><th>{t('teamPassword')}</th><th>{hold ? t('holdLabel') : t('payment')}</th></tr></thead>
           <tbody>
             {teams.map((x) => {
-              const sl = teamSlots(x, race), n = count(x.id);
+              const sl = teamSlots(x, race), n = count(x.id), inf = info(x), lg = logoSrc(x);
               return (
                 <tr key={x.id} className="click" onClick={() => open(x.id)}>
-                  <td><b>{x.name}</b>{x.category && <div className="muted" style={{ fontSize: 12 }}>{x.category}</div>}</td>
+                  <td><div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>{lg && <img src={lg} alt="" style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 4 }} />}<b>{x.name}</b></div></td>
                   <td>{x.captain_name}<div className="muted" style={{ fontSize: 12 }}>{x.captain_email}</div></td>
-                  <td className="num">{n}/{sl.size}{n > sl.size && <span className="chip bad" style={{ marginLeft: 6 }}>+{n - sl.size}</span>}</td>
+                  <td><CatChip c={inf.cat} /></td>
+                  <td><GroupChip g={inf.group} />{x.half_avg_min && <div className="muted num" style={{ fontSize: 12 }}>{fmtHalf(x.half_avg_min)}</div>}</td>
+                  <td className="num">{n}/{sl.size}{n > sl.size && <span className="chip bad" style={{ marginLeft: 6 }}>+{n - sl.size}</span>}<div>{inf.complete ? <span className="chip ok">{t('regComplete')}</span> : <span className="chip warn">{t('regIncomplete')}</span>}</div></td>
                   {hold && <td className="num"><SlotBar paid={sl.paid} size={sl.size} /></td>}
                   <td className="num" style={{ textAlign: 'right' }}>{sl.balance > 0 ? money(sl.balance, lang) : <span className="chip ok">{t('paid')}</span>}</td>
+                  <td><span className="chip plain">{t(x.reg_type === 'full' ? 'full' : 'presale')}</span></td>
+                  <td>{lg ? <span className="chip ok">✓</span> : <span className="chip">—</span>}</td>
                   <td>{x.has_password ? <span className="chip ok">{t('set')}</span> : <span className="chip">{t('notSet')}</span>}</td>
                   <td><PayChip status={x.payment_status} /></td>
                 </tr>
@@ -432,7 +512,7 @@ function TeamForm({ race, team, onClose, onSaved }: { race: ARace; team?: ATeam;
   const { act } = useAct();
   const cats = splitCats(race.categories);
   const sizes = sizeList(race);
-  const [f, setF] = useState<Record<string, any>>(team ? { ...team, team_size: team.team_size || race.team_size } : { name: '', category: cats[0] || '', captain_name: '', captain_email: '', captain_phone: '', amount: race.team_price, payment_status: 'pending', team_size: sizes[sizes.length - 1], notes: '' });
+  const [f, setF] = useState<Record<string, any>>(team ? { ...team, team_size: team.team_size || race.team_size, half_avg: team.half_avg_min ? fmtHalf(team.half_avg_min) : '' } : { half_avg: '', reg_type: 'presale', name: '', category: cats[0] || '', captain_name: '', captain_email: '', captain_phone: '', amount: race.team_price, payment_status: 'pending', team_size: sizes[sizes.length - 1], notes: '' });
   const set = (k: string) => (v: string) => setF((x) => ({ ...x, [k]: v }));
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -450,6 +530,8 @@ function TeamForm({ race, team, onClose, onSaved }: { race: ARace; team?: ATeam;
         <Field id="t-cphone" label={t('phone')} type="tel" value={f.captain_phone || ''} onChange={set('captain_phone')} />
         <Field id="t-amt" label={`${isHold(race) ? t('holdLabel') : t('amount')} (MXN)`} type="number" value={f.amount} onChange={set('amount')} />
         <Field id="t-size" label={t('teamSize')} value={String(f.team_size)} onChange={set('team_size')} options={sizes.map(String)} />
+        <Field id="t-half" label={t('halfAvg')} value={f.half_avg || ''} onChange={set('half_avg')} placeholder="1:45" hint={t('halfHint')} />
+        <Field id="t-reg" label={t('regType')} value={f.reg_type || 'presale'} onChange={set('reg_type')} options={[['presale', t('presale')], ['full', t('full')]]} />
         <Field id="t-notes" label={t('notes')} type="textarea" value={f.notes || ''} onChange={set('notes')} full />
         <div className="full row" style={{ justifyContent: 'flex-end', marginTop: 6 }}>
           <button type="button" className="btn" onClick={onClose}>{t('cancel')}</button>
@@ -460,7 +542,7 @@ function TeamForm({ race, team, onClose, onSaved }: { race: ARace; team?: ATeam;
   );
 }
 
-function TeamDrawer({ team: x, race, runners, payments, onClose, onEdit, onRunner }: { team: ATeam; race: ARace; runners: ARunner[]; payments: APayment[]; onClose: () => void; onEdit: () => void; onRunner: (id: string) => void }) {
+function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, onRunner }: { team: ATeam; race: ARace; runners: ARunner[]; payments: APayment[]; info: ReturnType<Info>; onClose: () => void; onEdit: () => void; onRunner: (id: string) => void }) {
   const { t, lang } = useT();
   const { act } = useAct();
   const copy = useCopy();
@@ -471,6 +553,9 @@ function TeamDrawer({ team: x, race, runners, payments, onClose, onEdit, onRunne
     <Drawer title={x.name} sub={`${race.name} · ${x.category || ''}`} onClose={onClose}>
       <div className="row"><PayChip status={x.payment_status} /><span className="chip plain num">{runners.length}/{sl.size} {t('runners').toLowerCase()}</span>
         {hold && <SlotBar paid={sl.paid} size={sl.size} />}{sl.balance > 0 && <span className="chip warn num">{t('balance')}: {money(sl.balance, lang)}</span>}</div>
+      <div className="row"><CatChip c={info.cat} /><GroupChip g={info.group} /><span className="chip plain num">{t('halfAvg').split(' ')[0]}: {fmtHalf(x.half_avg_min)}</span>
+        <span className="chip plain">{t(x.reg_type === 'full' ? 'full' : 'presale')}</span>{info.complete ? <span className="chip ok">{t('regComplete')}</span> : <span className="chip warn">{t('regIncomplete')}</span>}</div>
+      <LogoInput current={logoSrc(x)} onChange={async (d) => { await act(() => setTeamLogoAdmin(x.id, d)); }} />
       {x.notes && <div className="note" style={{ whiteSpace: 'pre-wrap' }}>{x.notes}</div>}
       <div className="card">
         <dl className="kv">

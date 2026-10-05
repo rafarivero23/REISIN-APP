@@ -27,3 +27,8 @@ export function raceStats(r: R, teams: T[], runners: Run[], payments?: P[]) {
   const cap = teams.length ? teams.reduce((a, t) => a + teamSlots(t, r).size, 0) + Math.max(0, r.capacity_teams - teams.length) * r.team_size : r.capacity_teams * r.team_size;
   return { teams: teams.length, runners: runners.length, revenue, pending, capRunners: cap, fill: cap ? runners.length / cap : 0, teamsLeft: Math.max(0, r.capacity_teams - teams.length) };
 }
+
+// Registration is complete when every spot is filled and every runner accepted the waiver.
+export function regComplete(size: number, runners: { waiver_accepted_at: string | null }[]) {
+  return runners.length >= size && runners.every((r) => !!r.waiver_accepted_at);
+}

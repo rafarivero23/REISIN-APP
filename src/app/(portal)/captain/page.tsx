@@ -21,7 +21,8 @@ export default async function CaptainPage() {
   return (
     <Suspense>
       <CaptainDash
-        team={{ name: team.name, category: team.category, payment_status: team.payment_status, claim_code: team.claim_code, has_password: !!team.password_hash }}
+        team={{ name: team.name, category: team.category, payment_status: team.payment_status, claim_code: team.claim_code, has_password: !!team.password_hash,
+          half_avg_min: team.half_avg_min, logo: team.logo ? `/api/logo/${team.id}?v=${team.logo.length}` : null }}
         race={{ id: race.id, name: race.name, team_size: race.team_size, runner_fee: race.runner_fee }}
         slots={{ hold: isHoldRace(race), size: teamSizeOf(team, race), paid: paidSlots(team, race) }}
         runners={runners}

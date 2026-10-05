@@ -11,6 +11,8 @@ import {
 import { newClaimCode, now } from '@/lib/ids';
 import { stripe } from '@/lib/stripe';
 import { splitCats } from '@/lib/format';
+import { parseHalf } from '@/lib/groups';
+import { cleanLogo } from '@/lib/logo';
 import { setCaptain, getCaptainTeamId, clearCaptain, setMember, getMemberTeamId, signPayToken, verifyPayToken } from '@/lib/team-session';
 
 type Err = { error: string };
@@ -90,7 +92,7 @@ async function confirmPayment(kind: Kind, id: string, proof: { sessionId?: strin
 }
 
 /* ---------------- buy a team ---------------- */
-export async function buyTeam(input: { raceId: string; name: string; category: string; captainName: string; captainEmail: string; captainPhone: string; teamSize?: number }):
+export async function buyTeam(input: { raceId: string; name: string; category: string; captainName: string; captainEmail: string; captainPhone: string; teamSize?: number; half?: string }):
   Promise<Err | ({ teamId: string; amount: number } & (Checkout | { free: true }))> {
   const race = await openRace(input.raceId);
   if ('error' in race) return race;
@@ -102,7 +104,7 @@ export async function buyTeam(input: { raceId: string; name: string; category: s
   const sizes = sizeOptions(race);
   const team_size = sizes.includes(Number(input.teamSize)) ? Number(input.teamSize) : sizes[sizes.length - 1];
   const teamId = await createTeam({
-    team_size,
+    team_size, half_avg_min: parseHalf(input.half), reg_type: 'presale',
     race_id: race.id, name, category: cats.includes(input.category) ? input.category : cats[0] || null,
     captain_name: captainName, captain_email: captainEmail, captain_phone: captainPhone, amount: race.team_price,
     payment_status: free ? 'paid' : 'pending', payment_method: free ? 'free' : null, paid_at: free ? now() : null,
@@ -155,6 +157,22 @@ export async function setTeamPassword(password: string): Promise<Err | { ok: tru
 }
 
 // Captain pays for N more runner slots (hold model) or one runner's fee (classic).
+export async function setTeamDetails(input: { half?: string; logo?: string | null }): Promise<Err | { ok: true }> {
+  const teamId = await getCaptainTeamId();
+  if (!teamId) return { error: 'p_captainSub' };
+  if (input.half !== undefined) {
+    const m = parseHalf(input.half);
+    if (input.half && !m) return { error: 'half_bad' };
+    await updateTeam(teamId, { half_avg_min: m });
+  }
+  if (input.logo !== undefined) {
+    const logo = input.logo ? cleanLogo(input.logo) : null;
+    if (input.logo && !logo) return { error: 'logo_bad' };
+    await updateTeam(teamId, { logo });
+  }
+  return { ok: true };
+}
+
 export async function captainPaySlots(qty: number): Promise<Err | Checkout> {
   const teamId = await getCaptainTeamId();
   const team = teamId ? await getTeam(teamId) : null;

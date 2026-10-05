@@ -5,8 +5,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useT } from './I18n';
 import { Field, PayChip, Bib, TestCheckout, useToast, useCopy } from './ui';
 import { money, splitCats, brandPrefix, SIZES } from '@/lib/format';
+import { fmtHalf } from '@/lib/groups';
+import { LogoInput } from './LogoInput';
 import {
-  buyTeam, confirmTeam, captainLogin, captainLogout, setTeamPassword, captainPayRunner, captainPaySlots, confirmSlots, joinTeam, registerRunner,
+  buyTeam, confirmTeam, captainLogin, captainLogout, setTeamPassword, captainPayRunner, captainPaySlots, confirmSlots, setTeamDetails, joinTeam, registerRunner,
   confirmRunner, retryRunnerPayment,
 } from '@/app/actions/portal';
 
@@ -22,7 +24,7 @@ export function BuyForm({ race }: { race: PublicRace }) {
   const router = useRouter();
   const cs = splitCats(race.categories);
   const hold = race.hold_slots > 0;
-  const [f, setF] = useState({ name: '', category: cs[0] || '', captainName: '', captainEmail: '', captainPhone: '', teamSize: String(race.sizes[race.sizes.length - 1]) });
+  const [f, setF] = useState({ name: '', category: cs[0] || '', captainName: '', captainEmail: '', captainPhone: '', teamSize: String(race.sizes[race.sizes.length - 1]), half: '' });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sim, setSim] = useState<{ teamId: string; payToken: string } | null>(null);
@@ -49,6 +51,7 @@ export function BuyForm({ race }: { race: PublicRace }) {
         <Field id="b-cname" label={t('p_captainName')} value={f.captainName} onChange={set('captainName')} req />
         <Field id="b-cemail" label={t('email')} type="email" value={f.captainEmail} onChange={set('captainEmail')} req />
         <Field id="b-cphone" label={t('phone')} type="tel" value={f.captainPhone} onChange={set('captainPhone')} req />
+        <Field id="b-half" label={t('halfAvg')} value={f.half} onChange={set('half')} placeholder="1:45" hint={t('halfHint')} />
         {race.sizes.length > 1 && <Field id="b-size" label={t('p_sizePick')} value={f.teamSize} onChange={set('teamSize')} options={race.sizes.map((n) => [String(n), `${n} ${t('runners').toLowerCase()}`])} />}
         <div className="full note">
           {hold
@@ -148,7 +151,7 @@ export function CaptainLoginForm({ raceId, brand }: { raceId: string; brand: str
 /* ---------------- captain dashboard ---------------- */
 type DashRunner = { id: string; bib: number | null; first_name: string; last_name: string; shirt_size: string | null; fee: number; payment_status: string };
 export function CaptainDash({ team, race, runners, slots }: {
-  team: { name: string; category: string | null; payment_status: string; claim_code: string; has_password: boolean };
+  team: { name: string; category: string | null; payment_status: string; claim_code: string; has_password: boolean; half_avg_min: number | null; logo: string | null };
   race: { id: string; name: string; team_size: number; runner_fee: number }; runners: DashRunner[];
   slots: { hold: boolean; size: number; paid: number };
 }) {
@@ -176,6 +179,13 @@ export function CaptainDash({ team, race, runners, slots }: {
     setSimSlots(res.payToken);
   };
   const [simSlots, setSimSlots] = useState<string | null>(null);
+  const [half, setHalf] = useState(team.half_avg_min ? fmtHalf(team.half_avg_min) : '');
+  const saveHalf = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const r = await setTeamDetails({ half });
+    if ('error' in r) return toast(t(r.error));
+    toast(t('saved')); router.refresh();
+  };
 
   const savePw = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -232,6 +242,14 @@ export function CaptainDash({ team, race, runners, slots }: {
           <button className="btn btn-sm" type="submit">{t('save')}</button>
         </form>
         <Err k={err} />
+      </div>
+      <div className="card stack">
+        <h3 style={{ textTransform: 'uppercase' }}>{t('p_teamDash')}</h3>
+        <LogoInput current={team.logo} onChange={async (d) => { const r = await setTeamDetails({ logo: d }); if ('error' in r) toast(t(r.error)); else { toast(t('saved')); router.refresh(); } }} />
+        <form className="row" style={{ alignItems: 'flex-end' }} onSubmit={saveHalf}>
+          <Field id="cd-half" label={t('halfAvg')} value={half} onChange={setHalf} placeholder="1:45" hint={t('halfHint')} />
+          <button className="btn btn-sm" type="submit">{t('save')}</button>
+        </form>
       </div>
       <div className="card">
         <h3 style={{ textTransform: 'uppercase', marginBottom: 8 }}>{t('p_roster')}</h3>

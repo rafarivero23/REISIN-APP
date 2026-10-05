@@ -2,6 +2,7 @@
 // and Ecwid order exports (holds + runner-slot payments). Both are safe to
 // re-run: RedPodium rows dedupe on Registrant ID, Ecwid on order number.
 import { parseCsv } from './csv';
+import { parseHalf } from './groups';
 import { many, one, run } from './db';
 import { newClaimCode, newId, now } from './ids';
 import {
@@ -60,7 +61,10 @@ export async function importRedPodium(raceId: string, rows: Record<string, strin
     if (!sizes.includes(size)) size = sizes[sizes.length - 1];
     if (members.length > size) res.warnings.push(`${members[0]['Team Name']}: ${members.length} registrados para equipo de ${size}`);
 
+    const halves = members.map((m) => parseHalf(m['Promedio de Medio Maraton x Equipo'])).filter((x): x is number => !!x);
+    const half = halves.length ? [...halves].sort((a, b) => halves.filter((v) => v === b).length - halves.filter((v) => v === a).length)[0] : null;
     let team = existing.find((t) => lc(t.name) === key);
+    if (team && !team.half_avg_min && half) await run('UPDATE teams SET half_avg_min = ? WHERE id = ?', [half, team.id]);
     if (!team) {
       const first = members[0];
       const captainName = `${first['Billing Name (First Name)'] || first['Nombre (First Name)']} ${first['Billing Name (Last Name)'] || first['Nombre (Last Name)']}`.trim();
@@ -68,7 +72,7 @@ export async function importRedPodium(raceId: string, rows: Record<string, strin
         race_id: race.id, name: first['Team Name'].trim(), category: null, captain_name: captainName,
         captain_email: lc(first['Billing Email Address'] || first['Mail']), captain_phone: first['Teléfono'] || null,
         amount: race.team_price, payment_status: 'pending', payment_method: 'manual', paid_at: null,
-        claim_code: newClaimCode(race.brand), team_size: size, notes: 'Importado de RedPodium', created_at: toIso(first['Registration Date']),
+        claim_code: newClaimCode(race.brand), team_size: size, notes: 'Importado de RedPodium', created_at: toIso(first['Registration Date']), half_avg_min: half,
       });
       team = (await one<Team>('SELECT * FROM teams WHERE id = ?', [id]))!;
       existing.push(team);

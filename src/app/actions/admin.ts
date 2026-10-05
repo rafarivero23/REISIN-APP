@@ -9,9 +9,11 @@ import { createSession, destroySession } from '@/lib/session';
 import {
   createRace, updateRace, deleteRace, getRace, getTeam, getRunner, createTeam, updateTeam, deleteTeam, updateRunner, deleteRunner,
   recordPayment, assignPayment, deletePayment, findUserByEmail, createUser, deleteUser, getUserById, updateUserPassword,
-  sizeOptions, type RaceInput, type RunnerInput,
+  sizeOptions, setRaceGroups, type RaceInput, type RunnerInput,
 } from '@/lib/repo';
 import { importCsvText, rematch } from '@/lib/importers';
+import { parseHalf } from '@/lib/groups';
+import { cleanLogo } from '@/lib/logo';
 import { newClaimCode, newId, now } from '@/lib/ids';
 
 type Result = { error?: string; id?: string };
@@ -99,7 +101,8 @@ export async function saveTeam(id: string | null, raceId: string, f: Record<stri
   const sizes = sizeOptions(race);
   const team_size = sizes.includes(int(f.team_size)) ? int(f.team_size) : sizes[sizes.length - 1];
   const base = { name, category: str(f.category, 60) || null, captain_name, captain_email, captain_phone: str(f.captain_phone, 40) || null,
-    amount: Math.max(0, int(f.amount)), team_size, notes: str(f.notes, 1000) || null };
+    amount: Math.max(0, int(f.amount)), team_size, notes: str(f.notes, 1000) || null,
+    half_avg_min: parseHalf(str(f.half_avg, 12)), reg_type: f.reg_type === 'full' ? 'full' : 'presale' };
   let wasPaid = false;
   if (id) {
     const prev = await getTeam(id);
@@ -178,6 +181,28 @@ export async function runnerMarkPaid(id: string): Promise<Result> {
   const r = await getRunner(id);
   if (!r) return { error: 'not_found' };
   await recordPayment({ race_id: r.race_id, team_id: r.team_id, runner_id: r.id, kind: 'runner', source: 'manual', external_id: 'manual:' + newId(), quantity: 1, amount: r.fee, payer_name: `${r.first_name} ${r.last_name}`, payer_email: r.email });
+  refresh();
+  return {};
+}
+
+export async function setTeamLogoAdmin(id: string, dataUrl: string | null): Promise<Result> {
+  await guard();
+  const logo = dataUrl ? cleanLogo(dataUrl) : null;
+  if (dataUrl && !logo) return { error: 'logo_bad' };
+  await updateTeam(id, { logo });
+  refresh();
+  return {};
+}
+
+// Start groups: label, limit in minutes (blank = no limit), color, start time.
+export async function saveGroups(raceId: string, groups: { label: string; max: string | number | null; color: string; start: string }[]): Promise<Result> {
+  await guard();
+  const clean = (groups || []).slice(0, 10).map((g) => ({
+    label: str(g.label, 20) || '?', max: g.max === '' || g.max == null ? null : Math.max(1, int(g.max)),
+    color: /^#[0-9a-f]{6}$/i.test(String(g.color)) ? String(g.color) : '#5b6370', start: str(g.start, 10),
+  }));
+  if (!clean.length) return { error: 'required' };
+  await setRaceGroups(raceId, JSON.stringify(clean));
   refresh();
   return {};
 }

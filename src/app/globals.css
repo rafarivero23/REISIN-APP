@@ -233,3 +233,7 @@ a.btn-primary{color:var(--accent-ink)}
 .choice a b{font-family:var(--f-display);font-size:22px;text-transform:uppercase}
 .choice a span{font-size:14px;color:var(--muted)}
 .choice a:focus-visible{outline:2px solid var(--accent)}
+
+.cat-femenil{background:var(--bad-soft)!important;color:var(--bad)!important}
+.cat-varonil{background:var(--accent-soft)!important;color:var(--accent)!important}
+.cat-mixto{background:var(--ok-soft)!important;color:var(--ok)!important}

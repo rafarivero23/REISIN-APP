@@ -5,14 +5,14 @@ export type Race = {
   id: string; name: string; brand: string; status: 'draft' | 'open' | 'closed';
   race_date: string | null; location: string | null; team_price: number; runner_fee: number;
   team_size: number; capacity_teams: number; categories: string; bib_start: number;
-  waiver: string | null; created_at: string; team_sizes: string; hold_slots: number;
+  waiver: string | null; created_at: string; team_sizes: string; hold_slots: number; start_groups: string;
 };
 export type Team = {
   id: string; race_id: string; name: string; category: string | null; captain_name: string;
   captain_email: string; captain_phone: string | null; amount: number;
   payment_status: 'pending' | 'paid'; payment_method: string | null; paid_at: string | null;
   stripe_session_id: string | null; claim_code: string; password_hash: string | null; created_at: string;
-  team_size: number | null; extra_slots: number; notes: string | null;
+  team_size: number | null; extra_slots: number; notes: string | null; half_avg_min: number | null; logo: string | null; reg_type: string;
 };
 export type Runner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string;
@@ -48,7 +48,7 @@ export async function listOpenRaces() {
   return races.map((r) => ({ ...r, teams_left: Math.max(0, r.capacity_teams - Number(r.live)) }));
 }
 
-export type RaceInput = Omit<Race, 'id' | 'created_at'>;
+export type RaceInput = Omit<Race, 'id' | 'created_at' | 'start_groups'>;
 export async function createRace(input: RaceInput) {
   const id = newId();
   await run(
@@ -84,21 +84,21 @@ export async function listedTeamsWithCounts(raceId: string) {
   );
 }
 
-type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes'> &
-  { password_hash?: string | null; team_size?: number | null; notes?: string | null; created_at?: string };
+type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes' | 'half_avg_min' | 'logo' | 'reg_type'> &
+  { password_hash?: string | null; team_size?: number | null; notes?: string | null; created_at?: string; half_avg_min?: number | null; reg_type?: string };
 export async function createTeam(t: NewTeam) {
   const id = newId();
   await run(
     `INSERT INTO teams (id, race_id, name, category, captain_name, captain_email, captain_phone, amount, payment_status,
-       payment_method, paid_at, claim_code, password_hash, team_size, notes, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       payment_method, paid_at, claim_code, password_hash, team_size, notes, half_avg_min, reg_type, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [id, t.race_id, t.name, t.category, t.captain_name, t.captain_email, t.captain_phone, t.amount, t.payment_status,
-      t.payment_method, t.paid_at, t.claim_code, t.password_hash ?? null, t.team_size ?? null, t.notes ?? null, t.created_at || now()]
+      t.payment_method, t.paid_at, t.claim_code, t.password_hash ?? null, t.team_size ?? null, t.notes ?? null, t.half_avg_min ?? null, t.reg_type || 'presale', t.created_at || now()]
   );
   return id;
 }
 
 const TEAM_FIELDS = ['name', 'category', 'captain_name', 'captain_email', 'captain_phone', 'amount', 'payment_status',
-  'payment_method', 'paid_at', 'stripe_session_id', 'claim_code', 'password_hash', 'team_size', 'extra_slots', 'notes'] as const;
+  'payment_method', 'paid_at', 'stripe_session_id', 'claim_code', 'password_hash', 'team_size', 'extra_slots', 'notes', 'half_avg_min', 'logo', 'reg_type'] as const;
 export async function updateTeam(id: string, patch: Partial<Pick<Team, (typeof TEAM_FIELDS)[number]>>) {
   const keys = TEAM_FIELDS.filter((k) => k in patch);
   if (!keys.length) return;
@@ -263,5 +263,6 @@ export async function createUser(u: { name: string; email: string; passwordHash:
   return id;
 }
 export const deleteUser = (id: string) => run('DELETE FROM users WHERE id = ?', [id]);
+export const setRaceGroups = (id: string, json: string) => run('UPDATE races SET start_groups = ? WHERE id = ?', [json, id]);
 export const updateUserPassword = (id: string, passwordHash: string) => run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, id]);
 export const getUserById = (id: string) => one<User>('SELECT * FROM users WHERE id = ?', [id]);

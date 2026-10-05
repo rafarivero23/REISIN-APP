@@ -188,5 +188,15 @@ CREATE INDEX IF NOT EXISTS idx_payments_team ON payments(team_id);
 -- so re-importing the same file never duplicates anyone.
 ALTER TABLE runners ADD COLUMN IF NOT EXISTS external_id TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_runners_external ON runners(external_id) WHERE external_id IS NOT NULL;
+
+-- Team half-marathon average in minutes (sets the start group), logo as a
+-- small data: URL (resized in the browser, so no file storage needed), and
+-- registration type: presale (deposit + balance) | full (paid at once).
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS half_avg_min INTEGER;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS logo TEXT;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS reg_type TEXT NOT NULL DEFAULT 'presale';
+
+-- Start groups: JSON array of {label, max (minutes, null = no limit), color, start}.
+ALTER TABLE races ADD COLUMN IF NOT EXISTS start_groups TEXT NOT NULL DEFAULT '[{"label":"1","max":99,"color":"#2f7d4f","start":""},{"label":"2","max":115,"color":"#c2571b","start":""},{"label":"3","max":null,"color":"#1d4ed8","start":""}]';
 `);
 }
