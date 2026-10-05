@@ -59,7 +59,7 @@ export async function importRedPodium(raceId: string, rows: Record<string, strin
     }
     let size = [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || race.team_size;
     if (!sizes.includes(size)) size = sizes[sizes.length - 1];
-    if (members.length > size) res.warnings.push(`${members[0]['Team Name']}: ${members.length} registrados para equipo de ${size}`);
+
 
     const halves = members.map((m) => parseHalf(m['Promedio de Medio Maraton x Equipo'])).filter((x): x is number => !!x);
     const half = halves.length ? [...halves].sort((a, b) => halves.filter((v) => v === b).length - halves.filter((v) => v === a).length)[0] : null;
@@ -78,9 +78,17 @@ export async function importRedPodium(raceId: string, rows: Record<string, strin
       existing.push(team);
       res.teamsCreated++;
     }
+    // RedPodium sometimes has the same person twice in a team (re-registered):
+    // keep the first one, matched by first + last name (captains often put
+    // their own email for every teammate, so email alone isn't reliable).
+    const seen = new Set((await many<{ first_name: string; last_name: string }>('SELECT first_name, last_name FROM runners WHERE team_id = ?', [team.id]))
+      .map((r) => words(r.first_name)[0] + ' ' + words(r.last_name)[0]));
     for (const m of members) {
       const ext = 'redpodium:' + m['Registrant ID'];
       if (await one('SELECT 1 FROM runners WHERE external_id = ?', [ext])) { res.skipped++; continue; }
+      const nk = words(m['Nombre (First Name)'])[0] + ' ' + words(m['Nombre (Last Name)'])[0];
+      if (seen.has(nk)) { res.warnings.push(`${m['Team Name'].trim()}: ${m['Nombre (First Name)']} ${m['Nombre (Last Name)']} repetido, se omitió`); res.skipped++; continue; }
+      seen.add(nk);
       const top = await one<{ bib: number | null }>('SELECT max(bib) AS bib FROM runners WHERE race_id = ?', [race.id]);
       const bib = Math.max(race.bib_start - 1, top?.bib || 0) + 1;
       const gender = /^f/i.test(m['Genero']) ? 'F' : /^m/i.test(m['Genero']) ? 'M' : null;
