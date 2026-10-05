@@ -1,0 +1,477 @@
+'use client';
+import { useState, useTransition } from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useT } from './I18n';
+import { Drawer, Field, PayChip, Bib, DeleteButton, useToast, useCopy } from './ui';
+import { RunnerFields, type RunnerForm } from './portal';
+import { money, fmtDate, fmtDT, splitCats, BRANDS } from '@/lib/format';
+import { raceStats } from '@/lib/stats';
+import {
+  saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
+  removeRunner, addTeammate, removeTeammate,
+} from '@/app/actions/admin';
+
+/* Shapes passed from server components (no password hashes). */
+export type ARace = {
+  id: string; name: string; brand: string; status: string; race_date: string | null; location: string | null;
+  team_price: number; runner_fee: number; team_size: number; capacity_teams: number; categories: string;
+  bib_start: number; waiver: string | null;
+};
+export type ATeam = {
+  id: string; race_id: string; name: string; category: string | null; captain_name: string; captain_email: string;
+  captain_phone: string | null; amount: number; payment_status: string; payment_method: string | null; paid_at: string | null;
+  claim_code: string; has_password: boolean; created_at: string;
+};
+export type ARunner = {
+  id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string; email: string;
+  phone: string | null; birth_date: string | null; gender: string | null; shirt_size: string | null; emergency_name: string | null;
+  emergency_phone: string | null; waiver_accepted_at: string | null; fee: number; payment_status: string;
+  payment_method: string | null; paid_at: string | null; created_at: string;
+};
+
+export const genderLabel = (g: string | null, t: (k: string) => string) => (g === 'F' ? t('female') : g === 'M' ? t('male') : g === 'X' ? t('nonbinary') : '—');
+const methodLabel = (m: string | null, t: (k: string) => string) => (m === 'stripe' ? 'Stripe' : m === 'test' ? t('stripeTest') : m === 'manual' ? t('manual') : '—');
+
+function useAct() {
+  const toast = useToast();
+  const router = useRouter();
+  const { t } = useT();
+  const [pending, start] = useTransition();
+  const act = async (fn: () => Promise<{ error?: string; id?: string }>, ok = 'saved') => {
+    const r = await fn();
+    if (r?.error) { toast(t(r.error)); return null; }
+    toast(t(ok));
+    start(() => router.refresh());
+    return r;
+  };
+  return { act, pending };
+}
+
+/* ---------------- nav ---------------- */
+export function AdminNav({ races, mobile }: { races: { id: string; name: string }[]; mobile?: boolean }) {
+  const { t } = useT();
+  const path = usePathname();
+  const cur = (href: string, exact = false) => (exact ? path === href : path.startsWith(href)) ? 'page' : undefined;
+  return (
+    <nav className="nav" aria-label={t('admin')}>
+      <Link href="/admin" aria-current={cur('/admin', true)}>{t('home')}</Link>
+      <Link href="/admin/races" aria-current={path === '/admin/races' ? 'page' : undefined}>{t('races')}</Link>
+      {!mobile && races.map((r) => <Link key={r.id} className="sub" href={`/admin/races/${r.id}`} aria-current={cur(`/admin/races/${r.id}`)}>{r.name}</Link>)}
+      <Link href="/admin/team" aria-current={cur('/admin/team')}>{t('staff')}</Link>
+    </nav>
+  );
+}
+
+/* ---------------- race form ---------------- */
+export function NewRaceButton({ label, className = 'btn btn-primary' }: { label?: string; className?: string }) {
+  const { t } = useT();
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" className={className} onClick={() => setOpen(true)}>+ {label || t('newRace')}</button>
+      {open && <RaceForm onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+export function RaceForm({ race, onClose }: { race?: ARace; onClose: () => void }) {
+  const { t } = useT();
+  const router = useRouter();
+  const { act } = useAct();
+  const [f, setF] = useState<Record<string, any>>(race || {
+    name: '', brand: 'Sal a Valle', status: 'draft', race_date: '', location: '', team_price: 12000, runner_fee: 0,
+    team_size: 6, capacity_teams: 50, categories: 'Varonil, Femenil, Mixto', bib_start: 100, waiver: t('w_default'),
+  });
+  const set = (k: string) => (v: string) => setF((x) => ({ ...x, [k]: v }));
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const r = await act(() => saveRace(race?.id || null, f));
+    if (!r) return;
+    onClose();
+    if (!race && r.id) router.push(`/admin/races/${r.id}`);
+  };
+  return (
+    <Drawer title={race ? race.name : t('newRace')} sub={t('races')} onClose={onClose}>
+      <form className="form" onSubmit={submit}>
+        <Field id="r-name" label={t('name')} value={f.name} onChange={set('name')} req full />
+        <Field id="r-brand" label={t('brand')} value={f.brand} onChange={set('brand')} options={BRANDS} />
+        <Field id="r-status" label={t('status')} value={f.status} onChange={set('status')} options={[['draft', t('draft')], ['open', t('open')], ['closed', t('closed')]]} />
+        <Field id="r-date" label={t('date')} type="date" value={f.race_date || ''} onChange={set('race_date')} req />
+        <Field id="r-loc" label={t('location')} value={f.location || ''} onChange={set('location')} />
+        <Field id="r-tprice" label={`${t('teamPrice')} (MXN)`} type="number" min="0" step="50" value={f.team_price} onChange={set('team_price')} />
+        <Field id="r-rfee" label={`${t('runnerFee')} (MXN)`} type="number" min="0" step="50" value={f.runner_fee} onChange={set('runner_fee')} hint={t('runnerFeeHint')} />
+        <Field id="r-size" label={t('teamSize')} type="number" min="1" value={f.team_size} onChange={set('team_size')} />
+        <Field id="r-cap" label={t('capacity')} type="number" min="1" value={f.capacity_teams} onChange={set('capacity_teams')} />
+        <Field id="r-cats" label={t('categories')} value={f.categories || ''} onChange={set('categories')} hint={t('categoriesHint')} />
+        <Field id="r-bib" label={t('bibStart')} type="number" min="1" value={f.bib_start} onChange={set('bib_start')} />
+        <Field id="r-waiver" label={t('waiver')} type="textarea" value={f.waiver || ''} onChange={set('waiver')} full />
+        <div className="full row" style={{ justifyContent: 'space-between', marginTop: 6 }}>
+          <div>{race && <DeleteButton onConfirm={async () => { if (await act(() => removeRace(race.id), 'deleted')) { onClose(); router.push('/admin/races'); } }} />}</div>
+          <div className="row">
+            <button type="button" className="btn" onClick={onClose}>{t('cancel')}</button>
+            <button className="btn btn-primary" type="submit">{race ? t('save') : t('create')}</button>
+          </div>
+        </div>
+      </form>
+    </Drawer>
+  );
+}
+
+/* ---------------- race detail ---------------- */
+type Modal = { type: 'race' } | { type: 'teamForm'; id?: string } | { type: 'team'; id: string } | { type: 'runner'; id: string } | null;
+
+export function RaceDetail({ race, teams, runners }: { race: ARace; teams: ATeam[]; runners: ARunner[] }) {
+  const { t, lang } = useT();
+  const router = useRouter();
+  const q = useSearchParams();
+  const tab = q.get('tab') || 'summary';
+  const [search, setSearch] = useState('');
+  const [modal, setModal] = useState<Modal>(null);
+  const teamById = (id: string) => teams.find((x) => x.id === id);
+  const runnersOfTeam = (id: string) => runners.filter((r) => r.team_id === id).sort((a, b) => (a.bib || 0) - (b.bib || 0));
+  const stats = raceStats(race, teams, runners);
+  const tabs: [string, string][] = [['summary', t('summary')], ['teams', `${t('teams')} · ${stats.teams}`], ['runners', `${t('runners')} · ${stats.runners}`], ['payments', t('payments')]];
+  const setTab = (k: string) => { setSearch(''); router.replace(k === 'summary' ? `/admin/races/${race.id}` : `/admin/races/${race.id}?tab=${k}`, { scroll: false }); };
+  const csvHref = `/api/admin/races/${race.id}/csv`;
+
+  return (
+    <>
+      <div className="top">
+        <div>
+          <div className="crumbs"><Link href="/admin/races">{t('races')}</Link> / <span className={'brand-chip ' + brandClass(race.brand)}>{race.brand}</span></div>
+          <h1>{race.name}</h1>
+          <div className="row muted" style={{ marginTop: 8, fontSize: 14 }}>
+            <StatusPill s={race.status} /><span>{fmtDate(race.race_date, lang)}</span>{race.location && <span>· {race.location}</span>}
+          </div>
+        </div>
+        <div className="row">
+          <button type="button" className="btn" onClick={() => setModal({ type: 'race' })}>{t('edit')}</button>
+          <a className="btn" href={csvHref}>{t('exportCsv')}</a>
+          <button type="button" className="btn btn-primary" onClick={() => setModal({ type: 'teamForm' })}>+ {t('addTeam')}</button>
+        </div>
+      </div>
+      <div className="tabs" role="tablist">
+        {tabs.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}</button>)}
+      </div>
+
+      {tab === 'summary' && <Summary race={race} teams={teams} runners={runners} stats={stats} />}
+      {tab === 'teams' && (
+        <>
+          <div className="toolbar">
+            <input className="search" type="search" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} aria-label={t('search')} />
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'teamForm' })}>+ {t('addTeam')}</button>
+          </div>
+          <TeamsTable race={race} teams={teams.filter((x) => !search || `${x.name} ${x.captain_name} ${x.captain_email} ${x.claim_code}`.toLowerCase().includes(search.toLowerCase()))}
+            count={(id) => runnersOfTeam(id).length} open={(id) => setModal({ type: 'team', id })} />
+        </>
+      )}
+      {tab === 'runners' && (
+        <>
+          <div className="toolbar">
+            <input className="search" type="search" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} aria-label={t('search')} />
+            <a className="btn btn-sm" href={csvHref}>{t('exportCsv')}</a>
+          </div>
+          <RunnersTable runners={runners.filter((x) => !search || `${x.first_name} ${x.last_name} ${x.email} ${teamById(x.team_id)?.name || ''} ${x.bib}`.toLowerCase().includes(search.toLowerCase()))}
+            teamName={(id) => teamById(id)?.name || '—'} open={(id) => setModal({ type: 'runner', id })} />
+        </>
+      )}
+      {tab === 'payments' && <Payments teams={teams} runners={runners} stats={stats} />}
+
+      {modal?.type === 'race' && <RaceForm race={race} onClose={() => setModal(null)} />}
+      {modal?.type === 'teamForm' && <TeamForm race={race} team={modal.id ? teamById(modal.id) : undefined} onClose={() => setModal(null)} onSaved={(id) => setModal({ type: 'team', id })} />}
+      {modal?.type === 'team' && teamById(modal.id) && (
+        <TeamDrawer team={teamById(modal.id)!} race={race} runners={runnersOfTeam(modal.id)} onClose={() => setModal(null)}
+          onEdit={() => setModal({ type: 'teamForm', id: modal.id })} onRunner={(id) => setModal({ type: 'runner', id })} />
+      )}
+      {modal?.type === 'runner' && runners.find((r) => r.id === modal.id) && (
+        <RunnerDrawer runner={runners.find((r) => r.id === modal.id)!} race={race} team={teamById(runners.find((r) => r.id === modal.id)!.team_id)}
+          onClose={() => setModal(null)} onTeam={(id) => setModal({ type: 'team', id })} />
+      )}
+    </>
+  );
+}
+
+export const brandClass = (b: string) => (b === 'Sal a Valle' ? 'sav' : b === 'Baja Crossing' ? 'baja' : 'other');
+function StatusPill({ s }: { s: string }) {
+  const { t } = useT();
+  return s === 'open' ? <span className="chip ok">{t('open')}</span> : s === 'closed' ? <span className="chip bad">{t('closed')}</span> : <span className="chip">{t('draft')}</span>;
+}
+
+type Stats = ReturnType<typeof raceStats>;
+
+function Summary({ race, teams, runners, stats }: { race: ARace; teams: ATeam[]; runners: ARunner[]; stats: Stats }) {
+  const { t, lang } = useT();
+  const copy = useCopy();
+  const [link] = useState(() => (typeof window !== 'undefined' ? window.location.origin : '') + `/r/${race.id}`);
+  const cats = splitCats(race.categories);
+  const shirts: Record<string, number> = {};
+  runners.forEach((x) => (shirts[x.shirt_size || '—'] = (shirts[x.shirt_size || '—'] || 0) + 1));
+  return (
+    <div className="stack">
+      <div className="kpis">
+        <div className="kpi"><div className="label">{t('teamsSold')}</div><div className="v num">{stats.teams}<span className="muted" style={{ fontSize: 22 }}>/{race.capacity_teams}</span></div><div className="s">{stats.teamsLeft} {t('slotsLeft')}</div></div>
+        <div className="kpi"><div className="label">{t('runners')}</div><div className="v num">{stats.runners}<span className="muted" style={{ fontSize: 22 }}>/{stats.capRunners}</span></div><div className="meter"><i style={{ width: Math.min(100, Math.round(stats.fill * 100)) + '%' }} /></div></div>
+        <div className="kpi"><div className="label">{t('revenue')}</div><div className="v num">{money(stats.revenue, lang)}</div><div className="s">{money(stats.pending, lang)} {t('pending').toLowerCase()}</div></div>
+        <div className="kpi"><div className="label">{t('teamPrice')}</div><div className="v num">{money(race.team_price, lang)}</div><div className="s">{race.runner_fee > 0 ? `${money(race.runner_fee, lang)} · ${t('runnerFee').toLowerCase()}` : t('p_included')}</div></div>
+      </div>
+      <div className="split">
+        <div className="card">
+          <h3 style={{ textTransform: 'uppercase', marginBottom: 10 }}>{t('categories')}</h3>
+          {cats.length ? <div className="list">{cats.map((c) => <div className="it" key={c}><span>{c}</span><b className="num">{teams.filter((x) => x.category === c).length} {t('teams').toLowerCase()}</b></div>)}</div> : <p className="muted">—</p>}
+          <h3 style={{ textTransform: 'uppercase', margin: '18px 0 10px' }}>{t('shirt')}</h3>
+          {Object.keys(shirts).length ? <div className="row">{Object.entries(shirts).map(([k, n]) => <span key={k} className="chip plain">{k} · <b className="num">{n}</b></span>)}</div> : <p className="muted">—</p>}
+        </div>
+        <div className="card stack">
+          <div><h3 style={{ textTransform: 'uppercase' }}>{t('p_captainLink')}</h3><p className="muted" style={{ fontSize: 14, marginTop: 6 }}>{race.status === 'open' ? t('p_shareText') : t('race_closed')}</p></div>
+          <div className="row"><span className="code" style={{ overflowWrap: 'anywhere' }}>{link}</span><button type="button" className="btn btn-sm" onClick={() => copy(link)}>{t('copy')}</button></div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TeamsTable({ race, teams, count, open }: { race: ARace; teams: ATeam[]; count: (id: string) => number; open: (id: string) => void }) {
+  const { t } = useT();
+  return (
+    <div className="tbl-wrap">
+      {teams.length ? (
+        <table>
+          <thead><tr><th>{t('team')}</th><th>{t('category')}</th><th>{t('captain')}</th><th>{t('members')}</th><th>{t('teamPassword')}</th><th>{t('payment')}</th></tr></thead>
+          <tbody>
+            {teams.map((x) => (
+              <tr key={x.id} className="click" onClick={() => open(x.id)}>
+                <td><b>{x.name}</b></td><td>{x.category || '—'}</td>
+                <td>{x.captain_name}<div className="muted" style={{ fontSize: 12 }}>{x.captain_email}</div></td>
+                <td className="num">{count(x.id)}/{race.team_size}</td>
+                <td>{x.has_password ? <span className="chip ok">{t('set')}</span> : <span className="chip">{t('notSet')}</span>}</td>
+                <td><PayChip status={x.payment_status} /></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : <div className="empty">{t('noTeams')}</div>}
+    </div>
+  );
+}
+
+function RunnersTable({ runners, teamName, open }: { runners: ARunner[]; teamName: (id: string) => string; open: (id: string) => void }) {
+  const { t } = useT();
+  const sorted = [...runners].sort((a, b) => (a.bib || 0) - (b.bib || 0));
+  return (
+    <div className="tbl-wrap">
+      {sorted.length ? (
+        <table>
+          <thead><tr><th>{t('bib')}</th><th>{t('name')}</th><th>{t('team')}</th><th>{t('gender')}</th><th>{t('shirt')}</th><th>{t('waiverOk')}</th><th>{t('payment')}</th></tr></thead>
+          <tbody>
+            {sorted.map((x) => (
+              <tr key={x.id} className="click" onClick={() => open(x.id)}>
+                <td><Bib n={x.bib} /></td>
+                <td><b>{x.first_name} {x.last_name}</b><div className="muted" style={{ fontSize: 12 }}>{x.email}</div></td>
+                <td>{teamName(x.team_id)}</td><td>{genderLabel(x.gender, t)}</td><td>{x.shirt_size || '—'}</td>
+                <td>{x.waiver_accepted_at ? <span className="chip ok">✓</span> : <span className="chip bad">✗</span>}</td>
+                <td>{x.fee > 0 ? <PayChip status={x.payment_status} /> : <span className="chip plain">{t('p_included')}</span>}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : <div className="empty">{t('noRunners')}</div>}
+    </div>
+  );
+}
+
+function Payments({ teams, runners, stats }: { teams: ATeam[]; runners: ARunner[]; stats: Stats }) {
+  const { t, lang } = useT();
+  const rows = [
+    ...teams.map((x) => ({ id: x.id, ts: x.paid_at || x.created_at, concept: `${t('team')}: ${x.name}`, amount: x.amount, status: x.payment_status, method: x.payment_method })),
+    ...runners.filter((x) => x.fee > 0).map((x) => ({ id: x.id, ts: x.paid_at || x.created_at, concept: `${x.first_name} ${x.last_name}`, amount: x.fee, status: x.payment_status, method: x.payment_method })),
+  ].sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
+  return (
+    <>
+      <div className="kpis" style={{ marginBottom: 16 }}>
+        <div className="kpi"><div className="label">{t('paid')}</div><div className="v num">{money(stats.revenue, lang)}</div></div>
+        <div className="kpi"><div className="label">{t('pending')}</div><div className="v num">{money(stats.pending, lang)}</div></div>
+      </div>
+      <div className="tbl-wrap">
+        {rows.length ? (
+          <table>
+            <thead><tr><th>{t('date')}</th><th>{t('concept')}</th><th>{t('method')}</th><th style={{ textAlign: 'right' }}>{t('amount')}</th><th>{t('status')}</th></tr></thead>
+            <tbody>
+              {rows.map((p) => (
+                <tr key={p.id}>
+                  <td className="num">{fmtDT(p.ts, lang)}</td><td>{p.concept}</td><td>{p.status === 'paid' ? methodLabel(p.method, t) : '—'}</td>
+                  <td className="num" style={{ textAlign: 'right' }}>{money(p.amount, lang)}</td><td><PayChip status={p.status} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : <div className="empty">{t('noPayments')}</div>}
+      </div>
+    </>
+  );
+}
+
+/* ---------------- team form / drawer ---------------- */
+function TeamForm({ race, team, onClose, onSaved }: { race: ARace; team?: ATeam; onClose: () => void; onSaved: (id: string) => void }) {
+  const { t } = useT();
+  const { act } = useAct();
+  const cats = splitCats(race.categories);
+  const [f, setF] = useState<Record<string, any>>(team || { name: '', category: cats[0] || '', captain_name: '', captain_email: '', captain_phone: '', amount: race.team_price, payment_status: 'pending' });
+  const set = (k: string) => (v: string) => setF((x) => ({ ...x, [k]: v }));
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const r = await act(() => saveTeam(team?.id || null, race.id, f));
+    if (r?.id) onSaved(r.id);
+  };
+  return (
+    <Drawer title={team ? team.name : t('addTeam')} sub={race.name} onClose={onClose}>
+      <form className="form" onSubmit={submit}>
+        <Field id="t-name" label={t('p_teamName')} value={f.name} onChange={set('name')} req full />
+        <Field id="t-cat" label={t('category')} value={f.category || ''} onChange={set('category')} options={cats.length ? cats : ['—']} />
+        <Field id="t-pay" label={t('payment')} value={f.payment_status} onChange={set('payment_status')} options={[['pending', t('pending')], ['paid', t('paid')]]} />
+        <Field id="t-cname" label={t('p_captainName')} value={f.captain_name} onChange={set('captain_name')} req />
+        <Field id="t-cemail" label={t('email')} type="email" value={f.captain_email} onChange={set('captain_email')} req />
+        <Field id="t-cphone" label={t('phone')} type="tel" value={f.captain_phone || ''} onChange={set('captain_phone')} />
+        <Field id="t-amt" label={`${t('amount')} (MXN)`} type="number" value={f.amount} onChange={set('amount')} />
+        <div className="full row" style={{ justifyContent: 'flex-end', marginTop: 6 }}>
+          <button type="button" className="btn" onClick={onClose}>{t('cancel')}</button>
+          <button className="btn btn-primary" type="submit">{team ? t('save') : t('create')}</button>
+        </div>
+      </form>
+    </Drawer>
+  );
+}
+
+function TeamDrawer({ team: x, race, runners, onClose, onEdit, onRunner }: { team: ATeam; race: ARace; runners: ARunner[]; onClose: () => void; onEdit: () => void; onRunner: (id: string) => void }) {
+  const { t, lang } = useT();
+  const { act } = useAct();
+  const copy = useCopy();
+  return (
+    <Drawer title={x.name} sub={`${race.name} · ${x.category || ''}`} onClose={onClose}>
+      <div className="row"><PayChip status={x.payment_status} /><span className="chip plain num">{runners.length}/{race.team_size} {t('runners').toLowerCase()}</span></div>
+      <div className="card">
+        <dl className="kv">
+          <dt>{t('captain')}</dt><dd>{x.captain_name}</dd>
+          <dt>{t('email')}</dt><dd>{x.captain_email}</dd>
+          <dt>{t('phone')}</dt><dd>{x.captain_phone || '—'}</dd>
+          <dt>{t('amount')}</dt><dd className="num">{money(x.amount, lang)}{x.payment_status === 'paid' && ` · ${methodLabel(x.payment_method, t)}`}</dd>
+          <dt>{t('captainCode')}</dt><dd><span className="code">{x.claim_code}</span> <button type="button" className="btn btn-ghost btn-sm" onClick={() => copy(x.claim_code)}>{t('copy')}</button></dd>
+          <dt>{t('teamPassword')}</dt><dd>{x.has_password ? <span className="chip ok">{t('set')}</span> : <span className="chip">{t('notSet')}</span>}</dd>
+          <dt>{t('registered')}</dt><dd>{fmtDT(x.created_at, lang)}</dd>
+        </dl>
+      </div>
+      <div className="row">
+        {x.payment_status !== 'paid' && <button type="button" className="btn btn-primary btn-sm" onClick={() => act(() => teamMarkPaid(x.id))}>{t('markPaid')}</button>}
+        <button type="button" className="btn btn-sm" onClick={onEdit}>{t('edit')}</button>
+        <button type="button" className="btn btn-sm" onClick={() => act(() => teamNewCode(x.id))}>{t('newCode')}</button>
+        {x.has_password && <button type="button" className="btn btn-sm" onClick={() => act(() => teamClearPassword(x.id))}>{t('resetPass')}</button>}
+      </div>
+      <div>
+        <h3 style={{ textTransform: 'uppercase', marginBottom: 8 }}>{t('runners')}</h3>
+        {runners.length ? (
+          <div className="tbl-wrap"><table><tbody>
+            {runners.map((y) => (
+              <tr key={y.id} className="click" onClick={() => onRunner(y.id)}>
+                <td><Bib n={y.bib} /></td>
+                <td><b>{y.first_name} {y.last_name}</b><div className="muted" style={{ fontSize: 12 }}>{y.email}</div></td>
+                <td>{y.fee > 0 && <PayChip status={y.payment_status} />}</td>
+              </tr>
+            ))}
+          </tbody></table></div>
+        ) : <p className="muted">{t('p_rosterEmpty')}</p>}
+      </div>
+      <div><DeleteButton onConfirm={async () => { if (await act(() => removeTeam(x.id), 'deleted')) onClose(); }} /></div>
+    </Drawer>
+  );
+}
+
+/* ---------------- runner drawer ---------------- */
+function RunnerDrawer({ runner: x, race, team, onClose, onTeam }: { runner: ARunner; race: ARace; team?: ATeam; onClose: () => void; onTeam: (id: string) => void }) {
+  const { t, lang } = useT();
+  const { act } = useAct();
+  const [edit, setEdit] = useState<(RunnerForm & { bib: string }) | null>(null);
+  if (edit) {
+    const set = (k: keyof RunnerForm | 'bib') => (v: string) => setEdit((f) => (f ? { ...f, [k]: v } : f));
+    const save = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (await act(() => saveRunner(x.id, edit))) setEdit(null);
+    };
+    return (
+      <Drawer title={`${x.first_name} ${x.last_name}`} sub={t('edit')} onClose={onClose}>
+        <form className="form" onSubmit={save}>
+          <RunnerFields f={edit} set={set} />
+          <Field id="u-bib" label={t('bib')} type="number" value={edit.bib} onChange={set('bib')} />
+          <div className="full row" style={{ justifyContent: 'flex-end' }}>
+            <button type="button" className="btn" onClick={() => setEdit(null)}>{t('cancel')}</button>
+            <button className="btn btn-primary" type="submit">{t('save')}</button>
+          </div>
+        </form>
+      </Drawer>
+    );
+  }
+  const s = (v: string | null) => v || '';
+  return (
+    <Drawer title={`${x.first_name} ${x.last_name}`} sub={`${race.name} · ${team?.name || ''}`} onClose={onClose}>
+      <div className="row"><Bib n={x.bib} big /></div>
+      <div className="card">
+        <dl className="kv">
+          <dt>{t('team')}</dt><dd>{team?.name || '—'}</dd>
+          <dt>{t('email')}</dt><dd>{x.email}</dd>
+          <dt>{t('phone')}</dt><dd>{x.phone || '—'}</dd>
+          <dt>{t('birth')}</dt><dd>{fmtDate(x.birth_date, lang)}</dd>
+          <dt>{t('gender')}</dt><dd>{genderLabel(x.gender, t)}</dd>
+          <dt>{t('shirt')}</dt><dd>{x.shirt_size || '—'}</dd>
+          <dt>{t('emergency')}</dt><dd>{x.emergency_name || '—'} · {x.emergency_phone}</dd>
+          <dt>{t('waiverOk')}</dt><dd>{x.waiver_accepted_at ? fmtDT(x.waiver_accepted_at, lang) : '✗'}</dd>
+          <dt>{t('payment')}</dt><dd>{x.fee > 0 ? <><PayChip status={x.payment_status} /> {money(x.fee, lang)}</> : t('p_included')}</dd>
+          <dt>{t('registered')}</dt><dd>{fmtDT(x.created_at, lang)}</dd>
+        </dl>
+      </div>
+      <div className="row">
+        {x.fee > 0 && x.payment_status !== 'paid' && <button type="button" className="btn btn-primary btn-sm" onClick={() => act(() => runnerMarkPaid(x.id))}>{t('markPaid')}</button>}
+        <button type="button" className="btn btn-sm" onClick={() => setEdit({
+          first_name: x.first_name, last_name: x.last_name, email: x.email, phone: s(x.phone), birth_date: s(x.birth_date), gender: s(x.gender),
+          shirt_size: s(x.shirt_size), emergency_name: s(x.emergency_name), emergency_phone: s(x.emergency_phone), bib: x.bib ? String(x.bib) : '',
+        })}>{t('edit')}</button>
+        {team && <button type="button" className="btn btn-sm" onClick={() => onTeam(team.id)}>{t('team')} →</button>}
+        <DeleteButton onConfirm={async () => { if (await act(() => removeRunner(x.id), 'deleted')) onClose(); }} />
+      </div>
+    </Drawer>
+  );
+}
+
+/* ---------------- staff ---------------- */
+export function Staff({ users, meId }: { users: { id: string; name: string; email: string; created_at: string }[]; meId: string }) {
+  const { t, lang } = useT();
+  const { act } = useAct();
+  const [f, setF] = useState({ name: '', email: '', password: '' });
+  const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (await act(() => addTeammate(f))) setF({ name: '', email: '', password: '' });
+  };
+  return (
+    <div className="split">
+      <div className="tbl-wrap">
+        <table>
+          <thead><tr><th>{t('name')}</th><th>{t('email')}</th><th>{t('registered')}</th><th /></tr></thead>
+          <tbody>
+            {users.map((u) => (
+              <tr key={u.id}>
+                <td><b>{u.name}</b></td><td>{u.email}</td><td className="num">{fmtDate(u.created_at, lang)}</td>
+                <td style={{ textAlign: 'right' }}>{u.id !== meId && <DeleteButton onConfirm={() => act(() => removeTeammate(u.id), 'deleted')} />}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <form className="card form" onSubmit={submit} style={{ gridTemplateColumns: '1fr' }}>
+        <h3 style={{ textTransform: 'uppercase' }}>{t('addUser')}</h3>
+        <Field id="s-name" label={t('name')} value={f.name} onChange={set('name')} req />
+        <Field id="s-email" label={t('email')} type="email" value={f.email} onChange={set('email')} req />
+        <Field id="s-pass" label={t('password')} type="text" value={f.password} onChange={set('password')} req minLength={8} hint={t('passMin8')} autoComplete="off" />
+        <div><button className="btn btn-primary" type="submit">{t('create')}</button></div>
+      </form>
+    </div>
+  );
+}

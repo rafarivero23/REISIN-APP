@@ -1,0 +1,34 @@
+import type { Metadata } from 'next';
+import './globals.css';
+import { I18nProvider } from '@/components/I18n';
+import { ToastProvider } from '@/components/ui';
+import { getLang } from '@/lib/lang';
+
+export const metadata: Metadata = {
+  title: 'Reisin Race Hub',
+  description: 'Venta de equipos e inscripción de corredores para Sal a Valle y Baja Crossing',
+  icons: { icon: '/icon.svg' },
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const lang = getLang();
+  return (
+    <html lang={lang}>
+      <head>
+        {/* Plain <link> rather than next/font: next/font downloads fonts at
+            build time, which fails in some build sandboxes. System fonts
+            take over if Google Fonts can't load. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600&display=swap"
+        />
+      </head>
+      <body>
+        <I18nProvider lang={lang}>
+          <ToastProvider>{children}</ToastProvider>
+        </I18nProvider>
+      </body>
+    </html>
+  );
+}
