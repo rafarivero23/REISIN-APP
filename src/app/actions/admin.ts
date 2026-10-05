@@ -7,10 +7,12 @@ import bcrypt from 'bcryptjs';
 import { getCurrentUser } from '@/lib/auth-guard';
 import { createSession, destroySession } from '@/lib/session';
 import {
-  createRace, updateRace, deleteRace, getRace, getTeam, createTeam, updateTeam, deleteTeam, updateRunner, deleteRunner,
-  markPaid, findUserByEmail, createUser, deleteUser, type RaceInput, type RunnerInput,
+  createRace, updateRace, deleteRace, getRace, getTeam, getRunner, createTeam, updateTeam, deleteTeam, updateRunner, deleteRunner,
+  recordPayment, assignPayment, deletePayment, findUserByEmail, createUser, deleteUser, getUserById, updateUserPassword,
+  sizeOptions, type RaceInput, type RunnerInput,
 } from '@/lib/repo';
-import { newClaimCode, now } from '@/lib/ids';
+import { importCsvText, rematch } from '@/lib/importers';
+import { newClaimCode, newId, now } from '@/lib/ids';
 
 type Result = { error?: string; id?: string };
 const int = (v: unknown, d = 0) => (Number.isFinite(Number(v)) && String(v) !== '' ? Math.round(Number(v)) : d);
@@ -66,6 +68,8 @@ function raceInput(f: Record<string, unknown>): RaceInput | null {
     team_price: Math.max(0, int(f.team_price)), runner_fee: Math.max(0, int(f.runner_fee)),
     team_size: Math.max(1, int(f.team_size, 1)), capacity_teams: Math.max(1, int(f.capacity_teams, 1)),
     categories: str(f.categories, 300), bib_start: Math.max(1, int(f.bib_start, 1)), waiver: str(f.waiver, 8000) || null,
+    team_sizes: str(f.team_sizes, 40).split(',').map((x) => parseInt(x, 10)).filter((n) => n > 0).join(','),
+    hold_slots: Math.max(0, int(f.hold_slots)),
   };
 }
 export async function saveRace(id: string | null, f: Record<string, unknown>): Promise<Result> {
@@ -90,23 +94,42 @@ export async function saveTeam(id: string | null, raceId: string, f: Record<stri
   const name = str(f.name, 80), captain_name = str(f.captain_name, 120), captain_email = str(f.captain_email, 160);
   if (!name || !captain_name || !captain_email) return { error: 'required' };
   const payment_status = f.payment_status === 'paid' ? 'paid' : 'pending';
-  const base = { name, category: str(f.category, 60) || null, captain_name, captain_email, captain_phone: str(f.captain_phone, 40) || null, amount: Math.max(0, int(f.amount)), payment_status } as const;
+  const race = await getRace(raceId);
+  if (!race) return { error: 'not_found' };
+  const sizes = sizeOptions(race);
+  const team_size = sizes.includes(int(f.team_size)) ? int(f.team_size) : sizes[sizes.length - 1];
+  const base = { name, category: str(f.category, 60) || null, captain_name, captain_email, captain_phone: str(f.captain_phone, 40) || null,
+    amount: Math.max(0, int(f.amount)), team_size, notes: str(f.notes, 1000) || null };
+  let wasPaid = false;
   if (id) {
     const prev = await getTeam(id);
     if (!prev) return { error: 'not_found' };
-    const extra = payment_status === 'paid' && prev.payment_status !== 'paid' ? { payment_method: 'manual', paid_at: now() } : {};
-    await updateTeam(id, { ...base, ...extra });
+    wasPaid = prev.payment_status === 'paid';
+    await updateTeam(id, base);
   } else {
-    const race = await getRace(raceId);
-    if (!race) return { error: 'not_found' };
-    id = await createTeam({ ...base, race_id: raceId, payment_method: 'manual', paid_at: payment_status === 'paid' ? now() : null, claim_code: newClaimCode(race.brand) });
+    id = await createTeam({ ...base, race_id: raceId, payment_status: 'pending', payment_method: 'manual', paid_at: null, claim_code: newClaimCode(race.brand) });
+  }
+  if (payment_status === 'paid' && !wasPaid) {
+    await recordPayment({ race_id: raceId, team_id: id, kind: 'team', source: 'manual', external_id: 'manual:' + newId(), quantity: 1, amount: base.amount, payer_name: captain_name, payer_email: captain_email });
   }
   refresh();
   return { id };
 }
 export async function teamMarkPaid(id: string): Promise<Result> {
   await guard();
-  await markPaid('team', id, 'manual');
+  const t = await getTeam(id);
+  if (!t) return { error: 'not_found' };
+  await recordPayment({ race_id: t.race_id, team_id: t.id, kind: 'team', source: 'manual', external_id: 'manual:' + newId(), quantity: 1, amount: t.amount, payer_name: t.captain_name, payer_email: t.captain_email });
+  refresh();
+  return {};
+}
+// Records slots paid outside the app (transfer, cash).
+export async function teamAddSlots(id: string, qty: number, amount: number): Promise<Result> {
+  await guard();
+  const t = await getTeam(id);
+  const n = Math.round(Number(qty));
+  if (!t || !n || n < 1 || n > 20) return { error: 'required' };
+  await recordPayment({ race_id: t.race_id, team_id: t.id, kind: 'slots', source: 'manual', external_id: 'manual:' + newId(), quantity: n, amount: Math.max(0, Math.round(Number(amount) || 0)), payer_name: t.captain_name, payer_email: t.captain_email });
   refresh();
   return {};
 }
@@ -152,8 +175,49 @@ export async function saveRunner(id: string, f: RunnerInput & { bib?: unknown })
 }
 export async function runnerMarkPaid(id: string): Promise<Result> {
   await guard();
-  await markPaid('runner', id, 'manual');
+  const r = await getRunner(id);
+  if (!r) return { error: 'not_found' };
+  await recordPayment({ race_id: r.race_id, team_id: r.team_id, runner_id: r.id, kind: 'runner', source: 'manual', external_id: 'manual:' + newId(), quantity: 1, amount: r.fee, payer_name: `${r.first_name} ${r.last_name}`, payer_email: r.email });
   refresh();
+  return {};
+}
+
+/* ---------------- payments & import ---------------- */
+export async function setPaymentTeam(paymentId: string, teamId: string | null): Promise<Result> {
+  await guard();
+  await assignPayment(paymentId, teamId || null);
+  refresh();
+  return {};
+}
+export async function removePayment(paymentId: string): Promise<Result> {
+  await guard();
+  await deletePayment(paymentId);
+  refresh();
+  return {};
+}
+export async function importCsv(raceId: string, text: string) {
+  await guard();
+  try {
+    const r = await importCsvText(raceId, text);
+    refresh();
+    return r;
+  } catch (e: any) {
+    return { error: e?.message === 'unknown_csv' ? 'unknown_csv' : String(e?.message || e) };
+  }
+}
+export async function rematchPayments(raceId: string) {
+  await guard();
+  const left = await rematch(raceId);
+  refresh();
+  return { left };
+}
+
+export async function changePassword(current: string, next: string): Promise<Result> {
+  const me = await guard();
+  const u = await getUserById(me.userId);
+  if (!u || !(await bcrypt.compare(String(current || ''), u.password_hash))) return { error: 'badCurrent' };
+  if (String(next || '').length < 8) return { error: 'passMin8' };
+  await updateUserPassword(u.id, await bcrypt.hash(next, 10));
   return {};
 }
 export async function removeRunner(id: string): Promise<Result> {

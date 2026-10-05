@@ -147,5 +147,46 @@ CREATE TABLE IF NOT EXISTS runners (
 CREATE UNIQUE INDEX IF NOT EXISTS ux_runners_race_bib ON runners(race_id, bib) WHERE bib IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_runners_team ON runners(team_id);
 CREATE INDEX IF NOT EXISTS idx_runners_race ON runners(race_id);
+-- Hold model (Baja Crossing): team_price is a deposit that covers
+-- hold_slots runners; every extra slot costs runner_fee. team_sizes lists
+-- the sizes a captain can pick (e.g. "4,5,6"); empty = fixed team_size.
+ALTER TABLE races ADD COLUMN IF NOT EXISTS team_sizes TEXT NOT NULL DEFAULT '';
+ALTER TABLE races ADD COLUMN IF NOT EXISTS hold_slots INTEGER NOT NULL DEFAULT 0;
+
+-- team_size: size the captain picked (NULL = race.team_size).
+-- extra_slots: runner slots paid on top of the hold. notes: free text
+-- (e.g. the buyer's order comment from Ecwid).
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS team_size INTEGER;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS extra_slots INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- Every money movement, whatever the source (Stripe, test mode, manual,
+-- Ecwid import). external_id makes imports and webhooks idempotent.
+-- kind: team (hold / team purchase) | slots (extra runner slots) | runner.
+-- team_id NULL = imported payment not yet matched to a team.
+CREATE TABLE IF NOT EXISTS payments (
+  id TEXT PRIMARY KEY,
+  race_id TEXT NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  team_id TEXT REFERENCES teams(id) ON DELETE SET NULL,
+  runner_id TEXT REFERENCES runners(id) ON DELETE SET NULL,
+  kind TEXT NOT NULL,
+  source TEXT NOT NULL,
+  external_id TEXT UNIQUE,
+  quantity INTEGER NOT NULL DEFAULT 1,
+  amount INTEGER NOT NULL DEFAULT 0,
+  payer_name TEXT,
+  payer_email TEXT,
+  payer_phone TEXT,
+  comment TEXT,
+  paid_at TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_payments_race ON payments(race_id);
+CREATE INDEX IF NOT EXISTS idx_payments_team ON payments(team_id);
+
+-- Source record id for imported runners (e.g. RedPodium registrant id),
+-- so re-importing the same file never duplicates anyone.
+ALTER TABLE runners ADD COLUMN IF NOT EXISTS external_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_runners_external ON runners(external_id) WHERE external_id IS NOT NULL;
 `);
 }

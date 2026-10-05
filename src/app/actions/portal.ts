@@ -5,8 +5,8 @@
 import { headers } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import {
-  getRace, getTeam, getRunner, liveTeamCount, countRunners, createTeam, updateTeam, createRunner, markPaid,
-  findTeamByCode, type Race, type RunnerInput,
+  getRace, getTeam, getRunner, liveTeamCount, countRunners, createTeam, updateTeam, createRunner, recordPayment,
+  findTeamByCode, feeForNewRunner, isHoldRace, paidSlots, sizeOptions, teamSizeOf, type Race, type RunnerInput,
 } from '@/lib/repo';
 import { newClaimCode, now } from '@/lib/ids';
 import { stripe } from '@/lib/stripe';
@@ -32,14 +32,16 @@ async function openRace(raceId: string): Promise<Race | Err> {
 }
 
 type Checkout = { url: string } | { simulated: true; payToken: string };
-async function checkout(kind: 'team' | 'runner', id: string, amount: number, label: string, email: string, successPath: string, cancelPath: string): Promise<Checkout> {
+type Kind = 'team' | 'runner' | 'slots';
+// kind/id: what the payment is for. slots → id is the team, qty = slots.
+async function checkout(kind: Kind, id: string, unit: number, qty: number, label: string, email: string, successPath: string, cancelPath: string): Promise<Checkout> {
   const s = stripe();
-  if (!s) return { simulated: true, payToken: await signPayToken(kind, id) };
+  if (!s) return { simulated: true, payToken: await signPayToken(kind, id, qty) };
   const session = await s.checkout.sessions.create({
     mode: 'payment',
     customer_email: email || undefined,
-    line_items: [{ quantity: 1, price_data: { currency: 'mxn', unit_amount: Math.round(amount * 100), product_data: { name: label } } }],
-    metadata: { kind, id },
+    line_items: [{ quantity: qty, price_data: { currency: 'mxn', unit_amount: Math.round(unit * 100), product_data: { name: label } } }],
+    metadata: { kind, id, qty: String(qty) },
     success_url: origin() + successPath + (successPath.includes('?') ? '&' : '?') + 'session_id={CHECKOUT_SESSION_ID}',
     cancel_url: origin() + cancelPath,
   });
@@ -47,24 +49,48 @@ async function checkout(kind: 'team' | 'runner', id: string, amount: number, lab
   return { url: session.url! };
 }
 
+// Turns a checkout result into a ledger entry (once). Shared with the webhook.
+export async function settle(kind: Kind, id: string, qty: number, amount: number, source: string, externalId: string, payer?: { name?: string | null; email?: string | null }) {
+  if (kind === 'team') {
+    const t = await getTeam(id);
+    if (!t) return false;
+    if (!amount) amount = t.amount;
+    return recordPayment({ race_id: t.race_id, team_id: t.id, kind, source, external_id: externalId, quantity: 1, amount, payer_name: payer?.name || t.captain_name, payer_email: payer?.email || t.captain_email });
+  }
+  if (kind === 'runner') {
+    const r = await getRunner(id);
+    if (!r) return false;
+    if (!amount) amount = r.fee;
+    return recordPayment({ race_id: r.race_id, team_id: r.team_id, runner_id: r.id, kind, source, external_id: externalId, quantity: 1, amount, payer_name: payer?.name || `${r.first_name} ${r.last_name}`, payer_email: payer?.email || r.email });
+  }
+  const t = await getTeam(id);
+  if (!t) return false;
+  if (!amount) amount = qty * ((await getRace(t.race_id))?.runner_fee || 0);
+  return recordPayment({ race_id: t.race_id, team_id: t.id, kind: 'slots', source, external_id: externalId, quantity: qty, amount, payer_name: payer?.name || t.captain_name, payer_email: payer?.email || t.captain_email });
+}
+
 // Confirms a payment from a real Stripe session or a test-mode pay token.
-async function confirmPayment(kind: 'team' | 'runner', id: string, proof: { sessionId?: string; payToken?: string }) {
+async function confirmPayment(kind: Kind, id: string, proof: { sessionId?: string; payToken?: string }) {
   const s = stripe();
   if (s && proof.sessionId) {
     const session = await s.checkout.sessions.retrieve(proof.sessionId);
     if (session.metadata?.kind !== kind || session.metadata?.id !== id) return false;
-    if (session.payment_status === 'paid') await markPaid(kind, id, 'stripe', session.id);
-    return session.payment_status === 'paid';
+    if (session.payment_status !== 'paid') return false;
+    await settle(kind, id, Number(session.metadata?.qty || 1), Math.round((session.amount_total || 0) / 100), 'stripe', session.id,
+      { name: session.customer_details?.name, email: session.customer_details?.email });
+    return true;
   }
-  if (!s && proof.payToken && (await verifyPayToken(proof.payToken, kind, id))) {
-    await markPaid(kind, id, 'test');
+  if (!s && proof.payToken) {
+    const v = await verifyPayToken(proof.payToken, kind, id);
+    if (!v) return false;
+    await settle(kind, id, v.qty, v.amount, 'test', 'test:' + proof.payToken.slice(-24));
     return true;
   }
   return false;
 }
 
 /* ---------------- buy a team ---------------- */
-export async function buyTeam(input: { raceId: string; name: string; category: string; captainName: string; captainEmail: string; captainPhone: string }):
+export async function buyTeam(input: { raceId: string; name: string; category: string; captainName: string; captainEmail: string; captainPhone: string; teamSize?: number }):
   Promise<Err | ({ teamId: string; amount: number } & (Checkout | { free: true }))> {
   const race = await openRace(input.raceId);
   if ('error' in race) return race;
@@ -73,14 +99,18 @@ export async function buyTeam(input: { raceId: string; name: string; category: s
   if ((await liveTeamCount(race.id)) >= race.capacity_teams) return { error: 'p_fullRace' };
   const cats = splitCats(race.categories);
   const free = race.team_price <= 0;
+  const sizes = sizeOptions(race);
+  const team_size = sizes.includes(Number(input.teamSize)) ? Number(input.teamSize) : sizes[sizes.length - 1];
   const teamId = await createTeam({
+    team_size,
     race_id: race.id, name, category: cats.includes(input.category) ? input.category : cats[0] || null,
     captain_name: captainName, captain_email: captainEmail, captain_phone: captainPhone, amount: race.team_price,
     payment_status: free ? 'paid' : 'pending', payment_method: free ? 'free' : null, paid_at: free ? now() : null,
     claim_code: newClaimCode(race.brand),
   });
   if (free) { await setCaptain(teamId); return { teamId, amount: 0, free: true }; }
-  const co = await checkout('team', teamId, race.team_price, `${race.name} — Equipo ${name}`, captainEmail,
+  const label = isHoldRace(race) ? `${race.name} — Apartado equipo ${name}` : `${race.name} — Equipo ${name}`;
+  const co = await checkout('team', teamId, race.team_price, 1, label, captainEmail,
     `/team-created?team=${teamId}`, `/r/${race.id}/buy`);
   return { teamId, amount: race.team_price, ...co };
 }
@@ -124,13 +154,33 @@ export async function setTeamPassword(password: string): Promise<Err | { ok: tru
   return { ok: true };
 }
 
+// Captain pays for N more runner slots (hold model) or one runner's fee (classic).
+export async function captainPaySlots(qty: number): Promise<Err | Checkout> {
+  const teamId = await getCaptainTeamId();
+  const team = teamId ? await getTeam(teamId) : null;
+  const race = team ? await getRace(team.race_id) : null;
+  if (!team || !race) return { error: 'p_captainSub' };
+  if (!isHoldRace(race) || team.payment_status !== 'paid') return { error: 'p_captainSub' };
+  const left = teamSizeOf(team, race) - paidSlots(team, race);
+  const n = Math.max(1, Math.min(Math.floor(Number(qty)) || 1, left));
+  if (left <= 0) return { error: 'paid' };
+  return checkout('slots', team.id, race.runner_fee, n, `${race.name} — ${n} lugar(es) equipo ${team.name}`, team.captain_email, `/captain?slots=${team.id}`, '/captain');
+}
+
+export async function confirmSlots(input: { sessionId?: string; payToken?: string }) {
+  const teamId = await getCaptainTeamId();
+  if (!teamId) return { error: 'p_captainSub' } as Err;
+  const ok = await confirmPayment('slots', teamId, input);
+  return ok ? { ok: true as const } : ({ error: 'p_notPaid' } as Err);
+}
+
 export async function captainPayRunner(runnerId: string): Promise<Err | Checkout> {
   const teamId = await getCaptainTeamId();
   const r = await getRunner(runnerId);
   if (!teamId || !r || r.team_id !== teamId) return { error: 'p_captainSub' };
   if (r.payment_status === 'paid' || r.fee <= 0) return { error: 'paid' };
   const race = await getRace(r.race_id);
-  return checkout('runner', r.id, r.fee, `${race!.name} — Inscripción ${r.first_name} ${r.last_name}`, r.email, `/captain?paid=${r.id}`, '/captain');
+  return checkout('runner', r.id, r.fee, 1, `${race!.name} — Inscripción ${r.first_name} ${r.last_name}`, r.email, `/captain?paid=${r.id}`, '/captain');
 }
 
 /* ---------------- runners ---------------- */
@@ -141,7 +191,7 @@ export async function joinTeam(input: { raceId: string; teamId: string; password
   if (!team || team.race_id !== race.id) return { error: 'not_found' };
   if (!team.password_hash) return { error: 'p_noPassYet' };
   if (!(await bcrypt.compare(String(input.password || ''), team.password_hash))) return { error: 'p_badPass' };
-  if ((await countRunners(team.id)) >= race.team_size) return { error: 'p_teamFull' };
+  if ((await countRunners(team.id)) >= teamSizeOf(team, race)) return { error: 'p_teamFull' };
   await setMember(team.id);
   return { ok: true };
 }
@@ -162,10 +212,11 @@ export async function registerRunner(input: { raceId: string; runner: RunnerInpu
   };
   if (Object.values(runner).some((v) => !v)) return { error: 'required' };
   if (input.waiverAccepted !== true) return { error: 'p_waiverAccept' };
-  if ((await countRunners(team.id)) >= race.team_size) return { error: 'p_teamFull' };
-  const row = await createRunner(race, team.id, runner, { lang: input.lang === 'en' ? 'en' : 'es' });
+  if ((await countRunners(team.id)) >= teamSizeOf(team, race)) return { error: 'p_teamFull' };
+  const due = await feeForNewRunner(race, team);
+  const row = await createRunner(race, team.id, runner, { lang: input.lang === 'en' ? 'en' : 'es', ...due });
   if (row.fee <= 0) return { runnerId: row.id, done: true };
-  const co = await checkout('runner', row.id, row.fee, `${race.name} — Inscripción ${row.first_name} ${row.last_name}`, row.email,
+  const co = await checkout('runner', row.id, row.fee, 1, `${race.name} — Inscripción ${row.first_name} ${row.last_name}`, row.email,
     `/done?runner=${row.id}`, `/done?runner=${row.id}&canceled=1`);
   return { runnerId: row.id, ...co };
 }
@@ -192,5 +243,5 @@ export async function retryRunnerPayment(runnerId: string): Promise<Err | Checko
   if (!r || r.team_id !== teamId) return { error: 'p_joinSub' };
   if (r.payment_status === 'paid' || r.fee <= 0) return { error: 'paid' };
   const race = await getRace(r.race_id);
-  return checkout('runner', r.id, r.fee, `${race!.name} — Inscripción ${r.first_name} ${r.last_name}`, r.email, `/done?runner=${r.id}`, `/done?runner=${r.id}&canceled=1`);
+  return checkout('runner', r.id, r.fee, 1, `${race!.name} — Inscripción ${r.first_name} ${r.last_name}`, r.email, `/done?runner=${r.id}`, `/done?runner=${r.id}&canceled=1`);
 }

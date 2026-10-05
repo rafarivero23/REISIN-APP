@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { stripe } from '@/lib/stripe';
-import { markPaid } from '@/lib/repo';
+import { settle } from '@/app/actions/portal';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,8 +21,10 @@ export async function POST(req: Request) {
   if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
     const session = event.data.object;
     const kind = session.metadata?.kind, id = session.metadata?.id;
-    if (session.payment_status === 'paid' && id && (kind === 'team' || kind === 'runner')) {
-      await markPaid(kind, id, 'stripe', session.id);
+    if (session.payment_status === 'paid' && id && (kind === 'team' || kind === 'runner' || kind === 'slots')) {
+      // Same entry the success redirect writes; external_id = session id, so it lands once.
+      await settle(kind, id, Number(session.metadata?.qty || 1), Math.round((session.amount_total || 0) / 100), 'stripe', session.id,
+        { name: session.customer_details?.name, email: session.customer_details?.email });
     }
   }
   return NextResponse.json({ received: true });

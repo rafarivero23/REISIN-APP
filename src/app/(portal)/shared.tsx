@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { getRace, liveTeamCount, type Race } from '@/lib/repo';
+import { getRace, liveTeamCount, sizeOptions, type Race } from '@/lib/repo';
 import { brandKey, fmtDate, type Lang } from '@/lib/format';
 import { getT } from '@/lib/lang';
 import type { PublicRace } from '@/components/portal';
@@ -27,8 +27,8 @@ export async function loadOpenRace(raceId: string): Promise<{ race: PublicRace }
   if (!race) notFound();
   if (race.status !== 'open') return { closed: race.name };
   const live = await liveTeamCount(race.id);
-  const { id, name, brand, race_date, location, team_price, runner_fee, team_size, categories, waiver } = race;
-  return { race: { id, name, brand, race_date, location, team_price, runner_fee, team_size, categories, waiver, teams_left: Math.max(0, race.capacity_teams - live) } };
+  const { id, name, brand, race_date, location, team_price, runner_fee, team_size, categories, waiver, hold_slots } = race;
+  return { race: { id, name, brand, race_date, location, team_price, runner_fee, team_size, categories, waiver, hold_slots, sizes: sizeOptions(race), teams_left: Math.max(0, race.capacity_teams - live) } };
 }
 
 export function Closed({ name }: { name: string }) {

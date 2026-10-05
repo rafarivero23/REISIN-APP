@@ -6,13 +6,13 @@ import { useT } from './I18n';
 import { Field, PayChip, Bib, TestCheckout, useToast, useCopy } from './ui';
 import { money, splitCats, brandPrefix, SIZES } from '@/lib/format';
 import {
-  buyTeam, confirmTeam, captainLogin, captainLogout, setTeamPassword, captainPayRunner, joinTeam, registerRunner,
+  buyTeam, confirmTeam, captainLogin, captainLogout, setTeamPassword, captainPayRunner, captainPaySlots, confirmSlots, joinTeam, registerRunner,
   confirmRunner, retryRunnerPayment,
 } from '@/app/actions/portal';
 
 export type PublicRace = {
   id: string; name: string; brand: string; race_date: string | null; location: string | null; team_price: number;
-  runner_fee: number; team_size: number; categories: string; waiver: string | null; teams_left: number;
+  runner_fee: number; team_size: number; categories: string; waiver: string | null; teams_left: number; hold_slots: number; sizes: number[];
 };
 const Err = ({ k }: { k: string | null }) => { const { t } = useT(); return k ? <p className="err full">{t(k)}</p> : null; };
 
@@ -21,7 +21,8 @@ export function BuyForm({ race }: { race: PublicRace }) {
   const { t, lang } = useT();
   const router = useRouter();
   const cs = splitCats(race.categories);
-  const [f, setF] = useState({ name: '', category: cs[0] || '', captainName: '', captainEmail: '', captainPhone: '' });
+  const hold = race.hold_slots > 0;
+  const [f, setF] = useState({ name: '', category: cs[0] || '', captainName: '', captainEmail: '', captainPhone: '', teamSize: String(race.sizes[race.sizes.length - 1]) });
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [sim, setSim] = useState<{ teamId: string; payToken: string } | null>(null);
@@ -32,7 +33,7 @@ export function BuyForm({ race }: { race: PublicRace }) {
     setErr(null);
     if (!f.name || !f.captainName || !f.captainEmail || !f.captainPhone) return setErr('required');
     setBusy(true);
-    const r = await buyTeam({ raceId: race.id, ...f });
+    const r = await buyTeam({ raceId: race.id, ...f, teamSize: Number(f.teamSize) });
     if ('error' in r) { setErr(r.error); setBusy(false); return; }
     if ('url' in r) { window.location.href = r.url; return; }
     if ('free' in r) { router.push(`/team-created?team=${r.teamId}`); return; }
@@ -48,8 +49,12 @@ export function BuyForm({ race }: { race: PublicRace }) {
         <Field id="b-cname" label={t('p_captainName')} value={f.captainName} onChange={set('captainName')} req />
         <Field id="b-cemail" label={t('email')} type="email" value={f.captainEmail} onChange={set('captainEmail')} req />
         <Field id="b-cphone" label={t('phone')} type="tel" value={f.captainPhone} onChange={set('captainPhone')} req />
+        {race.sizes.length > 1 && <Field id="b-size" label={t('p_sizePick')} value={f.teamSize} onChange={set('teamSize')} options={race.sizes.map((n) => [String(n), `${n} ${t('runners').toLowerCase()}`])} />}
         <div className="full note">
-          {t('teamSize')}: <b className="num">{race.team_size}</b> · {t('runnerFee')}: <b className="num">{race.runner_fee > 0 ? money(race.runner_fee, lang) : t('p_included')}</b>
+          {hold
+            ? t('p_holdNote').replace('{n}', String(race.hold_slots)).replace('{m}', String(Math.max(0, Number(f.teamSize) - race.hold_slots)))
+                .replace('{x}', `${money(race.runner_fee, lang)} c/u`)
+            : <>{t('teamSize')}: <b className="num">{race.team_size}</b> · {t('runnerFee')}: <b className="num">{race.runner_fee > 0 ? money(race.runner_fee, lang) : t('p_included')}</b></>}
         </div>
         <Err k={err} />
         <div className="full row" style={{ justifyContent: 'space-between' }}>
@@ -142,9 +147,10 @@ export function CaptainLoginForm({ raceId, brand }: { raceId: string; brand: str
 
 /* ---------------- captain dashboard ---------------- */
 type DashRunner = { id: string; bib: number | null; first_name: string; last_name: string; shirt_size: string | null; fee: number; payment_status: string };
-export function CaptainDash({ team, race, runners }: {
+export function CaptainDash({ team, race, runners, slots }: {
   team: { name: string; category: string | null; payment_status: string; claim_code: string; has_password: boolean };
-  race: { id: string; name: string; team_size: number }; runners: DashRunner[];
+  race: { id: string; name: string; team_size: number; runner_fee: number }; runners: DashRunner[];
+  slots: { hold: boolean; size: number; paid: number };
 }) {
   const { t, lang } = useT();
   const router = useRouter();
@@ -156,10 +162,20 @@ export function CaptainDash({ team, race, runners }: {
   const [sim, setSim] = useState<{ runner: DashRunner; payToken: string } | null>(null);
   const [link, setLink] = useState(`/r/${race.id}/join`);
   useEffect(() => setLink(`${window.location.origin}/r/${race.id}/join`), [race.id]);
+  const left = Math.max(0, slots.size - slots.paid);
+  const [qty, setQty] = useState(String(left || 1));
   useEffect(() => {
-    const paid = q.get('paid'), sid = q.get('session_id');
+    const paid = q.get('paid'), sid = q.get('session_id'), sl = q.get('slots');
     if (paid && sid) confirmRunner({ runnerId: paid, sessionId: sid }).then(() => router.replace('/captain'));
+    if (sl && sid) confirmSlots({ sessionId: sid }).then(() => router.replace('/captain'));
   }, [q, router]);
+  const paySlots = async () => {
+    const res = await captainPaySlots(Number(qty));
+    if ('error' in res) return toast(t(res.error));
+    if ('url' in res) { window.location.href = res.url; return; }
+    setSimSlots(res.payToken);
+  };
+  const [simSlots, setSimSlots] = useState<string | null>(null);
 
   const savePw = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,11 +199,26 @@ export function CaptainDash({ team, race, runners }: {
       <div className="p-hero">
         <div className="label">{t('p_teamDash')} · {race.name}</div>
         <h1>{team.name}</h1>
-        <div className="row"><PayChip status={team.payment_status} />{team.category && <span className="chip plain">{team.category}</span>}<span className="chip plain num">{runners.length}/{race.team_size}</span></div>
+        <div className="row"><PayChip status={team.payment_status} />{team.category && <span className="chip plain">{team.category}</span>}<span className="chip plain num">{runners.length}/{slots.size}</span></div>
       </div>
-      <div className="slots" aria-label={`${runners.length}/${race.team_size}`}>
-        {Array.from({ length: race.team_size }, (_, i) => <span key={i} className={'slot' + (i < runners.length ? ' f' : '')} />)}
+      <div className="slots" aria-label={`${runners.length}/${slots.size}`}>
+        {Array.from({ length: slots.size }, (_, i) => <span key={i} className={'slot' + (i < runners.length ? ' f' : '')} style={slots.hold && i >= slots.paid ? { opacity: 0.45 } : undefined} />)}
       </div>
+      {slots.hold && team.payment_status === 'paid' && (
+        <div className="card row" style={{ justifyContent: 'space-between' }}>
+          <div>
+            <div className="label">{t('p_slotsPaid')}</div>
+            <b className="num" style={{ fontFamily: 'var(--f-display)', fontSize: 26 }}>{slots.paid}/{slots.size}</b>
+            {left > 0 && <div className="muted num" style={{ fontSize: 14 }}>{t('p_balanceDue')}: {money(left * race.runner_fee, lang)}</div>}
+          </div>
+          {left > 0 && (
+            <div className="row" style={{ alignItems: 'flex-end' }}>
+              <Field id="ps-qty" label={t('slotsWord')} value={qty} onChange={setQty} options={Array.from({ length: left }, (_, i) => String(i + 1))} />
+              <button type="button" className="btn btn-primary" onClick={paySlots}>{t('p_paySlots')} · {money(Number(qty) * race.runner_fee, lang)}</button>
+            </div>
+          )}
+        </div>
+      )}
       <div className="card stack">
         <h3 style={{ textTransform: 'uppercase' }}>{t('p_shareTitle')}</h3>
         <p className="muted" style={{ fontSize: 14 }}>{t('p_shareText')}</p>
@@ -209,7 +240,7 @@ export function CaptainDash({ team, race, runners }: {
             {runners.map((y) => (
               <div className="it" key={y.id}>
                 <div className="row"><Bib n={y.bib} /><div><b>{y.first_name} {y.last_name}</b><div className="muted" style={{ fontSize: 13 }}>{y.shirt_size}</div></div></div>
-                {y.fee > 0 && y.payment_status !== 'paid'
+                {!slots.hold && y.fee > 0 && y.payment_status !== 'paid'
                   ? <button type="button" className="btn btn-sm btn-primary" onClick={() => payFor(y)}>{t('p_payFor')} · {money(y.fee, lang)}</button>
                   : y.fee > 0 ? <PayChip status="paid" /> : null}
               </div>
@@ -221,6 +252,11 @@ export function CaptainDash({ team, race, runners }: {
         <TestCheckout amount={sim.runner.fee} concept={`${t('p_feeDue')} · ${sim.runner.first_name} ${sim.runner.last_name}`}
           onClose={() => setSim(null)}
           onPay={async () => { await confirmRunner({ runnerId: sim.runner.id, payToken: sim.payToken }); setSim(null); toast(t('p_paidOk')); router.refresh(); }} />
+      )}
+      {simSlots && (
+        <TestCheckout amount={Number(qty) * race.runner_fee} concept={`${qty} ${t('slotsWord')} · ${team.name}`}
+          onClose={() => setSimSlots(null)}
+          onPay={async () => { await confirmSlots({ payToken: simSlots }); setSimSlots(null); toast(t('p_paidOk')); router.refresh(); }} />
       )}
     </>
   );
@@ -291,7 +327,7 @@ export function RunnerFields({ f, set }: { f: RunnerForm; set: (k: keyof RunnerF
   );
 }
 
-export function RegisterForm({ race, teamName }: { race: PublicRace; teamName: string }) {
+export function RegisterForm({ race, teamName, feeDue }: { race: PublicRace; teamName: string; feeDue: number }) {
   const { t, lang } = useT();
   const router = useRouter();
   const [f, setF] = useState<RunnerForm>(EMPTY_RUNNER);
@@ -300,7 +336,7 @@ export function RegisterForm({ race, teamName }: { race: PublicRace; teamName: s
   const [busy, setBusy] = useState(false);
   const [sim, setSim] = useState<{ runnerId: string; payToken: string } | null>(null);
   const set = (k: keyof RunnerForm) => (v: string) => setF((x) => ({ ...x, [k]: v }));
-  const fee = race.runner_fee || 0;
+  const fee = feeDue;
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
@@ -324,7 +360,7 @@ export function RegisterForm({ race, teamName }: { race: PublicRace; teamName: s
           <label className="check full"><input type="checkbox" checked={waiver} onChange={(e) => setWaiver(e.target.checked)} /> <span>{t('p_waiverAccept')}</span></label>
           <Err k={err} />
           <div className="full row" style={{ justifyContent: 'space-between' }}>
-            <div><div className="label">{t('p_feeDue')}</div><b className="num" style={{ fontFamily: 'var(--f-display)', fontSize: 26 }}>{fee > 0 ? money(fee, lang) : t('p_included')}</b></div>
+            <div><div className="label">{t('p_feeDue')}</div><b className="num" style={{ fontFamily: 'var(--f-display)', fontSize: 26 }}>{fee > 0 ? money(fee, lang) : race.hold_slots > 0 ? t('p_coveredFee') : t('p_included')}</b></div>
             <button className="btn btn-primary btn-lg" type="submit" disabled={busy}>{busy ? <span className="spin" /> : fee > 0 ? `${t('p_continuePay')} →` : t('p_register')}</button>
           </div>
         </form>

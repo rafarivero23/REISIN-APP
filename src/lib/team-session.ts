@@ -49,10 +49,12 @@ export async function getMemberTeamId(): Promise<string | null> {
   return (p?.t as string) ?? null;
 }
 
-export async function signPayToken(kind: 'team' | 'runner', id: string) {
-  return sign({ k: 'pay', kind, id }, '1h');
+// Test-mode only. qty = slots bought; amount is recomputed server-side.
+export async function signPayToken(kind: string, id: string, qty = 1) {
+  return sign({ k: 'pay', kind, id, qty, n: crypto.randomUUID() }, '1h');
 }
-export async function verifyPayToken(token: string, kind: 'team' | 'runner', id: string) {
+export async function verifyPayToken(token: string, kind: string, id: string): Promise<{ qty: number; amount: number } | null> {
   const p = await read(token, 'pay');
-  return !!p && p.kind === kind && p.id === id;
+  if (!p || p.kind !== kind || p.id !== id) return null;
+  return { qty: Number(p.qty || 1), amount: 0 };
 }

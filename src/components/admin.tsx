@@ -6,22 +6,30 @@ import { useT } from './I18n';
 import { Drawer, Field, PayChip, Bib, DeleteButton, useToast, useCopy } from './ui';
 import { RunnerFields, type RunnerForm } from './portal';
 import { money, fmtDate, fmtDT, splitCats, BRANDS } from '@/lib/format';
-import { raceStats } from '@/lib/stats';
+import { raceStats, teamSlots, isHold } from '@/lib/stats';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
-  removeRunner, addTeammate, removeTeammate,
+  removeRunner, addTeammate, removeTeammate, teamAddSlots, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
 /* Shapes passed from server components (no password hashes). */
 export type ARace = {
   id: string; name: string; brand: string; status: string; race_date: string | null; location: string | null;
   team_price: number; runner_fee: number; team_size: number; capacity_teams: number; categories: string;
-  bib_start: number; waiver: string | null;
+  bib_start: number; waiver: string | null; team_sizes: string; hold_slots: number;
+};
+export type APayment = {
+  id: string; team_id: string | null; runner_id: string | null; kind: string; source: string; external_id: string | null; quantity: number;
+  amount: number; payer_name: string | null; payer_email: string | null; comment: string | null; paid_at: string;
+};
+export const sizeList = (r: ARace) => {
+  const xs = (r.team_sizes || '').split(',').map((x) => parseInt(x, 10)).filter((n) => n > 0);
+  return xs.length ? xs : [r.team_size];
 };
 export type ATeam = {
   id: string; race_id: string; name: string; category: string | null; captain_name: string; captain_email: string;
   captain_phone: string | null; amount: number; payment_status: string; payment_method: string | null; paid_at: string | null;
-  claim_code: string; has_password: boolean; created_at: string;
+  claim_code: string; has_password: boolean; created_at: string; team_size: number | null; extra_slots: number; notes: string | null;
 };
 export type ARunner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string; email: string;
@@ -31,7 +39,7 @@ export type ARunner = {
 };
 
 export const genderLabel = (g: string | null, t: (k: string) => string) => (g === 'F' ? t('female') : g === 'M' ? t('male') : g === 'X' ? t('nonbinary') : '—');
-const methodLabel = (m: string | null, t: (k: string) => string) => (m === 'stripe' ? 'Stripe' : m === 'test' ? t('stripeTest') : m === 'manual' ? t('manual') : '—');
+const methodLabel = (m: string | null, t: (k: string) => string) => (m === 'stripe' ? 'Stripe' : m === 'test' ? t('stripeTest') : m === 'manual' ? t('manual') : m === 'ecwid' ? 'Ecwid' : m === 'team' ? t('team') : m === 'import' ? 'RedPodium' : '—');
 
 function useAct() {
   const toast = useToast();
@@ -81,7 +89,7 @@ export function RaceForm({ race, onClose }: { race?: ARace; onClose: () => void 
   const { act } = useAct();
   const [f, setF] = useState<Record<string, any>>(race || {
     name: '', brand: 'Sal a Valle', status: 'draft', race_date: '', location: '', team_price: 12000, runner_fee: 0,
-    team_size: 6, capacity_teams: 50, categories: 'Varonil, Femenil, Mixto', bib_start: 100, waiver: t('w_default'),
+    team_size: 6, capacity_teams: 50, categories: 'Varonil, Femenil, Mixto', bib_start: 100, waiver: t('w_default'), team_sizes: '', hold_slots: 0,
   });
   const set = (k: string) => (v: string) => setF((x) => ({ ...x, [k]: v }));
   const submit = async (e: React.FormEvent) => {
@@ -101,7 +109,9 @@ export function RaceForm({ race, onClose }: { race?: ARace; onClose: () => void 
         <Field id="r-loc" label={t('location')} value={f.location || ''} onChange={set('location')} />
         <Field id="r-tprice" label={`${t('teamPrice')} (MXN)`} type="number" min="0" step="50" value={f.team_price} onChange={set('team_price')} />
         <Field id="r-rfee" label={`${t('runnerFee')} (MXN)`} type="number" min="0" step="50" value={f.runner_fee} onChange={set('runner_fee')} hint={t('runnerFeeHint')} />
-        <Field id="r-size" label={t('teamSize')} type="number" min="1" value={f.team_size} onChange={set('team_size')} />
+        <Field id="r-size" label={t('teamSizeMax')} type="number" min="1" value={f.team_size} onChange={set('team_size')} />
+        <Field id="r-sizes" label={t('teamSizes')} value={f.team_sizes || ''} onChange={set('team_sizes')} hint={t('teamSizesHint')} placeholder="4,5,6" />
+        <Field id="r-hold" label={t('holdSlots')} type="number" min="0" value={f.hold_slots ?? 0} onChange={set('hold_slots')} hint={t('holdSlotsHint')} />
         <Field id="r-cap" label={t('capacity')} type="number" min="1" value={f.capacity_teams} onChange={set('capacity_teams')} />
         <Field id="r-cats" label={t('categories')} value={f.categories || ''} onChange={set('categories')} hint={t('categoriesHint')} />
         <Field id="r-bib" label={t('bibStart')} type="number" min="1" value={f.bib_start} onChange={set('bib_start')} />
@@ -121,7 +131,7 @@ export function RaceForm({ race, onClose }: { race?: ARace; onClose: () => void 
 /* ---------------- race detail ---------------- */
 type Modal = { type: 'race' } | { type: 'teamForm'; id?: string } | { type: 'team'; id: string } | { type: 'runner'; id: string } | null;
 
-export function RaceDetail({ race, teams, runners }: { race: ARace; teams: ATeam[]; runners: ARunner[] }) {
+export function RaceDetail({ race, teams, runners, payments }: { race: ARace; teams: ATeam[]; runners: ARunner[]; payments: APayment[] }) {
   const { t, lang } = useT();
   const router = useRouter();
   const q = useSearchParams();
@@ -130,8 +140,13 @@ export function RaceDetail({ race, teams, runners }: { race: ARace; teams: ATeam
   const [modal, setModal] = useState<Modal>(null);
   const teamById = (id: string) => teams.find((x) => x.id === id);
   const runnersOfTeam = (id: string) => runners.filter((r) => r.team_id === id).sort((a, b) => (a.bib || 0) - (b.bib || 0));
-  const stats = raceStats(race, teams, runners);
-  const tabs: [string, string][] = [['summary', t('summary')], ['teams', `${t('teams')} · ${stats.teams}`], ['runners', `${t('runners')} · ${stats.runners}`], ['payments', t('payments')]];
+  const stats = raceStats(race, teams, runners, payments);
+  const unassigned = payments.filter((p) => !p.team_id).length;
+  const tabs: [string, string][] = [['summary', t('summary')], ['teams', `${t('teams')} · ${stats.teams}`], ['runners', `${t('runners')} · ${stats.runners}`],
+    ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['import', t('importTab')]];
+  // Hold races: a runner is "covered" when they fit inside the team's paid slots.
+  const covered = new Set<string>();
+  if (isHold(race)) for (const tm of teams) runnersOfTeam(tm.id).slice(0, teamSlots(tm, race).paid).forEach((r) => covered.add(r.id));
   const setTab = (k: string) => { setSearch(''); router.replace(k === 'summary' ? `/admin/races/${race.id}` : `/admin/races/${race.id}?tab=${k}`, { scroll: false }); };
   const csvHref = `/api/admin/races/${race.id}/csv`;
 
@@ -173,15 +188,16 @@ export function RaceDetail({ race, teams, runners }: { race: ARace; teams: ATeam
             <a className="btn btn-sm" href={csvHref}>{t('exportCsv')}</a>
           </div>
           <RunnersTable runners={runners.filter((x) => !search || `${x.first_name} ${x.last_name} ${x.email} ${teamById(x.team_id)?.name || ''} ${x.bib}`.toLowerCase().includes(search.toLowerCase()))}
-            teamName={(id) => teamById(id)?.name || '—'} open={(id) => setModal({ type: 'runner', id })} />
+            teamName={(id) => teamById(id)?.name || '—'} open={(id) => setModal({ type: 'runner', id })} hold={isHold(race)} covered={covered} />
         </>
       )}
-      {tab === 'payments' && <Payments teams={teams} runners={runners} stats={stats} />}
+      {tab === 'payments' && <Payments race={race} teams={teams} payments={payments} stats={stats} />}
+      {tab === 'import' && <ImportPanel race={race} />}
 
       {modal?.type === 'race' && <RaceForm race={race} onClose={() => setModal(null)} />}
       {modal?.type === 'teamForm' && <TeamForm race={race} team={modal.id ? teamById(modal.id) : undefined} onClose={() => setModal(null)} onSaved={(id) => setModal({ type: 'team', id })} />}
       {modal?.type === 'team' && teamById(modal.id) && (
-        <TeamDrawer team={teamById(modal.id)!} race={race} runners={runnersOfTeam(modal.id)} onClose={() => setModal(null)}
+        <TeamDrawer team={teamById(modal.id)!} race={race} runners={runnersOfTeam(modal.id)} payments={payments.filter((p) => p.team_id === modal.id)} onClose={() => setModal(null)}
           onEdit={() => setModal({ type: 'teamForm', id: modal.id })} onRunner={(id) => setModal({ type: 'runner', id })} />
       )}
       {modal?.type === 'runner' && runners.find((r) => r.id === modal.id) && (
@@ -213,7 +229,7 @@ function Summary({ race, teams, runners, stats }: { race: ARace; teams: ATeam[];
         <div className="kpi"><div className="label">{t('teamsSold')}</div><div className="v num">{stats.teams}<span className="muted" style={{ fontSize: 22 }}>/{race.capacity_teams}</span></div><div className="s">{stats.teamsLeft} {t('slotsLeft')}</div></div>
         <div className="kpi"><div className="label">{t('runners')}</div><div className="v num">{stats.runners}<span className="muted" style={{ fontSize: 22 }}>/{stats.capRunners}</span></div><div className="meter"><i style={{ width: Math.min(100, Math.round(stats.fill * 100)) + '%' }} /></div></div>
         <div className="kpi"><div className="label">{t('revenue')}</div><div className="v num">{money(stats.revenue, lang)}</div><div className="s">{money(stats.pending, lang)} {t('pending').toLowerCase()}</div></div>
-        <div className="kpi"><div className="label">{t('teamPrice')}</div><div className="v num">{money(race.team_price, lang)}</div><div className="s">{race.runner_fee > 0 ? `${money(race.runner_fee, lang)} · ${t('runnerFee').toLowerCase()}` : t('p_included')}</div></div>
+        <div className="kpi"><div className="label">{isHold(race) ? t('holdLabel') : t('teamPrice')}</div><div className="v num">{money(race.team_price, lang)}</div><div className="s">{isHold(race) ? `${race.hold_slots} ${t('slotsWord')} · ${money(race.runner_fee, lang)} ${t('perExtraSlot')}` : race.runner_fee > 0 ? `${money(race.runner_fee, lang)} · ${t('runnerFee').toLowerCase()}` : t('p_included')}</div></div>
       </div>
       <div className="split">
         <div className="card">
@@ -232,22 +248,28 @@ function Summary({ race, teams, runners, stats }: { race: ARace; teams: ATeam[];
 }
 
 function TeamsTable({ race, teams, count, open }: { race: ARace; teams: ATeam[]; count: (id: string) => number; open: (id: string) => void }) {
-  const { t } = useT();
+  const { t, lang } = useT();
+  const hold = isHold(race);
   return (
     <div className="tbl-wrap">
       {teams.length ? (
         <table>
-          <thead><tr><th>{t('team')}</th><th>{t('category')}</th><th>{t('captain')}</th><th>{t('members')}</th><th>{t('teamPassword')}</th><th>{t('payment')}</th></tr></thead>
+          <thead><tr><th>{t('team')}</th><th>{t('captain')}</th><th>{t('members')}</th>{hold && <th>{t('paidSlots')}</th>}<th style={{ textAlign: 'right' }}>{t('balance')}</th><th>{t('teamPassword')}</th><th>{hold ? t('holdLabel') : t('payment')}</th></tr></thead>
           <tbody>
-            {teams.map((x) => (
-              <tr key={x.id} className="click" onClick={() => open(x.id)}>
-                <td><b>{x.name}</b></td><td>{x.category || '—'}</td>
-                <td>{x.captain_name}<div className="muted" style={{ fontSize: 12 }}>{x.captain_email}</div></td>
-                <td className="num">{count(x.id)}/{race.team_size}</td>
-                <td>{x.has_password ? <span className="chip ok">{t('set')}</span> : <span className="chip">{t('notSet')}</span>}</td>
-                <td><PayChip status={x.payment_status} /></td>
-              </tr>
-            ))}
+            {teams.map((x) => {
+              const sl = teamSlots(x, race), n = count(x.id);
+              return (
+                <tr key={x.id} className="click" onClick={() => open(x.id)}>
+                  <td><b>{x.name}</b>{x.category && <div className="muted" style={{ fontSize: 12 }}>{x.category}</div>}</td>
+                  <td>{x.captain_name}<div className="muted" style={{ fontSize: 12 }}>{x.captain_email}</div></td>
+                  <td className="num">{n}/{sl.size}{n > sl.size && <span className="chip bad" style={{ marginLeft: 6 }}>+{n - sl.size}</span>}</td>
+                  {hold && <td className="num"><SlotBar paid={sl.paid} size={sl.size} /></td>}
+                  <td className="num" style={{ textAlign: 'right' }}>{sl.balance > 0 ? money(sl.balance, lang) : <span className="chip ok">{t('paid')}</span>}</td>
+                  <td>{x.has_password ? <span className="chip ok">{t('set')}</span> : <span className="chip">{t('notSet')}</span>}</td>
+                  <td><PayChip status={x.payment_status} /></td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       ) : <div className="empty">{t('noTeams')}</div>}
@@ -255,7 +277,18 @@ function TeamsTable({ race, teams, count, open }: { race: ARace; teams: ATeam[];
   );
 }
 
-function RunnersTable({ runners, teamName, open }: { runners: ARunner[]; teamName: (id: string) => string; open: (id: string) => void }) {
+function SlotBar({ paid, size }: { paid: number; size: number }) {
+  return (
+    <span className="row" style={{ gap: 3, flexWrap: 'nowrap' }} title={`${paid}/${size}`}>
+      {Array.from({ length: Math.max(size, paid) }, (_, i) => (
+        <i key={i} style={{ width: 9, height: 14, borderRadius: 2, display: 'inline-block', background: i < paid ? (i < size ? 'var(--ok)' : 'var(--warn)') : 'var(--line)' }} />
+      ))}
+      <span style={{ marginLeft: 6 }}>{paid}/{size}</span>
+    </span>
+  );
+}
+
+function RunnersTable({ runners, teamName, open, hold, covered }: { runners: ARunner[]; teamName: (id: string) => string; open: (id: string) => void; hold: boolean; covered: Set<string> }) {
   const { t } = useT();
   const sorted = [...runners].sort((a, b) => (a.bib || 0) - (b.bib || 0));
   return (
@@ -270,7 +303,8 @@ function RunnersTable({ runners, teamName, open }: { runners: ARunner[]; teamNam
                 <td><b>{x.first_name} {x.last_name}</b><div className="muted" style={{ fontSize: 12 }}>{x.email}</div></td>
                 <td>{teamName(x.team_id)}</td><td>{genderLabel(x.gender, t)}</td><td>{x.shirt_size || '—'}</td>
                 <td>{x.waiver_accepted_at ? <span className="chip ok">✓</span> : <span className="chip bad">✗</span>}</td>
-                <td>{x.fee > 0 ? <PayChip status={x.payment_status} /> : <span className="chip plain">{t('p_included')}</span>}</td>
+                <td>{hold ? (covered.has(x.id) ? <span className="chip ok">{t('covered')}</span> : <span className="chip warn">{t('pending')}</span>)
+                  : x.fee > 0 ? <PayChip status={x.payment_status} /> : <span className="chip plain">{t('p_included')}</span>}</td>
               </tr>
             ))}
           </tbody>
@@ -280,34 +314,115 @@ function RunnersTable({ runners, teamName, open }: { runners: ARunner[]; teamNam
   );
 }
 
-function Payments({ teams, runners, stats }: { teams: ATeam[]; runners: ARunner[]; stats: Stats }) {
+function Payments({ race, teams, payments, stats }: { race: ARace; teams: ATeam[]; payments: APayment[]; stats: Stats }) {
   const { t, lang } = useT();
-  const rows = [
-    ...teams.map((x) => ({ id: x.id, ts: x.paid_at || x.created_at, concept: `${t('team')}: ${x.name}`, amount: x.amount, status: x.payment_status, method: x.payment_method })),
-    ...runners.filter((x) => x.fee > 0).map((x) => ({ id: x.id, ts: x.paid_at || x.created_at, concept: `${x.first_name} ${x.last_name}`, amount: x.fee, status: x.payment_status, method: x.payment_method })),
-  ].sort((a, b) => String(b.ts).localeCompare(String(a.ts)));
+  const { act } = useAct();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const [q, setQ] = useState('');
+  const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));
+  const teamName = (id: string | null) => teams.find((x) => x.id === id)?.name || '—';
+  const un = payments.filter((p) => !p.team_id);
+  const shown = payments.filter((p) => !q || `${p.payer_name} ${p.payer_email} ${p.comment} ${teamName(p.team_id)} ${p.external_id}`.toLowerCase().includes(q.toLowerCase()));
+  const concept = (p: APayment) => p.kind === 'team' ? (isHold(race) ? t('holdLabel') : t('team')) : p.kind === 'slots' ? `${p.quantity} ${t('slotsWord')}` : t('runnerFee');
+  const TeamSelect = ({ p }: { p: APayment }) => (
+    <select value={p.team_id || ''} onChange={(e) => act(() => setPaymentTeam(p.id, e.target.value || null))} aria-label={t('team')} style={{ maxWidth: 220, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)' }}>
+      <option value="">— {t('unassigned')} —</option>
+      {sortedTeams.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+    </select>
+  );
   return (
-    <>
-      <div className="kpis" style={{ marginBottom: 16 }}>
-        <div className="kpi"><div className="label">{t('paid')}</div><div className="v num">{money(stats.revenue, lang)}</div></div>
+    <div className="stack">
+      <div className="kpis">
+        <div className="kpi"><div className="label">{t('paid')}</div><div className="v num">{money(stats.revenue, lang)}</div><div className="s">{payments.length} {t('payments').toLowerCase()}</div></div>
         <div className="kpi"><div className="label">{t('pending')}</div><div className="v num">{money(stats.pending, lang)}</div></div>
+        <div className="kpi"><div className="label">{t('unassigned')}</div><div className="v num">{un.length}</div><div className="s">{money(un.reduce((a, p) => a + p.amount, 0), lang)}</div></div>
       </div>
+      {un.length > 0 && (
+        <div className="card stack">
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <div><h3 style={{ textTransform: 'uppercase' }}>{t('unassignedTitle')}</h3><p className="muted" style={{ fontSize: 14, marginTop: 4 }}>{t('unassignedSub')}</p></div>
+            <button type="button" className="btn btn-sm" disabled={busy} onClick={async () => { setBusy(true); const r = await rematchPayments(race.id); setBusy(false); toast(`${t('stillUnassigned')}: ${r.left}`); }}>{t('rematch')}</button>
+          </div>
+          <div className="tbl-wrap"><table>
+            <thead><tr><th>{t('date')}</th><th>{t('payer')}</th><th>{t('concept')}</th><th style={{ textAlign: 'right' }}>{t('amount')}</th><th>{t('team')}</th></tr></thead>
+            <tbody>{un.map((p) => (
+              <tr key={p.id}>
+                <td className="num">{fmtDate(p.paid_at, lang)}</td>
+                <td><b>{p.payer_name || '—'}</b><div className="muted" style={{ fontSize: 12 }}>{p.payer_email}</div>{p.comment && <div style={{ fontSize: 12, marginTop: 2 }}>“{p.comment}”</div>}</td>
+                <td>{concept(p)}</td><td className="num" style={{ textAlign: 'right' }}>{money(p.amount, lang)}</td>
+                <td><TeamSelect p={p} /></td>
+              </tr>
+            ))}</tbody>
+          </table></div>
+        </div>
+      )}
+      <div className="toolbar"><input className="search" type="search" placeholder={t('search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('search')} /></div>
       <div className="tbl-wrap">
-        {rows.length ? (
+        {shown.length ? (
           <table>
-            <thead><tr><th>{t('date')}</th><th>{t('concept')}</th><th>{t('method')}</th><th style={{ textAlign: 'right' }}>{t('amount')}</th><th>{t('status')}</th></tr></thead>
+            <thead><tr><th>{t('date')}</th><th>{t('payer')}</th><th>{t('concept')}</th><th>{t('method')}</th><th style={{ textAlign: 'right' }}>{t('amount')}</th><th>{t('team')}</th><th /></tr></thead>
             <tbody>
-              {rows.map((p) => (
+              {shown.map((p) => (
                 <tr key={p.id}>
-                  <td className="num">{fmtDT(p.ts, lang)}</td><td>{p.concept}</td><td>{p.status === 'paid' ? methodLabel(p.method, t) : '—'}</td>
-                  <td className="num" style={{ textAlign: 'right' }}>{money(p.amount, lang)}</td><td><PayChip status={p.status} /></td>
+                  <td className="num">{fmtDT(p.paid_at, lang)}</td>
+                  <td>{p.payer_name || '—'}<div className="muted" style={{ fontSize: 12 }}>{p.payer_email}{p.external_id?.startsWith('ecwid:') ? ` · #${p.external_id.slice(6)}` : ''}</div></td>
+                  <td>{concept(p)}</td><td>{methodLabel(p.source, t)}</td>
+                  <td className="num" style={{ textAlign: 'right' }}>{money(p.amount, lang)}</td>
+                  <td><TeamSelect p={p} /></td>
+                  <td style={{ textAlign: 'right' }}>{p.source === 'manual' && <DeleteButton onConfirm={() => act(() => removePayment(p.id), 'deleted')} />}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         ) : <div className="empty">{t('noPayments')}</div>}
       </div>
-    </>
+    </div>
+  );
+}
+
+function ImportPanel({ race }: { race: ARace }) {
+  const { t } = useT();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [log, setLog] = useState<{ file: string; text: string; ok: boolean }[]>([]);
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    setBusy(true);
+    // RedPodium first so payments can match against its runners.
+    const texts = await Promise.all(files.map(async (f) => ({ name: f.name, text: await f.text() })));
+    texts.sort((a, b) => Number(/order_number/.test(a.text.slice(0, 500))) - Number(/order_number/.test(b.text.slice(0, 500))));
+    for (const f of texts) {
+      const r: any = await importCsv(race.id, f.text);
+      if (r.error) setLog((l) => [...l, { file: f.name, ok: false, text: t(r.error) }]);
+      else setLog((l) => [...l, { file: f.name, ok: true, text:
+        (r.kind === 'redpodium' ? `RedPodium · ${r.teamsCreated} ${t('teams').toLowerCase()}, ${r.runnersCreated} ${t('runners').toLowerCase()}` : `Ecwid · ${r.paymentsCreated} ${t('payments').toLowerCase()}`) +
+        ` · ${r.skipped} ${t('alreadyImported')} · ${r.unmatched} ${t('unassigned').toLowerCase()}` + (r.warnings?.length ? `\n⚠ ${r.warnings.join('\n⚠ ')}` : '') }]);
+    }
+    setBusy(false);
+    router.refresh();
+  };
+  return (
+    <div className="split">
+      <div className="card stack">
+        <h3 style={{ textTransform: 'uppercase' }}>{t('importTitle')}</h3>
+        <p className="muted" style={{ fontSize: 14 }}>{t('importSub')}</p>
+        <ol style={{ margin: 0, paddingLeft: 20, fontSize: 14, display: 'grid', gap: 6 }}>
+          <li>{t('importStep1')}</li><li>{t('importStep2')}</li><li>{t('importStep3')}</li>
+        </ol>
+        <label className="btn btn-primary" style={{ alignSelf: 'flex-start', cursor: busy ? 'wait' : 'pointer' }}>
+          {busy ? <><span className="spin" /> {t('importing')}</> : t('chooseCsv')}
+          <input type="file" accept=".csv,text/csv" multiple hidden onChange={onFile} disabled={busy} />
+        </label>
+      </div>
+      <div className="card stack">
+        <h3 style={{ textTransform: 'uppercase' }}>{t('importLog')}</h3>
+        {log.length ? log.map((l, i) => (
+          <div key={i} className="note" style={{ whiteSpace: 'pre-wrap', color: l.ok ? undefined : 'var(--bad)' }}><b>{l.file}</b><br />{l.text}</div>
+        )) : <p className="muted">—</p>}
+      </div>
+    </div>
   );
 }
 
@@ -316,7 +431,8 @@ function TeamForm({ race, team, onClose, onSaved }: { race: ARace; team?: ATeam;
   const { t } = useT();
   const { act } = useAct();
   const cats = splitCats(race.categories);
-  const [f, setF] = useState<Record<string, any>>(team || { name: '', category: cats[0] || '', captain_name: '', captain_email: '', captain_phone: '', amount: race.team_price, payment_status: 'pending' });
+  const sizes = sizeList(race);
+  const [f, setF] = useState<Record<string, any>>(team ? { ...team, team_size: team.team_size || race.team_size } : { name: '', category: cats[0] || '', captain_name: '', captain_email: '', captain_phone: '', amount: race.team_price, payment_status: 'pending', team_size: sizes[sizes.length - 1], notes: '' });
   const set = (k: string) => (v: string) => setF((x) => ({ ...x, [k]: v }));
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -332,7 +448,9 @@ function TeamForm({ race, team, onClose, onSaved }: { race: ARace; team?: ATeam;
         <Field id="t-cname" label={t('p_captainName')} value={f.captain_name} onChange={set('captain_name')} req />
         <Field id="t-cemail" label={t('email')} type="email" value={f.captain_email} onChange={set('captain_email')} req />
         <Field id="t-cphone" label={t('phone')} type="tel" value={f.captain_phone || ''} onChange={set('captain_phone')} />
-        <Field id="t-amt" label={`${t('amount')} (MXN)`} type="number" value={f.amount} onChange={set('amount')} />
+        <Field id="t-amt" label={`${isHold(race) ? t('holdLabel') : t('amount')} (MXN)`} type="number" value={f.amount} onChange={set('amount')} />
+        <Field id="t-size" label={t('teamSize')} value={String(f.team_size)} onChange={set('team_size')} options={sizes.map(String)} />
+        <Field id="t-notes" label={t('notes')} type="textarea" value={f.notes || ''} onChange={set('notes')} full />
         <div className="full row" style={{ justifyContent: 'flex-end', marginTop: 6 }}>
           <button type="button" className="btn" onClick={onClose}>{t('cancel')}</button>
           <button className="btn btn-primary" type="submit">{team ? t('save') : t('create')}</button>
@@ -342,13 +460,18 @@ function TeamForm({ race, team, onClose, onSaved }: { race: ARace; team?: ATeam;
   );
 }
 
-function TeamDrawer({ team: x, race, runners, onClose, onEdit, onRunner }: { team: ATeam; race: ARace; runners: ARunner[]; onClose: () => void; onEdit: () => void; onRunner: (id: string) => void }) {
+function TeamDrawer({ team: x, race, runners, payments, onClose, onEdit, onRunner }: { team: ATeam; race: ARace; runners: ARunner[]; payments: APayment[]; onClose: () => void; onEdit: () => void; onRunner: (id: string) => void }) {
   const { t, lang } = useT();
   const { act } = useAct();
   const copy = useCopy();
+  const sl = teamSlots(x, race);
+  const hold = isHold(race);
+  const [add, setAdd] = useState<{ qty: string; amount: string } | null>(null);
   return (
     <Drawer title={x.name} sub={`${race.name} · ${x.category || ''}`} onClose={onClose}>
-      <div className="row"><PayChip status={x.payment_status} /><span className="chip plain num">{runners.length}/{race.team_size} {t('runners').toLowerCase()}</span></div>
+      <div className="row"><PayChip status={x.payment_status} /><span className="chip plain num">{runners.length}/{sl.size} {t('runners').toLowerCase()}</span>
+        {hold && <SlotBar paid={sl.paid} size={sl.size} />}{sl.balance > 0 && <span className="chip warn num">{t('balance')}: {money(sl.balance, lang)}</span>}</div>
+      {x.notes && <div className="note" style={{ whiteSpace: 'pre-wrap' }}>{x.notes}</div>}
       <div className="card">
         <dl className="kv">
           <dt>{t('captain')}</dt><dd>{x.captain_name}</dd>
@@ -365,7 +488,30 @@ function TeamDrawer({ team: x, race, runners, onClose, onEdit, onRunner }: { tea
         <button type="button" className="btn btn-sm" onClick={onEdit}>{t('edit')}</button>
         <button type="button" className="btn btn-sm" onClick={() => act(() => teamNewCode(x.id))}>{t('newCode')}</button>
         {x.has_password && <button type="button" className="btn btn-sm" onClick={() => act(() => teamClearPassword(x.id))}>{t('resetPass')}</button>}
+        {hold && <button type="button" className="btn btn-sm" onClick={() => setAdd({ qty: String(Math.max(1, sl.size - sl.paid)), amount: String(Math.max(1, sl.size - sl.paid) * race.runner_fee) })}>{t('addSlots')}</button>}
       </div>
+      {add && (
+        <form className="card row" style={{ alignItems: 'flex-end' }} onSubmit={async (e) => { e.preventDefault(); if (await act(() => teamAddSlots(x.id, Number(add.qty), Number(add.amount)))) setAdd(null); }}>
+          <Field id="as-qty" label={t('slotsWord')} type="number" min="1" value={add.qty} onChange={(v) => setAdd({ qty: v, amount: String((Number(v) || 0) * race.runner_fee) })} />
+          <Field id="as-amt" label={`${t('amount')} (MXN)`} type="number" min="0" value={add.amount} onChange={(v) => setAdd({ ...add, amount: v })} />
+          <button className="btn btn-primary btn-sm" type="submit">{t('save')}</button>
+          <button className="btn btn-sm" type="button" onClick={() => setAdd(null)}>{t('cancel')}</button>
+        </form>
+      )}
+      {payments.length > 0 && (
+        <div>
+          <h3 style={{ textTransform: 'uppercase', marginBottom: 8 }}>{t('payments')}</h3>
+          <div className="tbl-wrap"><table><tbody>
+            {payments.map((p) => (
+              <tr key={p.id}>
+                <td className="num">{fmtDate(p.paid_at, lang)}</td>
+                <td>{p.kind === 'team' ? (hold ? t('holdLabel') : t('team')) : p.kind === 'slots' ? `${p.quantity} ${t('slotsWord')}` : t('runnerFee')}<div className="muted" style={{ fontSize: 12 }}>{p.payer_name} · {methodLabel(p.source, t)}</div></td>
+                <td className="num" style={{ textAlign: 'right' }}>{money(p.amount, lang)}</td>
+              </tr>
+            ))}
+          </tbody></table></div>
+        </div>
+      )}
       <div>
         <h3 style={{ textTransform: 'uppercase', marginBottom: 8 }}>{t('runners')}</h3>
         {runners.length ? (
@@ -472,6 +618,21 @@ export function Staff({ users, meId }: { users: { id: string; name: string; emai
         <Field id="s-pass" label={t('password')} type="text" value={f.password} onChange={set('password')} req minLength={8} hint={t('passMin8')} autoComplete="off" />
         <div><button className="btn btn-primary" type="submit">{t('create')}</button></div>
       </form>
+      <ChangePassword />
     </div>
+  );
+}
+
+function ChangePassword() {
+  const { t } = useT();
+  const { act } = useAct();
+  const [f, setF] = useState({ current: '', next: '' });
+  return (
+    <form className="card form" style={{ gridTemplateColumns: '1fr' }} onSubmit={async (e) => { e.preventDefault(); if (await act(() => changePassword(f.current, f.next))) setF({ current: '', next: '' }); }}>
+      <h3 style={{ textTransform: 'uppercase' }}>{t('changePassword')}</h3>
+      <Field id="cp-cur" label={t('currentPassword')} type="password" value={f.current} onChange={(v) => setF({ ...f, current: v })} req autoComplete="current-password" />
+      <Field id="cp-new" label={t('newPassword')} type="password" value={f.next} onChange={(v) => setF({ ...f, next: v })} req minLength={8} hint={t('passMin8')} autoComplete="new-password" />
+      <div><button className="btn btn-primary" type="submit">{t('save')}</button></div>
+    </form>
   );
 }

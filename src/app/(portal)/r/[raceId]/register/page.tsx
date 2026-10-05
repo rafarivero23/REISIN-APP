@@ -1,5 +1,5 @@
 import { getT } from '@/lib/lang';
-import { getTeam } from '@/lib/repo';
+import { getTeam, getRace, feeForNewRunner } from '@/lib/repo';
 import { getMemberTeamId } from '@/lib/team-session';
 import { RegisterForm } from '@/components/portal';
 import { Back, loadOpenRace, Closed } from '../../../shared';
@@ -21,7 +21,7 @@ export default async function RegisterPage({ params }: { params: { raceId: strin
   return (
     <>
       <Back href={`/r/${params.raceId}/join`} />
-      <RegisterForm race={res.race} teamName={team.name} />
+      <RegisterForm race={res.race} teamName={team.name} feeDue={(await feeForNewRunner((await getRace(res.race.id))!, team)).fee} />
     </>
   );
 }

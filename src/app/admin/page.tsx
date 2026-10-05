@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { listRaces, listTeams, listRunners } from '@/lib/repo';
+import { listRaces, listTeams, listRunners, listPayments } from '@/lib/repo';
 import { getT } from '@/lib/lang';
 import { money } from '@/lib/format';
 import { NewRaceButton } from '@/components/admin';
@@ -9,9 +9,9 @@ import RaceCard from './RaceCard';
 
 export default async function AdminHome() {
   const { t, lang } = getT();
-  const [races, teams, runners] = await Promise.all([listRaces(), listTeams(), listRunners()]);
+  const [races, teams, runners, payments] = await Promise.all([listRaces(), listTeams(), listRunners(), listPayments()]);
   const aTeams = toATeams(teams), aRunners = toARunners(runners);
-  const rs = races.map(toARace).map((r) => ({ r, s: raceStats(r, aTeams.filter((x) => x.race_id === r.id), aRunners.filter((x) => x.race_id === r.id)) }));
+  const rs = races.map(toARace).map((r) => ({ r, s: raceStats(r, aTeams.filter((x) => x.race_id === r.id), aRunners.filter((x) => x.race_id === r.id), payments.filter((x) => x.race_id === r.id)) }));
   const open = rs.filter((x) => x.r.status === 'open');
   const tot = rs.reduce((a, { s }) => ({ teams: a.teams + s.teams, runners: a.runners + s.runners, rev: a.rev + s.revenue, pend: a.pend + s.pending }), { teams: 0, runners: 0, rev: 0, pend: 0 });
   const teamName = (id: string) => teams.find((x) => x.id === id)?.name || '—';

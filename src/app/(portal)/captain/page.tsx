@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { getTeam, getRace, runnersOfTeam } from '@/lib/repo';
+import { getTeam, getRace, runnersOfTeam, isHoldRace, paidSlots, teamSizeOf } from '@/lib/repo';
 import { getCaptainTeamId } from '@/lib/team-session';
 import { getT } from '@/lib/lang';
 import { CaptainDash } from '@/components/portal';
@@ -22,7 +22,8 @@ export default async function CaptainPage() {
     <Suspense>
       <CaptainDash
         team={{ name: team.name, category: team.category, payment_status: team.payment_status, claim_code: team.claim_code, has_password: !!team.password_hash }}
-        race={{ id: race.id, name: race.name, team_size: race.team_size }}
+        race={{ id: race.id, name: race.name, team_size: race.team_size, runner_fee: race.runner_fee }}
+        slots={{ hold: isHoldRace(race), size: teamSizeOf(team, race), paid: paidSlots(team, race) }}
         runners={runners}
       />
     </Suspense>
