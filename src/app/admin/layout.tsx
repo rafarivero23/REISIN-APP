@@ -15,7 +15,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <div className="shell">
       <aside className="rail">
-        <div className="brand"><div className="brand-mark">R</div><div><div className="brand-name">Reisin</div><div className="brand-sub">{t('admin')}</div></div></div>
+        <div className="brand"><img src="/reisin-mark-white.png" alt="Reisin" className="brand-logo" /><div><div className="brand-name">Reisin</div><div className="brand-sub">{t('admin')}</div></div></div>
         <AdminNav races={open} />
         <div className="rail-foot">
           <LangToggle />
@@ -27,7 +27,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div style={{ minWidth: 0 }}>
         <div className="mobile-bar">
           <div className="brand">
-            <Link href="/admin" className="brand-mark" style={{ width: 30, height: 30, fontSize: 17, textDecoration: 'none' }}>R</Link>
+            <Link href="/admin" style={{ display: 'flex' }}><img src="/reisin-mark-white.png" alt="Reisin" className="brand-logo sm" /></Link>
             <AdminNav races={[]} mobile />
           </div>
           <LangToggle />

@@ -7,7 +7,7 @@ import { getLang } from '@/lib/lang';
 export const metadata: Metadata = {
   title: 'Reisin Race Hub',
   description: 'Venta de equipos e inscripción de corredores para Sal a Valle y Baja Crossing',
-  icons: { icon: '/icon.svg' },
+  icons: { icon: '/icon.png', apple: '/apple-icon.png' },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

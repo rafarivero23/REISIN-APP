@@ -5,7 +5,7 @@
 
 /* Layout: admin = left rail + working canvas; portal = single race-bib column. Bib numbers are the signature detail. */
 :root{
-  --bg:#f3f4f1; --surface:#ffffff; --surface-2:#eceeea; --ink:#141820; --muted:#5b6370; --line:#dcdfda;
+  --bg:#f3f4f1; --header-bg:#141820; --logo-on-surface:invert(1) brightness(.35); --surface:#ffffff; --surface-2:#eceeea; --ink:#141820; --muted:#5b6370; --line:#dcdfda;
   --accent:#1d4ed8; --accent-ink:#ffffff; --accent-soft:#e3eafc;
   --bib:#f2c230; --bib-ink:#141820;
   --ok:#147a4a; --ok-soft:#dcf2e6; --warn:#a35b00; --warn-soft:#fbecd5; --bad:#b42318; --bad-soft:#fbe0dd;
@@ -16,14 +16,14 @@
   --r:10px;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#0f1217; --surface:#171b22; --surface-2:#1f242d; --ink:#e9ecef; --muted:#9aa3ae; --line:#2b313b;
+  --bg:#0f1217; --header-bg:#0a0d11; --logo-on-surface:none; --surface:#171b22; --surface-2:#1f242d; --ink:#e9ecef; --muted:#9aa3ae; --line:#2b313b;
   --accent:#6b93ff; --accent-ink:#0b1020; --accent-soft:#1c2846;
   --bib:#f2c230; --bib-ink:#141820;
   --ok:#4cc38a; --ok-soft:#14301f; --warn:#f0a94a; --warn-soft:#33240f; --bad:#f2786a; --bad-soft:#3a1714;
   --sav:#5fbf86; --baja:#f08a4b; --other:#9aa3ae;
   --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0f1217; --surface:#171b22; --surface-2:#1f242d; --ink:#e9ecef; --muted:#9aa3ae; --line:#2b313b;
+  --bg:#0f1217; --header-bg:#0a0d11; --logo-on-surface:none; --surface:#171b22; --surface-2:#1f242d; --ink:#e9ecef; --muted:#9aa3ae; --line:#2b313b;
   --accent:#6b93ff; --accent-ink:#0b1020; --accent-soft:#1c2846;
   --bib:#f2c230; --bib-ink:#141820;
   --ok:#4cc38a; --ok-soft:#14301f; --warn:#f0a94a; --warn-soft:#33240f; --bad:#f2786a; --bad-soft:#3a1714;
@@ -237,3 +237,12 @@ a.btn-primary{color:var(--accent-ink)}
 .cat-femenil{background:var(--bad-soft)!important;color:var(--bad)!important}
 .cat-varonil{background:var(--accent-soft)!important;color:var(--accent)!important}
 .cat-mixto{background:var(--ok-soft)!important;color:var(--ok)!important}
+
+.brand-logo{height:30px;width:auto;display:block}
+.brand-logo.sm{height:22px}
+.login .brand-logo{height:34px}
+
+.login .brand-logo{filter:var(--logo-on-surface)}
+
+/* Header bars stay dark in both themes so the white Reisin mark always reads. */
+.rail,.p-top,.mobile-bar{background:var(--header-bg)!important;color:#f3f4f1}
