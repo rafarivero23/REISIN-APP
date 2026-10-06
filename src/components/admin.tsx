@@ -11,7 +11,7 @@ import { parseGroups, groupFor, categoryOf, fmtHalf, type StartGroup } from '@/l
 import { LogoInput } from './LogoInput';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
-  removeRunner, addTeammate, removeTeammate, teamAddSlots, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
+  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
 /* Shapes passed from server components (no password hashes). */
@@ -22,7 +22,7 @@ export type ARace = {
 };
 export type APayment = {
   id: string; team_id: string | null; runner_id: string | null; kind: string; source: string; external_id: string | null; quantity: number;
-  amount: number; payer_name: string | null; payer_email: string | null; comment: string | null; paid_at: string;
+  amount: number; payer_name: string | null; payer_email: string | null; comment: string | null; paid_at: string; notes: string | null;
 };
 export const sizeList = (r: ARace) => {
   const xs = (r.team_sizes || '').split(',').map((x) => parseInt(x, 10)).filter((n) => n > 0);
@@ -38,7 +38,7 @@ export type ARunner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string; email: string;
   phone: string | null; birth_date: string | null; gender: string | null; shirt_size: string | null; emergency_name: string | null;
   emergency_phone: string | null; waiver_accepted_at: string | null; fee: number; payment_status: string;
-  payment_method: string | null; paid_at: string | null; created_at: string;
+  payment_method: string | null; paid_at: string | null; created_at: string; notes: string | null;
 };
 
 export const genderLabel = (g: string | null, t: (k: string) => string) => (g === 'F' ? t('female') : g === 'M' ? t('male') : g === 'X' ? t('nonbinary') : '—');
@@ -69,6 +69,24 @@ export function CatChip({ c }: { c: string | null }) {
   return c ? <span className={'chip plain cat-' + c}>{t(c)}</span> : <span className="muted">—</span>;
 }
 const logoSrc = (x: { id: string; logo_v: string | null }) => (x.logo_v ? `/api/logo/${x.id}?v=${x.logo_v}` : null);
+
+// Inline note: click to edit, saves on blur or Enter. Empty shows a faint "+ nota".
+function NoteCell({ value, onSave, wide }: { value: string | null; onSave: (v: string) => Promise<unknown>; wide?: boolean }) {
+  const { t } = useT();
+  const [edit, setEdit] = useState<string | null>(null);
+  if (edit !== null) {
+    const done = async () => { const v = edit.trim(); setEdit(null); if (v !== (value || '')) await onSave(v); };
+    return <textarea autoFocus value={edit} onChange={(e) => setEdit(e.target.value)} onBlur={done}
+      onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); (e.target as HTMLTextAreaElement).blur(); } if (e.key === 'Escape') setEdit(null); }}
+      rows={2} style={{ width: wide ? '100%' : 240, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--accent)', background: 'var(--surface)', font: 'inherit', fontSize: 13 }} />;
+  }
+  return (
+    <button type="button" onClick={(e) => { e.stopPropagation(); setEdit(value || ''); }} title={t('notes')}
+      style={{ all: 'unset', cursor: 'text', display: 'block', minWidth: 120, maxWidth: wide ? '100%' : 260, fontSize: 13, whiteSpace: 'pre-wrap', padding: '4px 6px', borderRadius: 6, background: value ? 'var(--warn-soft)' : 'transparent', color: value ? 'var(--ink)' : 'var(--muted)' }}>
+      {value || `+ ${t('addNote')}`}
+    </button>
+  );
+}
 
 /* ---------------- nav ---------------- */
 export function AdminNav({ races, mobile }: { races: { id: string; name: string }[]; mobile?: boolean }) {
@@ -370,12 +388,14 @@ function SlotBar({ paid, size }: { paid: number; size: number }) {
 
 function RunnersTable({ runners, teamName, open, hold, covered }: { runners: ARunner[]; teamName: (id: string) => string; open: (id: string) => void; hold: boolean; covered: Set<string> }) {
   const { t } = useT();
+  const { act } = useAct();
+  const saveNote = (id: string, v: string) => act(() => saveRunnerNotes(id, v));
   const sorted = [...runners].sort((a, b) => (a.bib || 0) - (b.bib || 0));
   return (
     <div className="tbl-wrap">
       {sorted.length ? (
         <table>
-          <thead><tr><th>{t('bib')}</th><th>{t('name')}</th><th>{t('team')}</th><th>{t('gender')}</th><th>{t('shirt')}</th><th>{t('waiverOk')}</th><th>{t('payment')}</th></tr></thead>
+          <thead><tr><th>{t('bib')}</th><th>{t('name')}</th><th>{t('team')}</th><th>{t('gender')}</th><th>{t('shirt')}</th><th>{t('waiverOk')}</th><th>{t('payment')}</th><th>{t('notes')}</th></tr></thead>
           <tbody>
             {sorted.map((x) => (
               <tr key={x.id} className="click" onClick={() => open(x.id)}>
@@ -385,6 +405,7 @@ function RunnersTable({ runners, teamName, open, hold, covered }: { runners: ARu
                 <td>{x.waiver_accepted_at ? <span className="chip ok">✓</span> : <span className="chip bad">✗</span>}</td>
                 <td>{hold ? (covered.has(x.id) ? <span className="chip ok">{t('covered')}</span> : <span className="chip warn">{t('pending')}</span>)
                   : x.fee > 0 ? <PayChip status={x.payment_status} /> : <span className="chip plain">{t('p_included')}</span>}</td>
+                <td onClick={(e) => e.stopPropagation()}><NoteCell value={x.notes} onSave={(v) => saveNote(x.id, v)} /></td>
               </tr>
             ))}
           </tbody>
@@ -403,7 +424,7 @@ function Payments({ race, teams, payments, stats }: { race: ARace; teams: ATeam[
   const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));
   const teamName = (id: string | null) => teams.find((x) => x.id === id)?.name || '—';
   const un = payments.filter((p) => !p.team_id);
-  const shown = payments.filter((p) => !q || `${p.payer_name} ${p.payer_email} ${p.comment} ${teamName(p.team_id)} ${p.external_id}`.toLowerCase().includes(q.toLowerCase()));
+  const shown = payments.filter((p) => !q || `${p.payer_name} ${p.payer_email} ${p.comment} ${p.notes} ${teamName(p.team_id)} ${p.external_id}`.toLowerCase().includes(q.toLowerCase()));
   const concept = (p: APayment) => p.kind === 'team' ? (isHold(race) ? t('holdLabel') : t('team')) : p.kind === 'slots' ? `${p.quantity} ${t('slotsWord')}` : t('runnerFee');
   const TeamSelect = ({ p }: { p: APayment }) => (
     <select value={p.team_id || ''} onChange={(e) => act(() => setPaymentTeam(p.id, e.target.value || null))} aria-label={t('team')} style={{ maxWidth: 220, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)' }}>
@@ -425,13 +446,14 @@ function Payments({ race, teams, payments, stats }: { race: ARace; teams: ATeam[
             <button type="button" className="btn btn-sm" disabled={busy} onClick={async () => { setBusy(true); const r = await rematchPayments(race.id); setBusy(false); toast(`${t('stillUnassigned')}: ${r.left}`); }}>{t('rematch')}</button>
           </div>
           <div className="tbl-wrap"><table>
-            <thead><tr><th>{t('date')}</th><th>{t('payer')}</th><th>{t('concept')}</th><th style={{ textAlign: 'right' }}>{t('amount')}</th><th>{t('team')}</th></tr></thead>
+            <thead><tr><th>{t('date')}</th><th>{t('payer')}</th><th>{t('concept')}</th><th style={{ textAlign: 'right' }}>{t('amount')}</th><th>{t('team')}</th><th>{t('notes')}</th></tr></thead>
             <tbody>{un.map((p) => (
               <tr key={p.id}>
                 <td className="num">{fmtDate(p.paid_at, lang)}</td>
                 <td><b>{p.payer_name || '—'}</b><div className="muted" style={{ fontSize: 12 }}>{p.payer_email}</div>{p.comment && <div style={{ fontSize: 12, marginTop: 2 }}>“{p.comment}”</div>}</td>
                 <td>{concept(p)}</td><td className="num" style={{ textAlign: 'right' }}>{money(p.amount, lang)}</td>
                 <td><TeamSelect p={p} /></td>
+                <td><NoteCell value={p.notes} onSave={(v) => act(() => savePaymentNotes(p.id, v))} /></td>
               </tr>
             ))}</tbody>
           </table></div>
@@ -441,7 +463,7 @@ function Payments({ race, teams, payments, stats }: { race: ARace; teams: ATeam[
       <div className="tbl-wrap">
         {shown.length ? (
           <table>
-            <thead><tr><th>{t('date')}</th><th>{t('payer')}</th><th>{t('concept')}</th><th>{t('method')}</th><th style={{ textAlign: 'right' }}>{t('amount')}</th><th>{t('team')}</th><th /></tr></thead>
+            <thead><tr><th>{t('date')}</th><th>{t('payer')}</th><th>{t('concept')}</th><th>{t('method')}</th><th style={{ textAlign: 'right' }}>{t('amount')}</th><th>{t('team')}</th><th>{t('notes')}</th><th /></tr></thead>
             <tbody>
               {shown.map((p) => (
                 <tr key={p.id}>
@@ -450,6 +472,7 @@ function Payments({ race, teams, payments, stats }: { race: ARace; teams: ATeam[
                   <td>{concept(p)}</td><td>{methodLabel(p.source, t)}</td>
                   <td className="num" style={{ textAlign: 'right' }}>{money(p.amount, lang)}</td>
                   <td><TeamSelect p={p} /></td>
+                  <td><NoteCell value={p.notes} onSave={(v) => act(() => savePaymentNotes(p.id, v))} /></td>
                   <td style={{ textAlign: 'right' }}>{p.source === 'manual' && <DeleteButton onConfirm={() => act(() => removePayment(p.id), 'deleted')} />}</td>
                 </tr>
               ))}
@@ -658,6 +681,7 @@ function RunnerDrawer({ runner: x, race, team, onClose, onTeam }: { runner: ARun
           <dt>{t('registered')}</dt><dd>{fmtDT(x.created_at, lang)}</dd>
         </dl>
       </div>
+      <div><div className="label" style={{ marginBottom: 6 }}>{t('notes')}</div><NoteCell wide value={x.notes} onSave={(v) => act(() => saveRunnerNotes(x.id, v))} /></div>
       <div className="row">
         {x.fee > 0 && x.payment_status !== 'paid' && <button type="button" className="btn btn-primary btn-sm" onClick={() => act(() => runnerMarkPaid(x.id))}>{t('markPaid')}</button>}
         <button type="button" className="btn btn-sm" onClick={() => setEdit({

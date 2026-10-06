@@ -21,9 +21,10 @@ export const toARunners = (rs: Runner[]): ARunner[] =>
     id: x.id, race_id: x.race_id, team_id: x.team_id, bib: x.bib, first_name: x.first_name, last_name: x.last_name, email: x.email, phone: x.phone,
     birth_date: x.birth_date, gender: x.gender, shirt_size: x.shirt_size, emergency_name: x.emergency_name, emergency_phone: x.emergency_phone,
     waiver_accepted_at: x.waiver_accepted_at, fee: x.fee, payment_status: x.payment_status, payment_method: x.payment_method, paid_at: x.paid_at, created_at: x.created_at,
+    notes: x.notes,
   }));
 export const toAPayments = (ps: Payment[]): APayment[] =>
   ps.map((p) => ({
     id: p.id, team_id: p.team_id, runner_id: p.runner_id, kind: p.kind, source: p.source, external_id: p.external_id, quantity: p.quantity,
-    amount: p.amount, payer_name: p.payer_name, payer_email: p.payer_email, comment: p.comment, paid_at: p.paid_at,
+    amount: p.amount, payer_name: p.payer_name, payer_email: p.payer_email, comment: p.comment, paid_at: p.paid_at, notes: p.notes,
   }));

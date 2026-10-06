@@ -198,5 +198,9 @@ ALTER TABLE teams ADD COLUMN IF NOT EXISTS reg_type TEXT NOT NULL DEFAULT 'presa
 
 -- Start groups: JSON array of {label, max (minutes, null = no limit), color, start}.
 ALTER TABLE races ADD COLUMN IF NOT EXISTS start_groups TEXT NOT NULL DEFAULT '[{"label":"1","max":99,"color":"#2f7d4f","start":""},{"label":"2","max":115,"color":"#c2571b","start":""},{"label":"3","max":null,"color":"#1d4ed8","start":""}]';
+
+-- Internal staff notes (follow-up status) on payments and runners.
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS notes TEXT;
+ALTER TABLE runners ADD COLUMN IF NOT EXISTS notes TEXT;
 `);
 }

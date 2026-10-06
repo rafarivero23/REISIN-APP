@@ -19,7 +19,7 @@ export type Runner = {
   email: string; phone: string | null; birth_date: string | null; gender: string | null; shirt_size: string | null;
   emergency_name: string | null; emergency_phone: string | null; waiver_accepted_at: string | null;
   waiver_text: string | null; fee: number; payment_status: 'pending' | 'paid'; payment_method: string | null;
-  paid_at: string | null; stripe_session_id: string | null; lang: string | null; created_at: string;
+  paid_at: string | null; stripe_session_id: string | null; lang: string | null; created_at: string; notes: string | null;
 };
 
 // A team "counts" once it's paid, was added by staff, or a checkout for it
@@ -175,13 +175,13 @@ export async function feeForNewRunner(race: Race, team: Team) {
 export type Payment = {
   id: string; race_id: string; team_id: string | null; runner_id: string | null; kind: 'team' | 'slots' | 'runner';
   source: string; external_id: string | null; quantity: number; amount: number; payer_name: string | null;
-  payer_email: string | null; payer_phone: string | null; comment: string | null; paid_at: string; created_at: string;
+  payer_email: string | null; payer_phone: string | null; comment: string | null; paid_at: string; created_at: string; notes: string | null;
 };
 export const paymentsOfRace = (raceId: string) => many<Payment>('SELECT * FROM payments WHERE race_id = ? ORDER BY paid_at DESC', [raceId]);
 export const listPayments = () => many<Payment>('SELECT * FROM payments');
 export const getPayment = (id: string) => one<Payment>('SELECT * FROM payments WHERE id = ?', [id]);
 
-type PaymentIn = Omit<Payment, 'id' | 'created_at' | 'paid_at' | 'runner_id' | 'team_id' | 'payer_name' | 'payer_email' | 'payer_phone' | 'comment' | 'external_id'> &
+type PaymentIn = Omit<Payment, 'id' | 'created_at' | 'notes' | 'paid_at' | 'runner_id' | 'team_id' | 'payer_name' | 'payer_email' | 'payer_phone' | 'comment' | 'external_id'> &
   Partial<Pick<Payment, 'paid_at' | 'runner_id' | 'team_id' | 'payer_name' | 'payer_email' | 'payer_phone' | 'comment' | 'external_id'>>;
 
 // Records a payment once (external_id dedupes webhooks, redirects and
@@ -264,5 +264,7 @@ export async function createUser(u: { name: string; email: string; passwordHash:
 }
 export const deleteUser = (id: string) => run('DELETE FROM users WHERE id = ?', [id]);
 export const setRaceGroups = (id: string, json: string) => run('UPDATE races SET start_groups = ? WHERE id = ?', [json, id]);
+export const setPaymentNotes = (id: string, notes: string | null) => run('UPDATE payments SET notes = ? WHERE id = ?', [notes, id]);
+export const setRunnerNotes = (id: string, notes: string | null) => run('UPDATE runners SET notes = ? WHERE id = ?', [notes, id]);
 export const updateUserPassword = (id: string, passwordHash: string) => run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, id]);
 export const getUserById = (id: string) => one<User>('SELECT * FROM users WHERE id = ?', [id]);
