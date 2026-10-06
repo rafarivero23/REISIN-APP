@@ -5,7 +5,7 @@
 import { headers } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import {
-  getRace, getTeam, getRunner, liveTeamCount, countRunners, createTeam, updateTeam, createRunner, recordPayment,
+  getRace, getTeam, getRunner, updateRunner, deleteRunner, liveTeamCount, countRunners, createTeam, updateTeam, createRunner, recordPayment,
   findTeamByCode, feeForNewRunner, isHoldRace, paidSlots, sizeOptions, teamSizeOf, type Race, type RunnerInput,
 } from '@/lib/repo';
 import { newClaimCode, now } from '@/lib/ids';
@@ -282,4 +282,63 @@ export async function retryRunnerPayment(runnerId: string): Promise<Err | Checko
   if (r.payment_status === 'paid' || r.fee <= 0) return { error: 'paid' };
   const race = await getRace(r.race_id);
   return checkout('runner', r.id, r.fee, 1, `${race!.name} — Inscripción ${r.first_name} ${r.last_name}`, r.email, `/done?runner=${r.id}`, `/done?runner=${r.id}&canceled=1`);
+}
+
+
+/* ---------- captain manages the roster ---------- */
+async function captainRunner(runnerId: string) {
+  const teamId = await getCaptainTeamId();
+  const r = teamId ? await getRunner(runnerId) : null;
+  return r && r.team_id === teamId ? r : null;
+}
+const cleanRunner = (f: Partial<RunnerInput>): RunnerInput => ({
+  first_name: clean(f.first_name, 80), last_name: clean(f.last_name, 120), email: clean(f.email, 160).toLowerCase(), phone: clean(f.phone, 40),
+  birth_date: clean(f.birth_date, 10), gender: clean(f.gender, 2), shirt_size: clean(f.shirt_size, 4),
+  emergency_name: clean(f.emergency_name, 120), emergency_phone: clean(f.emergency_phone, 40),
+});
+
+export async function captainRunnerDetails(runnerId: string): Promise<Err | { runner: RunnerInput }> {
+  const r = await captainRunner(runnerId);
+  if (!r) return { error: 'p_captainSub' };
+  const { first_name, last_name, email, phone, birth_date, gender, shirt_size, emergency_name, emergency_phone } = r;
+  return { runner: { first_name, last_name, email, phone: phone || '', birth_date: birth_date || '', gender: gender || '', shirt_size: shirt_size || '', emergency_name: emergency_name || '', emergency_phone: emergency_phone || '' } as RunnerInput };
+}
+
+export async function captainUpdateRunner(runnerId: string, f: Partial<RunnerInput>): Promise<Err | { ok: true }> {
+  const r = await captainRunner(runnerId);
+  if (!r) return { error: 'p_captainSub' };
+  const data = cleanRunner(f);
+  if (!data.first_name || !data.last_name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(data.email)) return { error: 'required' };
+  await updateRunner(r.id, data);
+  return { ok: true };
+}
+
+// Frees the spot (paid slots stay with the team). A runner who paid their own
+// fee can only be removed by staff, so no money gets lost.
+export async function captainRemoveRunner(runnerId: string): Promise<Err | { ok: true }> {
+  const r = await captainRunner(runnerId);
+  if (!r) return { error: 'p_captainSub' };
+  if (r.fee > 0 && r.payment_status === 'paid' && r.payment_method !== 'import') return { error: 'p_removePaid' };
+  await deleteRunner(r.id);
+  return { ok: true };
+}
+
+// Captain registers a teammate themselves: same form runners use.
+export async function captainStartRegister(): Promise<Err | { raceId: string }> {
+  const teamId = await getCaptainTeamId();
+  const team = teamId ? await getTeam(teamId) : null;
+  const race = team ? await getRace(team.race_id) : null;
+  if (!team || !race) return { error: 'p_captainSub' };
+  if ((await countRunners(team.id)) >= teamSizeOf(team, race)) return { error: 'p_teamFull' };
+  await setMember(team.id);
+  return { raceId: race.id };
+}
+
+export async function captainUpdateContact(f: { name?: string; email?: string; phone?: string }): Promise<Err | { ok: true }> {
+  const teamId = await getCaptainTeamId();
+  if (!teamId) return { error: 'p_captainSub' };
+  const captain_name = clean(f.name, 120), captain_email = clean(f.email, 160).toLowerCase(), captain_phone = clean(f.phone, 40);
+  if (!captain_name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(captain_email)) return { error: 'required' };
+  await updateTeam(teamId, { captain_name, captain_email, captain_phone: captain_phone || null });
+  return { ok: true };
 }

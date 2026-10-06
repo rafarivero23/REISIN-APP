@@ -29,7 +29,7 @@ export default async function CaptainPage() {
     <Suspense>
       <CaptainDash
         team={{ name: team.name, category: team.category, payment_status: team.payment_status, claim_code: team.claim_code, has_password: !!team.password_hash,
-          half_avg_min: team.half_avg_min, logo: team.logo ? `/api/logo/${team.id}?v=${team.logo.length}` : null }}
+          half_avg_min: team.half_avg_min, captain_name: team.captain_name, captain_email: team.captain_email, captain_phone: team.captain_phone, logo: team.logo ? `/api/logo/${team.id}?v=${team.logo.length}` : null }}
         race={{ id: race.id, name: race.name, team_size: race.team_size, runner_fee: race.runner_fee, sizes: sizeOptions(race) }}
         slots={{ hold: isHoldRace(race), size: teamSizeOf(team, race), paid: paidSlots(team, race) }}
         runners={runners}
