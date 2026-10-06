@@ -202,5 +202,36 @@ ALTER TABLE races ADD COLUMN IF NOT EXISTS start_groups TEXT NOT NULL DEFAULT '[
 -- Internal staff notes (follow-up status) on payments and runners.
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS notes TEXT;
 ALTER TABLE runners ADD COLUMN IF NOT EXISTS notes TEXT;
+
+-- "Busco equipo": runners looking for a team (e.g. their team fell apart
+-- after paying). Contact info is only shown to captains and staff.
+-- status: open | matched | closed. paid_claim = says they already paid a spot.
+CREATE TABLE IF NOT EXISTS free_agents (
+  id TEXT PRIMARY KEY,
+  race_id TEXT NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT,
+  gender TEXT,
+  half_avg_min INTEGER,
+  city TEXT,
+  message TEXT,
+  paid_claim BOOLEAN NOT NULL DEFAULT false,
+  status TEXT NOT NULL DEFAULT 'open',
+  team_id TEXT REFERENCES teams(id) ON DELETE SET NULL,
+  notes TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_free_agents_race ON free_agents(race_id);
+
+CREATE TABLE IF NOT EXISTS agent_invites (
+  id TEXT PRIMARY KEY,
+  agent_id TEXT NOT NULL REFERENCES free_agents(id) ON DELETE CASCADE,
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TEXT NOT NULL,
+  UNIQUE (agent_id, team_id)
+);
 `);
 }

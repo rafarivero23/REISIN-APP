@@ -4,6 +4,8 @@ import { getTeam, getRace, runnersOfTeam, isHoldRace, paidSlots, teamSizeOf } fr
 import { getCaptainTeamId } from '@/lib/team-session';
 import { getT } from '@/lib/lang';
 import { CaptainDash } from '@/components/portal';
+import { CaptainAgents } from '@/components/agents';
+import { openAgents, invitesOfTeam } from '@/lib/agents';
 
 export default async function CaptainPage() {
   const { t } = getT();
@@ -18,6 +20,11 @@ export default async function CaptainPage() {
   const runners = (await runnersOfTeam(team.id)).map((r) => ({
     id: r.id, bib: r.bib, first_name: r.first_name, last_name: r.last_name, shirt_size: r.shirt_size, fee: r.fee, payment_status: r.payment_status,
   }));
+  const [agents, invs] = await Promise.all([openAgents(race.id), invitesOfTeam(team.id)]);
+  const invited = new Set(invs.filter((i) => i.status === 'pending').map((i) => i.agent_id));
+  const capAgents = agents.map((a) => ({ id: a.id, name: a.name, gender: a.gender, half_avg_min: a.half_avg_min, city: a.city, message: a.message,
+    paid_claim: a.paid_claim, created_at: a.created_at, email: a.email, phone: a.phone, invited: invited.has(a.id) }));
+  const spotsLeft = teamSizeOf(team, race) - runners.length;
   return (
     <Suspense>
       <CaptainDash
@@ -27,6 +34,7 @@ export default async function CaptainPage() {
         slots={{ hold: isHoldRace(race), size: teamSizeOf(team, race), paid: paidSlots(team, race) }}
         runners={runners}
       />
+      <div style={{ marginTop: 20 }}><CaptainAgents agents={capAgents} spotsLeft={spotsLeft} /></div>
     </Suspense>
   );
 }

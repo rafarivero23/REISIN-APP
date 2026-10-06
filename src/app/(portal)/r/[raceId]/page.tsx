@@ -19,6 +19,7 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
         </Link>
         <Link href={`/r/${r.id}/captain`}><b>{t('p_captain')}</b><span>{t('p_captainSub')}</span></Link>
         <Link href={`/r/${r.id}/join`}><b>{t('p_join')}</b><span>{t('p_joinSub')}</span></Link>
+        <Link href={`/r/${r.id}/agents`}><b>{t('fa_title')}</b><span>{t('fa_cardSub')}</span></Link>
       </div>
     </>
   );

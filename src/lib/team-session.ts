@@ -58,3 +58,23 @@ export async function verifyPayToken(token: string, kind: string, id: string): P
   if (!p || p.kind !== kind || p.id !== id) return null;
   return { qty: Number(p.qty || 1), amount: 0 };
 }
+
+// "Busco equipo" listing owner. Long-lived so a runner can come back to see
+// invitations; the same token also works as a private link (?k=…).
+const AGENT = 'reisin_agent';
+export async function agentToken(agentId: string) {
+  return sign({ k: 'agent', a: agentId }, '180d');
+}
+export async function setAgent(token: string) {
+  cookies().set(AGENT, token, cookieOpts(60 * 60 * 24 * 180));
+}
+export async function readAgentToken(token: string | undefined): Promise<string | null> {
+  const p = await read(token, 'agent');
+  return (p?.a as string) ?? null;
+}
+export async function getAgentId(): Promise<string | null> {
+  return readAgentToken(cookies().get(AGENT)?.value);
+}
+export function clearAgent() {
+  cookies().set(AGENT, '', { path: '/', maxAge: 0 });
+}

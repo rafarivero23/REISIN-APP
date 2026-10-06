@@ -1,5 +1,5 @@
 'use client';
-import { useState, useTransition } from 'react';
+import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useT } from './I18n';
@@ -9,6 +9,7 @@ import { money, fmtDate, fmtDT, splitCats, BRANDS } from '@/lib/format';
 import { raceStats, teamSlots, isHold, regComplete } from '@/lib/stats';
 import { parseGroups, groupFor, categoryOf, fmtHalf, type StartGroup } from '@/lib/groups';
 import { LogoInput } from './LogoInput';
+import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
   removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
@@ -163,7 +164,9 @@ export function RaceForm({ race, onClose }: { race?: ARace; onClose: () => void 
 /* ---------------- race detail ---------------- */
 type Modal = { type: 'race' } | { type: 'teamForm'; id?: string } | { type: 'team'; id: string } | { type: 'runner'; id: string } | null;
 
-export function RaceDetail({ race, teams, runners, payments }: { race: ARace; teams: ATeam[]; runners: ARunner[]; payments: APayment[] }) {
+export type AAgent = { id: string; name: string; email: string; phone: string | null; gender: string | null; half_avg_min: number | null; city: string | null;
+  message: string | null; paid_claim: boolean; status: string; team_id: string | null; notes: string | null; created_at: string };
+export function RaceDetail({ race, teams, runners, payments, agents }: { race: ARace; teams: ATeam[]; runners: ARunner[]; payments: APayment[]; agents: AAgent[] }) {
   const { t, lang } = useT();
   const router = useRouter();
   const q = useSearchParams();
@@ -175,7 +178,7 @@ export function RaceDetail({ race, teams, runners, payments }: { race: ARace; te
   const stats = raceStats(race, teams, runners, payments);
   const unassigned = payments.filter((p) => !p.team_id).length;
   const tabs: [string, string][] = [['summary', t('summary')], ['teams', `${t('teams')} · ${stats.teams}`], ['runners', `${t('runners')} · ${stats.runners}`],
-    ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['import', t('importTab')]];
+    ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['agents', `${t('fa_tab')} · ${agents.filter((a) => a.status === 'open').length}`], ['import', t('importTab')]];
   // Hold races: a runner is "covered" when they fit inside the team's paid slots.
   const groups = parseGroups(race.start_groups);
   const info = (tm: ATeam) => {
@@ -230,6 +233,7 @@ export function RaceDetail({ race, teams, runners, payments }: { race: ARace; te
       )}
       {tab === 'payments' && <Payments race={race} teams={teams} payments={payments} stats={stats} />}
       {tab === 'import' && <ImportPanel race={race} />}
+      {tab === 'agents' && <AgentsAdmin agents={agents} teamName={(id) => teamById(id)?.name || '—'} />}
 
       {modal?.type === 'race' && <RaceForm race={race} onClose={() => setModal(null)} />}
       {modal?.type === 'teamForm' && <TeamForm race={race} team={modal.id ? teamById(modal.id) : undefined} onClose={() => setModal(null)} onSaved={(id) => setModal({ type: 'team', id })} />}
@@ -311,7 +315,8 @@ type Info = (tm: ATeam) => { cat: string | null; group: StartGroup | null; compl
 function Summary({ race, teams, runners, stats, info, groups }: { race: ARace; teams: ATeam[]; runners: ARunner[]; stats: Stats; info: Info; groups: StartGroup[] }) {
   const { t, lang } = useT();
   const copy = useCopy();
-  const [link] = useState(() => (typeof window !== 'undefined' ? window.location.origin : '') + `/r/${race.id}`);
+  const [link, setLink] = useState(`/r/${race.id}`);
+  useEffect(() => setLink(window.location.origin + `/r/${race.id}`), [race.id]);
   const cats = splitCats(race.categories);
   const shirts: Record<string, number> = {};
   runners.forEach((x) => (shirts[x.shirt_size || '—'] = (shirts[x.shirt_size || '—'] || 0) + 1));
@@ -479,6 +484,41 @@ function Payments({ race, teams, payments, stats }: { race: ARace; teams: ATeam[
             </tbody>
           </table>
         ) : <div className="empty">{t('noPayments')}</div>}
+      </div>
+    </div>
+  );
+}
+
+function AgentsAdmin({ agents, teamName }: { agents: AAgent[]; teamName: (id: string) => string }) {
+  const { t, lang } = useT();
+  const { act } = useAct();
+  return (
+    <div className="stack">
+      <p className="muted" style={{ fontSize: 14 }}>{t('fa_adminSub')}</p>
+      <div className="tbl-wrap">
+        {agents.length ? (
+          <table>
+            <thead><tr><th>{t('date')}</th><th>{t('name')}</th><th>{t('gender')}</th><th>21K</th><th>{t('fa_city')}</th><th>{t('fa_paid')}</th><th>{t('status')}</th><th>{t('notes')}</th><th /></tr></thead>
+            <tbody>
+              {agents.map((a) => (
+                <tr key={a.id}>
+                  <td className="num">{fmtDate(a.created_at, lang)}</td>
+                  <td><b>{a.name}</b><div className="muted" style={{ fontSize: 12 }}>{a.email} · {a.phone}</div>{a.message && <div style={{ fontSize: 12, marginTop: 2 }}>“{a.message}”</div>}</td>
+                  <td>{genderLabel(a.gender, t)}</td><td className="num">{fmtHalf(a.half_avg_min)}</td><td>{a.city || '—'}</td>
+                  <td>{a.paid_claim ? <span className="chip warn">{t('fa_paid')}</span> : '—'}</td>
+                  <td>
+                    <select value={a.status} onChange={(e) => act(() => staffSetAgentStatus(a.id, e.target.value as any))} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)' }}>
+                      {['open', 'matched', 'closed'].map((s) => <option key={s} value={s}>{t('fa_st_' + s)}</option>)}
+                    </select>
+                    {a.team_id && <div className="muted" style={{ fontSize: 12 }}>{teamName(a.team_id)}</div>}
+                  </td>
+                  <td><NoteCell value={a.notes} onSave={(v) => act(() => staffAgentNotes(a.id, v))} /></td>
+                  <td style={{ textAlign: 'right' }}><DeleteButton onConfirm={() => act(() => staffDeleteAgent(a.id), 'deleted')} /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : <div className="empty">{t('fa_empty')}</div>}
       </div>
     </div>
   );
