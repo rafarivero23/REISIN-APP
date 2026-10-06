@@ -6,6 +6,7 @@ import { Field, useToast, useCopy } from './ui';
 import { RichText } from './RichText';
 import { unlockRace, saveRacePage } from '@/app/actions/racepage';
 import { BAJA_TEMPLATE, cleanSlug, type PageData } from '@/lib/racepage';
+import { PHOTOS, photoSrc, defaultCover } from '@/lib/photos';
 
 /* ---------- portal: password gate ---------- */
 export function RaceGate({ raceId }: { raceId: string }) {
@@ -125,6 +126,39 @@ export function PageEditor({ race, initial }: { race: { id: string; name: string
             <button type="button" className="btn btn-sm" onClick={() => { if (!p.sections.length || confirm(t('pg_templateConfirm'))) setPage(() => BAJA_TEMPLATE); }}>{t('pg_template')}</button>
           )}
         </div>
+        <div className="stack" style={{ gap: 8 }}>
+          <div><div className="label">{t('pg_cover')}</div><p className="muted" style={{ fontSize: 13, marginTop: 2 }}>{t('pg_coverSub')}</p></div>
+          <div className="photo-pick" role="radiogroup" aria-label={t('pg_cover')}>
+            {PHOTOS.map((ph) => {
+              const on = (p.cover || defaultCover(race.brand)) === ph.id;
+              return (
+                <button key={ph.id} type="button" role="radio" aria-checked={on} aria-pressed={on} title={ph.label} onClick={() => setPage((x) => ({ ...x, cover: ph.id }))}>
+                  <img src={photoSrc(ph.id, true)} alt={ph.label} loading="lazy" style={{ objectPosition: ph.pos }} />{on && <span className="tick">✓</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+        <div className="stack" style={{ gap: 8 }}>
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <div><div className="label">{t('pg_photos')} · {p.photos.length}</div><p className="muted" style={{ fontSize: 13, marginTop: 2 }}>{t('pg_photosSub')}</p></div>
+            <span className="row" style={{ gap: 4 }}>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPage((x) => ({ ...x, photos: PHOTOS.map((ph) => ph.id) }))}>{t('pg_all')}</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPage((x) => ({ ...x, photos: [] }))}>{t('pg_none')}</button>
+            </span>
+          </div>
+          <div className="photo-pick">
+            {PHOTOS.map((ph) => {
+              const on = p.photos.includes(ph.id);
+              return (
+                <button key={ph.id} type="button" aria-pressed={on} title={ph.label}
+                  onClick={() => setPage((x) => ({ ...x, photos: on ? x.photos.filter((y) => y !== ph.id) : [...x.photos, ph.id] }))}>
+                  <img src={photoSrc(ph.id, true)} alt={ph.label} loading="lazy" style={{ objectPosition: ph.pos }} />{on && <span className="tick">{p.photos.indexOf(ph.id) + 1}</span>}
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <Field id="pg-intro" label={t('pg_intro')} type="textarea" value={p.intro} onChange={(v) => setPage((x) => ({ ...x, intro: v }))} />
 
         <div className="stack" style={{ gap: 8 }}>
@@ -182,7 +216,7 @@ export function PageEditor({ race, initial }: { race: { id: string; name: string
         </div>
       </div>
 
-      <div className="save-bar row" style={{ justifyContent: 'flex-end' }}>
+      <div className={"row" + (dirty ? " save-bar" : "")} style={{ justifyContent: "flex-end" }}>
         {err && <span className="err">{t(err)}</span>}
         {dirty && <button type="button" className="btn" onClick={() => { setD(initial); setErr(null); }}>{t('cancel')}</button>}
         <button type="button" className="btn btn-primary" disabled={busy || !dirty} onClick={save}>{busy ? <span className="spin" /> : t('save')}</button>

@@ -266,3 +266,41 @@ a.btn-primary{color:var(--accent-ink)}
 .agenda-row{display:grid;grid-template-columns:130px 90px 1fr 1fr auto;gap:6px;align-items:center}
 @media (max-width:760px){.agenda-row{grid-template-columns:1fr 1fr}.agenda-row>span{grid-column:1/-1;justify-content:flex-end}}
 .save-bar{position:sticky;bottom:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;box-shadow:var(--shadow)}
+
+/* photos */
+.portal{overflow-x:clip}
+.bleed{width:100vw;margin-left:calc(50% - 50vw);margin-right:calc(50% - 50vw)}
+.hero{position:relative;color:#fff;background:#141820;overflow:hidden;margin-top:-28px;display:flex}
+.hero-md{min-height:clamp(300px,48vh,460px)}
+.hero-lg{min-height:clamp(380px,64vh,620px)}
+.hero picture,.hero img{position:absolute;inset:0;width:100%;height:100%}
+.hero img{object-fit:cover;animation:heroIn 1.2s ease-out both}
+.hero::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,13,17,.45) 0%,rgba(10,13,17,0) 30%,rgba(10,13,17,.15) 55%,rgba(10,13,17,.82) 100%)}
+.hero-in{position:relative;z-index:1;max-width:760px;width:100%;margin:0 auto;padding:18px 16px 28px;display:flex;flex-direction:column;justify-content:space-between;gap:16px}
+.hero-body{display:flex;flex-direction:column;gap:10px;margin-top:auto}
+.hero h1{font-size:clamp(44px,10vw,88px);text-transform:uppercase;line-height:.92;text-shadow:0 2px 24px rgba(0,0,0,.35)}
+.hero p{color:rgba(255,255,255,.88);max-width:56ch;font-size:16px}
+.hero .label{color:rgba(255,255,255,.8)}
+.hero .brand-chip{color:#fff;background:rgba(255,255,255,.14);backdrop-filter:blur(6px);padding:4px 10px;border-radius:999px;align-self:flex-start}
+.hero .p-back{color:#fff;font-weight:600}
+@keyframes heroIn{from{transform:scale(1.06);opacity:.4}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.hero img{animation:none}}
+.race-card .cover{height:170px;position:relative;overflow:hidden;background:#141820}
+.race-card .cover img{width:100%;height:100%;object-fit:cover;transition:transform .5s ease}
+.race-card:hover .cover img{transform:scale(1.04)}
+.gallery{columns:3 220px;column-gap:10px}
+.gallery a{display:block;margin-bottom:10px;border-radius:10px;overflow:hidden;break-inside:avoid;background:var(--surface-2)}
+.gallery img{width:100%;height:auto;display:block;transition:transform .4s ease}
+.gallery a:hover img{transform:scale(1.03)}
+.login{position:relative;overflow:hidden}
+.login-photo{position:absolute;inset:0}
+.login-photo img{width:100%;height:100%;object-fit:cover}
+.login-photo::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(10,13,17,.25),rgba(10,13,17,.65))}
+.login>form{position:relative;z-index:1;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.photo-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px}
+.photo-pick button{all:unset;cursor:pointer;position:relative;aspect-ratio:4/3;border-radius:8px;overflow:hidden;outline:2px solid transparent;outline-offset:2px}
+.photo-pick button img{width:100%;height:100%;object-fit:cover;display:block}
+.photo-pick button[aria-pressed="true"]{outline-color:var(--accent)}
+.photo-pick button[aria-pressed="false"] img{opacity:.55;filter:grayscale(.4)}
+.photo-pick button .tick{position:absolute;top:6px;right:6px;background:var(--accent);color:#fff;border-radius:999px;width:22px;height:22px;display:grid;place-items:center;font-size:13px}
+.photo-pick button:focus-visible{outline-color:var(--ink)}

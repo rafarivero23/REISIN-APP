@@ -15,6 +15,7 @@ export default function LoginForm({ next }: { next: string }) {
   const [state, action] = useFormState(login, {});
   return (
     <div className="login">
+      <div className="login-photo" aria-hidden><img src="/photos/golden-runner.jpg" alt="" style={{ objectPosition: '55% 60%' }} /></div>
       <form className="card stack" action={action}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
           <div className="brand"><img src="/reisin-mark-white.png" alt="Reisin" className="brand-logo" /><div><div className="brand-name">Reisin</div><div className="brand-sub">{t('admin')}</div></div></div>

@@ -8,7 +8,10 @@ import { hasRaceAccess } from '@/lib/team-session';
 import { parsePage } from '@/lib/racepage';
 import { RichText } from '@/components/RichText';
 import { RaceGate } from '@/components/racepage';
-import { RaceHeader, Back, loadOpenRace, Closed } from '../../shared';
+import { Back, loadOpenRace, Closed } from '../../shared';
+import { PhotoHero, PhotoGallery } from '@/components/PhotoHero';
+import { defaultCover } from '@/lib/photos';
+import { brandKey, fmtDate } from '@/lib/format';
 
 export default async function RaceChoice({ params }: { params: { raceId: string } }) {
   const { t, lang } = getT();
@@ -17,17 +20,23 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
   const res = await loadOpenRace(raw.id);
   if ('closed' in res) return <Closed name={res.closed} />;
   const r = res.race;
+  const page = parsePage(raw.page);
+  const hero = (
+    <PhotoHero photo={page.cover || defaultCover(r.brand)} size="lg" top={<Back href="/" />}>
+      <span className={'brand-chip ' + brandKey(r.brand)}>{r.brand}</span>
+      <h1>{r.name}</h1>
+      <p>{fmtDate(r.race_date, lang)}{r.location ? ' · ' + r.location : ''}</p>
+    </PhotoHero>
+  );
   // Password-protected page: staff always get in (to preview).
   if (raw.access_code && !(await hasRaceAccess(raw.id, raw.access_code)) && !(await getCurrentUser())) {
     return (
       <>
-        <Back href="/" />
-        <RaceHeader race={r} lang={lang} />
+        {hero}
         <RaceGate raceId={r.id} />
       </>
     );
   }
-  const page = parsePage(raw.page);
   const days: { day: string; items: typeof page.agenda }[] = [];
   for (const a of page.agenda) {
     const last = days[days.length - 1];
@@ -36,8 +45,7 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
   }
   return (
     <>
-      <Back href="/" />
-      <RaceHeader race={r} lang={lang} />
+      {hero}
       {page.intro && <div className="rp-intro"><RichText text={page.intro} /></div>}
       {page.links.length > 0 && (
         <div className="row rp-links">
@@ -83,6 +91,7 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
           ))}
         </div>
       )}
+      <PhotoGallery photos={page.photos} title={t('pg_gallery')} />
     </>
   );
 }

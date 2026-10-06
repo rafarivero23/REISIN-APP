@@ -2,9 +2,11 @@
 export type PageLink = { label: string; url: string };
 export type PageAgendaItem = { day: string; time: string; title: string; note: string };
 export type PageSection = { title: string; body: string };
-export type PageData = { intro: string; links: PageLink[]; agenda: PageAgendaItem[]; sections: PageSection[] };
+export type PageData = { intro: string; links: PageLink[]; agenda: PageAgendaItem[]; sections: PageSection[]; cover: string; photos: string[] };
 
-export const emptyPage = (): PageData => ({ intro: '', links: [], agenda: [], sections: [] });
+export const emptyPage = (): PageData => ({ intro: '', links: [], agenda: [], sections: [], cover: '', photos: [] });
+
+import { isPhoto } from './photos';
 
 const s = (v: unknown, max: number) => (v == null ? '' : String(v)).slice(0, max);
 const arr = (v: unknown) => (Array.isArray(v) ? v : []);
@@ -24,6 +26,8 @@ export function cleanPage(p: any): PageData {
     intro: s(p?.intro, 2000).trim(),
     links: arr(p?.links).slice(0, 12).map((l: any) => ({ label: s(l?.label, 60).trim(), url: safeUrl(s(l?.url, 500).trim()) })).filter((l) => l.label && l.url),
     agenda: arr(p?.agenda).slice(0, 40).map((a: any) => ({ day: s(a?.day, 40).trim(), time: s(a?.time, 20).trim(), title: s(a?.title, 140).trim(), note: s(a?.note, 300).trim() })).filter((a) => a.title),
+    cover: isPhoto(p?.cover) ? p.cover : '',
+    photos: Array.from(new Set(arr(p?.photos).filter(isPhoto))).slice(0, 24),
     sections: arr(p?.sections).slice(0, 20).map((x: any) => ({ title: s(x?.title, 100).trim(), body: s(x?.body, 6000).trim() })).filter((x) => x.title || x.body),
   };
 }
@@ -45,6 +49,8 @@ export function cleanSlug(v: unknown): string {
 
 // Starting point copied from bajaxing.mx/registered — staff edit from here.
 export const BAJA_TEMPLATE: PageData = {
+  cover: 'aerial-duo',
+  photos: ['golden-runner', 'handoff', 'beach-duo', 'car-13', 'sunset-road', 'canyon-crowd', 'coast-runner', 'shades', 'desert-runner', 'road-crew', 'crowd-rocks'],
   intro: 'Bienvenido a Baja Crossing, el relevo de La Paz a Los Cabos. Aquí está todo lo que tu equipo necesita antes de la carrera.',
   links: [
     { label: 'Preguntas frecuentes', url: 'https://bajaxing.mx/faq/' },
