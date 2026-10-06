@@ -235,6 +235,9 @@ ALTER TABLE races ADD COLUMN IF NOT EXISTS access_code TEXT;
 ALTER TABLE races ADD COLUMN IF NOT EXISTS page TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_races_slug ON races(lower(slug)) WHERE slug IS NOT NULL;
 
+-- When staff sent the captain their code (null = not yet).
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS code_sent_at TEXT;
+
 CREATE TABLE IF NOT EXISTS agent_invites (
   id TEXT PRIMARY KEY,
   agent_id TEXT NOT NULL REFERENCES free_agents(id) ON DELETE CASCADE,

@@ -15,7 +15,7 @@ export const toATeams = (teams: Team[]): ATeam[] =>
     captain_phone: x.captain_phone, amount: x.amount, payment_status: x.payment_status, payment_method: x.payment_method, paid_at: x.paid_at,
     claim_code: x.claim_code, has_password: !!x.password_hash, created_at: x.created_at,
     team_size: x.team_size, extra_slots: x.extra_slots, notes: x.notes, half_avg_min: x.half_avg_min, reg_type: x.reg_type,
-    logo_v: x.logo ? String(x.logo.length) : null,
+    logo_v: x.logo ? String(x.logo.length) : null, code_sent_at: x.code_sent_at,
   }));
 export const toARunners = (rs: Runner[]): ARunner[] =>
   rs.map((x) => ({

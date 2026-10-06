@@ -10,6 +10,8 @@ import { raceStats, teamSlots, isHold, regComplete } from '@/lib/stats';
 import { parseGroups, groupFor, categoryOf, fmtHalf, type StartGroup } from '@/lib/groups';
 import { LogoInput } from './LogoInput';
 import { PageEditor } from './racepage';
+import { CaptainsPanel } from './captains';
+import { captainMessage, waLink, mailLink } from '@/lib/capmsg';
 import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
@@ -36,7 +38,7 @@ export type ATeam = {
   id: string; race_id: string; name: string; category: string | null; captain_name: string; captain_email: string;
   captain_phone: string | null; amount: number; payment_status: string; payment_method: string | null; paid_at: string | null;
   claim_code: string; has_password: boolean; created_at: string; team_size: number | null; extra_slots: number; notes: string | null;
-  half_avg_min: number | null; reg_type: string; logo_v: string | null;
+  half_avg_min: number | null; reg_type: string; logo_v: string | null; code_sent_at: string | null;
 };
 export type ARunner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string; email: string;
@@ -181,7 +183,7 @@ export function RaceDetail({ race, teams, runners, payments, agents }: { race: A
   const stats = raceStats(race, teams, runners, payments);
   const unassigned = payments.filter((p) => !p.team_id).length;
   const tabs: [string, string][] = [['summary', t('summary')], ['teams', `${t('teams')} · ${stats.teams}`], ['runners', `${t('runners')} · ${stats.runners}`],
-    ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['agents', `${t('fa_tab')} · ${agents.filter((a) => a.status === 'open').length}`], ['page', t('pg_tab') + (race.access_code ? ' 🔒' : '')], ['import', t('importTab')]];
+    ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['agents', `${t('fa_tab')} · ${agents.filter((a) => a.status === 'open').length}`], ['captains', t('cap_tab') + ` · ${teams.filter((x) => x.code_sent_at).length}/${teams.length}`], ['page', t('pg_tab') + (race.access_code ? ' 🔒' : '')], ['import', t('importTab')]];
   // Hold races: a runner is "covered" when they fit inside the team's paid slots.
   const groups = parseGroups(race.start_groups);
   const info = (tm: ATeam) => {
@@ -236,6 +238,7 @@ export function RaceDetail({ race, teams, runners, payments, agents }: { race: A
       )}
       {tab === 'payments' && <Payments race={race} teams={teams} payments={payments} stats={stats} openTeam={(id) => setModal({ type: 'team', id })} />}
       {tab === 'import' && <ImportPanel race={race} />}
+      {tab === 'captains' && <CaptainsPanel race={race} teams={teams} />}
       {tab === 'page' && <PageEditor race={race} initial={{ slug: race.slug || '', access_code: race.access_code || '', page: parsePage(race.page) }} />}
       {tab === 'agents' && <AgentsAdmin agents={agents} teamName={(id) => teamById(id)?.name || '—'} />}
 
@@ -622,14 +625,10 @@ function CaptainMessage({ team, race }: { team: ATeam; race: ARace }) {
   const copy = useCopy();
   const [origin, setOrigin] = useState('');
   useEffect(() => setOrigin(window.location.origin), []);
-  const url = `${origin}/${race.slug || 'r/' + race.id}`;
-  const first = team.captain_name.split(/\s+/)[0] || '';
-  const msg = t('capMsg')
-    .replace('{name}', first).replace('{race}', race.name).replace('{team}', team.name).replace('{url}', url)
-    .replace('{pass}', race.access_code ? `\n${t('capMsgPass')}: ${race.access_code}` : '').replace('{code}', team.claim_code);
-  const phone = (team.captain_phone || '').replace(/\D/g, '');
-  const wa = phone ? `https://wa.me/${phone.length === 10 ? '52' + phone : phone}?text=${encodeURIComponent(msg)}` : null;
-  const mail = team.captain_email ? `mailto:${team.captain_email}?subject=${encodeURIComponent(race.name + ' · ' + t('captainCode'))}&body=${encodeURIComponent(msg)}` : null;
+  const { body: msg } = captainMessage(t, team, race, origin);
+  const wa = waLink(team.captain_phone, msg);
+  const em = captainMessage(t, team, race, origin, true);
+  const mail = mailLink(team.captain_email, em.subject, em.body);
   return (
     <div className="card stack" style={{ gap: 10 }}>
       <div><h3 style={{ textTransform: 'uppercase' }}>{t('capMsgTitle')}</h3><p className="muted" style={{ fontSize: 13, marginTop: 4 }}>{t('capMsgSub')}</p></div>

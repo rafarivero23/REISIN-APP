@@ -14,6 +14,7 @@ export type Team = {
   payment_status: 'pending' | 'paid'; payment_method: string | null; paid_at: string | null;
   stripe_session_id: string | null; claim_code: string; password_hash: string | null; created_at: string;
   team_size: number | null; extra_slots: number; notes: string | null; half_avg_min: number | null; logo: string | null; reg_type: string;
+  code_sent_at: string | null;
 };
 export type Runner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string;
@@ -88,7 +89,7 @@ export async function listedTeamsWithCounts(raceId: string) {
   );
 }
 
-type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes' | 'half_avg_min' | 'logo' | 'reg_type'> &
+type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes' | 'half_avg_min' | 'logo' | 'reg_type' | 'code_sent_at'> &
   { password_hash?: string | null; team_size?: number | null; notes?: string | null; created_at?: string; half_avg_min?: number | null; reg_type?: string };
 export async function createTeam(t: NewTeam) {
   const id = newId();
@@ -269,6 +270,8 @@ export async function createUser(u: { name: string; email: string; passwordHash:
 export const deleteUser = (id: string) => run('DELETE FROM users WHERE id = ?', [id]);
 export const setRaceGroups = (id: string, json: string) => run('UPDATE races SET start_groups = ? WHERE id = ?', [json, id]);
 export const setPaymentNotes = (id: string, notes: string | null) => run('UPDATE payments SET notes = ? WHERE id = ?', [notes, id]);
+export const setCodeSent = (ids: string[], at: string | null) =>
+  ids.length ? run(`UPDATE teams SET code_sent_at = ? WHERE id IN (${ids.map(() => '?').join(',')})`, [at, ...ids]) : Promise.resolve();
 export const setRunnerNotes = (id: string, notes: string | null) => run('UPDATE runners SET notes = ? WHERE id = ?', [notes, id]);
 export const updateUserPassword = (id: string, passwordHash: string) => run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, id]);
 export const getUserById = (id: string) => one<User>('SELECT * FROM users WHERE id = ?', [id]);
