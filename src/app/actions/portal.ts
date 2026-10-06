@@ -14,6 +14,7 @@ import { splitCats } from '@/lib/format';
 import { parseHalf } from '@/lib/groups';
 import { cleanLogo } from '@/lib/logo';
 import { setCaptain, getCaptainTeamId, clearCaptain, setMember, getMemberTeamId, signPayToken, verifyPayToken } from '@/lib/team-session';
+import { one } from '@/lib/db';
 
 type Err = { error: string };
 const clean = (v: unknown, max = 200) => (v == null ? '' : String(v).trim().slice(0, max));
@@ -157,9 +158,28 @@ export async function setTeamPassword(password: string): Promise<Err | { ok: tru
 }
 
 // Captain pays for N more runner slots (hold model) or one runner's fee (classic).
-export async function setTeamDetails(input: { half?: string; logo?: string | null }): Promise<Err | { ok: true }> {
+export async function setTeamDetails(input: { half?: string; logo?: string | null; name?: string; size?: number }): Promise<Err | { ok: true }> {
   const teamId = await getCaptainTeamId();
   if (!teamId) return { error: 'p_captainSub' };
+  if (input.name !== undefined || input.size !== undefined) {
+    const team = await getTeam(teamId);
+    const race = team ? await getRace(team.race_id) : null;
+    if (!team || !race) return { error: 'p_captainSub' };
+    if (input.name !== undefined) {
+      const name = clean(input.name, 80);
+      if (!name) return { error: 'required' };
+      const dup = await one('SELECT 1 FROM teams WHERE race_id = ? AND lower(name) = lower(?) AND id <> ?', [race.id, name, team.id]);
+      if (dup) return { error: 'p_nameTaken' };
+      await updateTeam(teamId, { name });
+    }
+    if (input.size !== undefined) {
+      const size = Number(input.size);
+      const min = Math.max(await countRunners(team.id), paidSlots(team, race));
+      if (!sizeOptions(race).includes(size)) return { error: 'required' };
+      if (size < min) return { error: 'p_sizeTooSmall' };
+      await updateTeam(teamId, { team_size: size });
+    }
+  }
   if (input.half !== undefined) {
     const m = parseHalf(input.half);
     if (input.half && !m) return { error: 'half_bad' };

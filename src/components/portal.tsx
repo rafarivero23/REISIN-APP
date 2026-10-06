@@ -144,6 +144,7 @@ export function CaptainLoginForm({ raceId, brand }: { raceId: string; brand: str
         <Err k={err} />
         <div><button className="btn btn-primary btn-lg" type="submit">{t('p_enter')}</button></div>
       </form>
+      <p className="muted" style={{ fontSize: 13, marginTop: 12 }}>{t('p_noCode')}</p>
     </div>
   );
 }
@@ -152,7 +153,7 @@ export function CaptainLoginForm({ raceId, brand }: { raceId: string; brand: str
 type DashRunner = { id: string; bib: number | null; first_name: string; last_name: string; shirt_size: string | null; fee: number; payment_status: string };
 export function CaptainDash({ team, race, runners, slots }: {
   team: { name: string; category: string | null; payment_status: string; claim_code: string; has_password: boolean; half_avg_min: number | null; logo: string | null };
-  race: { id: string; name: string; team_size: number; runner_fee: number }; runners: DashRunner[];
+  race: { id: string; name: string; team_size: number; runner_fee: number; sizes: number[] }; runners: DashRunner[];
   slots: { hold: boolean; size: number; paid: number };
 }) {
   const { t, lang } = useT();
@@ -167,6 +168,7 @@ export function CaptainDash({ team, race, runners, slots }: {
   useEffect(() => setLink(`${window.location.origin}/r/${race.id}/join`), [race.id]);
   const left = Math.max(0, slots.size - slots.paid);
   const [qty, setQty] = useState(String(left || 1));
+  useEffect(() => setQty(String(left || 1)), [left]);
   useEffect(() => {
     const paid = q.get('paid'), sid = q.get('session_id'), sl = q.get('slots');
     if (paid && sid) confirmRunner({ runnerId: paid, sessionId: sid }).then(() => router.replace('/captain'));
@@ -180,6 +182,14 @@ export function CaptainDash({ team, race, runners, slots }: {
   };
   const [simSlots, setSimSlots] = useState<string | null>(null);
   const [half, setHalf] = useState(team.half_avg_min ? fmtHalf(team.half_avg_min) : '');
+  const [nm, setNm] = useState({ name: team.name, size: String(slots.size) });
+  const minSize = Math.max(runners.length, slots.paid);
+  const saveName = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const r = await setTeamDetails({ name: nm.name, size: Number(nm.size) });
+    if ('error' in r) return toast(t(r.error));
+    toast(t('saved')); router.refresh();
+  };
   const saveHalf = async (e: React.FormEvent) => {
     e.preventDefault();
     const r = await setTeamDetails({ half });
@@ -245,6 +255,14 @@ export function CaptainDash({ team, race, runners, slots }: {
       </div>
       <div className="card stack">
         <h3 style={{ textTransform: 'uppercase' }}>{t('p_teamDash')}</h3>
+        <form className="row" style={{ alignItems: 'flex-end' }} onSubmit={saveName}>
+          <Field id="cd-name" label={t('p_teamNameEdit')} value={nm.name} onChange={(v) => setNm((x) => ({ ...x, name: v }))} req maxLength={80} />
+          {race.sizes.length > 1 && (
+            <Field id="cd-size" label={t('p_teamSizeEdit')} value={nm.size} onChange={(v) => setNm((x) => ({ ...x, size: v }))}
+              options={race.sizes.filter((n) => n >= minSize || String(n) === nm.size).map((n) => [String(n), String(n)])} />
+          )}
+          <button className="btn btn-sm" type="submit" disabled={!nm.name.trim() || (nm.name === team.name && nm.size === String(slots.size))}>{t('save')}</button>
+        </form>
         <LogoInput current={team.logo} onChange={async (d) => { const r = await setTeamDetails({ logo: d }); if ('error' in r) toast(t(r.error)); else { toast(t('saved')); router.refresh(); } }} />
         <form className="row" style={{ alignItems: 'flex-end' }} onSubmit={saveHalf}>
           <Field id="cd-half" label={t('halfAvg')} value={half} onChange={setHalf} placeholder="1:45" hint={t('halfHint')} />

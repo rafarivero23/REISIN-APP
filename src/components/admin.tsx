@@ -14,7 +14,7 @@ import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
-  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
+  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
 /* Shapes passed from server components (no password hashes). */
@@ -234,7 +234,7 @@ export function RaceDetail({ race, teams, runners, payments, agents }: { race: A
             teamName={(id) => teamById(id)?.name || '—'} open={(id) => setModal({ type: 'runner', id })} hold={isHold(race)} covered={covered} />
         </>
       )}
-      {tab === 'payments' && <Payments race={race} teams={teams} payments={payments} stats={stats} />}
+      {tab === 'payments' && <Payments race={race} teams={teams} payments={payments} stats={stats} openTeam={(id) => setModal({ type: 'team', id })} />}
       {tab === 'import' && <ImportPanel race={race} />}
       {tab === 'page' && <PageEditor race={race} initial={{ slug: race.slug || '', access_code: race.access_code || '', page: parsePage(race.page) }} />}
       {tab === 'agents' && <AgentsAdmin agents={agents} teamName={(id) => teamById(id)?.name || '—'} />}
@@ -426,9 +426,14 @@ function RunnersTable({ runners, teamName, open, hold, covered }: { runners: ARu
   );
 }
 
-function Payments({ race, teams, payments, stats }: { race: ARace; teams: ATeam[]; payments: APayment[]; stats: Stats }) {
+function Payments({ race, teams, payments, stats, openTeam }: { race: ARace; teams: ATeam[]; payments: APayment[]; stats: Stats; openTeam: (id: string) => void }) {
   const { t, lang } = useT();
   const { act } = useAct();
+  const makeTeam = async (p: APayment) => {
+    if (!confirm(t('fromPayConfirm').replace('{n}', p.payer_name || p.payer_email || '—'))) return;
+    const r = await act(() => teamFromPayment(p.id), 'fromPayDone');
+    if (r?.id) openTeam(r.id);
+  };
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const [q, setQ] = useState('');
@@ -463,7 +468,7 @@ function Payments({ race, teams, payments, stats }: { race: ARace; teams: ATeam[
                 <td className="num">{fmtDate(p.paid_at, lang)}</td>
                 <td><b>{p.payer_name || '—'}</b><div className="muted" style={{ fontSize: 12 }}>{p.payer_email}</div>{p.comment && <div style={{ fontSize: 12, marginTop: 2 }}>“{p.comment}”</div>}</td>
                 <td>{concept(p)}</td><td className="num" style={{ textAlign: 'right' }}>{money(p.amount, lang)}</td>
-                <td><TeamSelect p={p} /></td>
+                <td><TeamSelect p={p} />{p.kind !== 'runner' && <div style={{ marginTop: 6 }}><button type="button" className="btn btn-sm" onClick={() => makeTeam(p)}>+ {t('fromPay')}</button></div>}</td>
                 <td><NoteCell value={p.notes} onSave={(v) => act(() => savePaymentNotes(p.id, v))} /></td>
               </tr>
             ))}</tbody>
@@ -611,6 +616,33 @@ function TeamForm({ race, team, onClose, onSaved }: { race: ARace; team?: ATeam;
   );
 }
 
+// Ready-to-send message so the captain knows where to go and what code to use.
+function CaptainMessage({ team, race }: { team: ATeam; race: ARace }) {
+  const { t } = useT();
+  const copy = useCopy();
+  const [origin, setOrigin] = useState('');
+  useEffect(() => setOrigin(window.location.origin), []);
+  const url = `${origin}/${race.slug || 'r/' + race.id}`;
+  const first = team.captain_name.split(/\s+/)[0] || '';
+  const msg = t('capMsg')
+    .replace('{name}', first).replace('{race}', race.name).replace('{team}', team.name).replace('{url}', url)
+    .replace('{pass}', race.access_code ? `\n${t('capMsgPass')}: ${race.access_code}` : '').replace('{code}', team.claim_code);
+  const phone = (team.captain_phone || '').replace(/\D/g, '');
+  const wa = phone ? `https://wa.me/${phone.length === 10 ? '52' + phone : phone}?text=${encodeURIComponent(msg)}` : null;
+  const mail = team.captain_email ? `mailto:${team.captain_email}?subject=${encodeURIComponent(race.name + ' · ' + t('captainCode'))}&body=${encodeURIComponent(msg)}` : null;
+  return (
+    <div className="card stack" style={{ gap: 10 }}>
+      <div><h3 style={{ textTransform: 'uppercase' }}>{t('capMsgTitle')}</h3><p className="muted" style={{ fontSize: 13, marginTop: 4 }}>{t('capMsgSub')}</p></div>
+      <div className="note" style={{ whiteSpace: 'pre-wrap', color: 'var(--ink)' }}>{msg}</div>
+      <div className="row">
+        <button type="button" className="btn btn-sm btn-primary" onClick={() => copy(msg)}>{t('copy')}</button>
+        {wa && <a className="btn btn-sm" href={wa} target="_blank" rel="noreferrer">WhatsApp ↗</a>}
+        {mail && <a className="btn btn-sm" href={mail}>{t('email')} ↗</a>}
+      </div>
+    </div>
+  );
+}
+
 function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, onRunner }: { team: ATeam; race: ARace; runners: ARunner[]; payments: APayment[]; info: ReturnType<Info>; onClose: () => void; onEdit: () => void; onRunner: (id: string) => void }) {
   const { t, lang } = useT();
   const { act } = useAct();
@@ -637,6 +669,7 @@ function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, o
           <dt>{t('registered')}</dt><dd>{fmtDT(x.created_at, lang)}</dd>
         </dl>
       </div>
+      <CaptainMessage team={x} race={race} />
       <div className="row">
         {x.payment_status !== 'paid' && <button type="button" className="btn btn-primary btn-sm" onClick={() => act(() => teamMarkPaid(x.id))}>{t('markPaid')}</button>}
         <button type="button" className="btn btn-sm" onClick={onEdit}>{t('edit')}</button>

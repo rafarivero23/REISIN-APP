@@ -8,7 +8,7 @@ import { getCurrentUser } from '@/lib/auth-guard';
 import { createSession, destroySession } from '@/lib/session';
 import {
   createRace, updateRace, deleteRace, getRace, getTeam, getRunner, createTeam, updateTeam, deleteTeam, updateRunner, deleteRunner,
-  recordPayment, assignPayment, deletePayment, findUserByEmail, createUser, deleteUser, getUserById, updateUserPassword,
+  recordPayment, assignPayment, deletePayment, getPayment, findUserByEmail, createUser, deleteUser, getUserById, updateUserPassword,
   sizeOptions, setRaceGroups, setPaymentNotes, setRunnerNotes, type RaceInput, type RunnerInput,
 } from '@/lib/repo';
 import { importCsvText, rematch } from '@/lib/importers';
@@ -228,6 +228,29 @@ export async function saveRunnerNotes(id: string, notes: string): Promise<Result
 }
 
 /* ---------------- payments & import ---------------- */
+// Someone paid the apartado but never formed a team: create the team with
+// the payer as captain and put the payment on it. The captain then signs
+// in with the code, names the team and picks its size.
+export async function teamFromPayment(paymentId: string): Promise<Result> {
+  await guard();
+  const p = await getPayment(paymentId);
+  if (!p || p.team_id) return { error: 'not_found' };
+  const race = await getRace(p.race_id);
+  if (!race) return { error: 'not_found' };
+  const sizes = sizeOptions(race);
+  const payer = (p.payer_name || p.payer_email || 'Capitán').trim();
+  const order = p.external_id?.startsWith('ecwid:') ? ` #${p.external_id.slice(6)}` : '';
+  const id = await createTeam({
+    race_id: race.id, name: `Equipo de ${payer.split(/\s+/).slice(0, 2).join(' ')}`, category: null,
+    captain_name: payer, captain_email: (p.payer_email || '').toLowerCase(), captain_phone: p.payer_phone || null,
+    amount: race.team_price, payment_status: 'pending', payment_method: 'manual', paid_at: null,
+    claim_code: newClaimCode(race.brand), team_size: sizes[sizes.length - 1], notes: `Creado desde el pago${order}. Falta que el capitán ponga nombre y tamaño.`,
+  });
+  await assignPayment(p.id, id);
+  refresh();
+  return { id };
+}
+
 export async function setPaymentTeam(paymentId: string, teamId: string | null): Promise<Result> {
   await guard();
   await assignPayment(paymentId, teamId || null);
