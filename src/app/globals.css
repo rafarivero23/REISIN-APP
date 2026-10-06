@@ -304,3 +304,9 @@ a.btn-primary{color:var(--accent-ink)}
 .photo-pick button[aria-pressed="false"] img{opacity:.55;filter:grayscale(.4)}
 .photo-pick button .tick{position:absolute;top:6px;right:6px;background:var(--accent);color:#fff;border-radius:999px;width:22px;height:22px;display:grid;place-items:center;font-size:13px}
 .photo-pick button:focus-visible{outline-color:var(--ink)}
+
+/* Baja Crossing title font (one weight; missing glyphs like $ : / fall back to Barlow) */
+@font-face{font-family:"Baja Crossing";src:url(/fonts/BajaCrossing.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap;size-adjust:118%}
+:root{--f-title:"Baja Crossing","Barlow Condensed","Arial Narrow",system-ui,sans-serif}
+h1,h2,h3,.choice b,.choice a b,.race-card h3,.section-t{font-family:var(--f-title);font-weight:400;font-synthesis:none;letter-spacing:.02em;text-transform:uppercase}
+.hero h1{line-height:.95}

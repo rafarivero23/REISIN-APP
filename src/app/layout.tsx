@@ -15,6 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang={lang}>
       <head>
+        <link rel="preload" href="/fonts/BajaCrossing.woff2" as="font" type="font/woff2" crossOrigin="" />
         {/* Plain <link> rather than next/font: next/font downloads fonts at
             build time, which fails in some build sandboxes. System fonts
             take over if Google Fonts can't load. */}
