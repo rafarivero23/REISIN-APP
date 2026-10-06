@@ -214,6 +214,12 @@ export async function savePaymentNotes(id: string, notes: string): Promise<Resul
   refresh();
   return {};
 }
+export async function saveTeamNotes(id: string, notes: string): Promise<Result> {
+  await guard();
+  await updateTeam(id, { notes: str(notes, 2000) || null });
+  refresh();
+  return {};
+}
 export async function saveRunnerNotes(id: string, notes: string): Promise<Result> {
   await guard();
   await setRunnerNotes(id, str(notes, 2000) || null);

@@ -202,6 +202,8 @@ ALTER TABLE races ADD COLUMN IF NOT EXISTS start_groups TEXT NOT NULL DEFAULT '[
 -- Internal staff notes (follow-up status) on payments and runners.
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS notes TEXT;
 ALTER TABLE runners ADD COLUMN IF NOT EXISTS notes TEXT;
+-- Team notes are now shown in the teams table: drop the import placeholder.
+UPDATE teams SET notes = NULL WHERE notes = 'Importado de RedPodium';
 
 -- "Busco equipo": runners looking for a team (e.g. their team fell apart
 -- after paying). Contact info is only shown to captains and staff.

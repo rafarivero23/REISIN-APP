@@ -12,7 +12,7 @@ import { LogoInput } from './LogoInput';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
-  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
+  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
 /* Shapes passed from server components (no password hashes). */
@@ -348,12 +348,13 @@ function Summary({ race, teams, runners, stats, info, groups }: { race: ARace; t
 
 function TeamsTable({ race, teams, count, open, info }: { race: ARace; teams: ATeam[]; count: (id: string) => number; open: (id: string) => void; info: Info }) {
   const { t, lang } = useT();
+  const { act } = useAct();
   const hold = isHold(race);
   return (
     <div className="tbl-wrap">
       {teams.length ? (
         <table>
-          <thead><tr><th>{t('team')}</th><th>{t('captain')}</th><th>{t('categories')}</th><th>{t('group')}</th><th>{t('members')}</th>{hold && <th>{t('paidSlots')}</th>}<th style={{ textAlign: 'right' }}>{t('balance')}</th><th>{t('regType')}</th><th>{t('logo')}</th><th>{t('teamPassword')}</th><th>{hold ? t('holdLabel') : t('payment')}</th></tr></thead>
+          <thead><tr><th>{t('team')}</th><th>{t('captain')}</th><th>{t('categories')}</th><th>{t('group')}</th><th>{t('members')}</th>{hold && <th>{t('paidSlots')}</th>}<th style={{ textAlign: 'right' }}>{t('balance')}</th><th>{t('regType')}</th><th>{t('logo')}</th><th>{t('teamPassword')}</th><th>{hold ? t('holdLabel') : t('payment')}</th><th>{t('notes')}</th></tr></thead>
           <tbody>
             {teams.map((x) => {
               const sl = teamSlots(x, race), n = count(x.id), inf = info(x), lg = logoSrc(x);
@@ -370,6 +371,7 @@ function TeamsTable({ race, teams, count, open, info }: { race: ARace; teams: AT
                   <td>{lg ? <span className="chip ok">✓</span> : <span className="chip">—</span>}</td>
                   <td>{x.has_password ? <span className="chip ok">{t('set')}</span> : <span className="chip">{t('notSet')}</span>}</td>
                   <td><PayChip status={x.payment_status} /></td>
+                  <td onClick={(e) => e.stopPropagation()}><NoteCell value={x.notes} onSave={(v) => act(() => saveTeamNotes(x.id, v))} /></td>
                 </tr>
               );
             })}
@@ -619,7 +621,7 @@ function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, o
       <div className="row"><CatChip c={info.cat} /><GroupChip g={info.group} /><span className="chip plain num">{t('halfAvg').split(' ')[0]}: {fmtHalf(x.half_avg_min)}</span>
         <span className="chip plain">{t(x.reg_type === 'full' ? 'full' : 'presale')}</span>{info.complete ? <span className="chip ok">{t('regComplete')}</span> : <span className="chip warn">{t('regIncomplete')}</span>}</div>
       <LogoInput current={logoSrc(x)} onChange={async (d) => { await act(() => setTeamLogoAdmin(x.id, d)); }} />
-      {x.notes && <div className="note" style={{ whiteSpace: 'pre-wrap' }}>{x.notes}</div>}
+      <div><div className="label" style={{ marginBottom: 4 }}>{t('notes')}</div><NoteCell wide value={x.notes} onSave={(v) => act(() => saveTeamNotes(x.id, v))} /></div>
       <div className="card">
         <dl className="kv">
           <dt>{t('captain')}</dt><dd>{x.captain_name}</dd>

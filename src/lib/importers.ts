@@ -72,7 +72,7 @@ export async function importRedPodium(raceId: string, rows: Record<string, strin
         race_id: race.id, name: first['Team Name'].trim(), category: null, captain_name: captainName,
         captain_email: lc(first['Billing Email Address'] || first['Mail']), captain_phone: first['Teléfono'] || null,
         amount: race.team_price, payment_status: 'pending', payment_method: 'manual', paid_at: null,
-        claim_code: newClaimCode(race.brand), team_size: size, notes: 'Importado de RedPodium', created_at: toIso(first['Registration Date']), half_avg_min: half,
+        claim_code: newClaimCode(race.brand), team_size: size, notes: null, created_at: toIso(first['Registration Date']), half_avg_min: half,
       });
       team = (await one<Team>('SELECT * FROM teams WHERE id = ?', [id]))!;
       existing.push(team);
