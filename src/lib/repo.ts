@@ -6,6 +6,7 @@ export type Race = {
   race_date: string | null; location: string | null; team_price: number; runner_fee: number;
   team_size: number; capacity_teams: number; categories: string; bib_start: number;
   waiver: string | null; created_at: string; team_sizes: string; hold_slots: number; start_groups: string;
+  slug: string | null; access_code: string | null; page: string | null;
 };
 export type Team = {
   id: string; race_id: string; name: string; category: string | null; captain_name: string;
@@ -32,7 +33,10 @@ export const isListedTeam = (t: Pick<Team, 'payment_status' | 'payment_method'>)
 
 /* ---------------- races ---------------- */
 export const listRaces = () => many<Race>('SELECT * FROM races ORDER BY race_date NULLS LAST, created_at');
-export const getRace = (id: string) => one<Race>('SELECT * FROM races WHERE id = ?', [id]);
+// Accepts the id or the page slug (/r/baja-crossing-2026 works too).
+export const getRace = (id: string) => one<Race>('SELECT * FROM races WHERE id = ? OR lower(slug) = lower(?) ORDER BY (id = ?) DESC LIMIT 1', [id, id, id]);
+export const setRacePage = (id: string, p: { slug: string | null; access_code: string | null; page: string }) =>
+  run('UPDATE races SET slug = ?, access_code = ?, page = ? WHERE id = ?', [p.slug, p.access_code, p.page, id]);
 
 export async function liveTeamCount(raceId: string) {
   const r = await one<{ n: string }>(`SELECT count(*) AS n FROM teams WHERE race_id = ? AND ${LIVE_TEAM_SQL}`, [raceId, holdSince()]);
@@ -48,7 +52,7 @@ export async function listOpenRaces() {
   return races.map((r) => ({ ...r, teams_left: Math.max(0, r.capacity_teams - Number(r.live)) }));
 }
 
-export type RaceInput = Omit<Race, 'id' | 'created_at' | 'start_groups'>;
+export type RaceInput = Omit<Race, 'id' | 'created_at' | 'start_groups' | 'slug' | 'access_code' | 'page'>;
 export async function createRace(input: RaceInput) {
   const id = newId();
   await run(

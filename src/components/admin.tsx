@@ -9,6 +9,8 @@ import { money, fmtDate, fmtDT, splitCats, BRANDS } from '@/lib/format';
 import { raceStats, teamSlots, isHold, regComplete } from '@/lib/stats';
 import { parseGroups, groupFor, categoryOf, fmtHalf, type StartGroup } from '@/lib/groups';
 import { LogoInput } from './LogoInput';
+import { PageEditor } from './racepage';
+import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
@@ -20,6 +22,7 @@ export type ARace = {
   id: string; name: string; brand: string; status: string; race_date: string | null; location: string | null;
   team_price: number; runner_fee: number; team_size: number; capacity_teams: number; categories: string;
   bib_start: number; waiver: string | null; team_sizes: string; hold_slots: number; start_groups: string;
+  slug: string | null; access_code: string | null; page: string | null;
 };
 export type APayment = {
   id: string; team_id: string | null; runner_id: string | null; kind: string; source: string; external_id: string | null; quantity: number;
@@ -178,7 +181,7 @@ export function RaceDetail({ race, teams, runners, payments, agents }: { race: A
   const stats = raceStats(race, teams, runners, payments);
   const unassigned = payments.filter((p) => !p.team_id).length;
   const tabs: [string, string][] = [['summary', t('summary')], ['teams', `${t('teams')} · ${stats.teams}`], ['runners', `${t('runners')} · ${stats.runners}`],
-    ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['agents', `${t('fa_tab')} · ${agents.filter((a) => a.status === 'open').length}`], ['import', t('importTab')]];
+    ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['agents', `${t('fa_tab')} · ${agents.filter((a) => a.status === 'open').length}`], ['page', t('pg_tab') + (race.access_code ? ' 🔒' : '')], ['import', t('importTab')]];
   // Hold races: a runner is "covered" when they fit inside the team's paid slots.
   const groups = parseGroups(race.start_groups);
   const info = (tm: ATeam) => {
@@ -233,6 +236,7 @@ export function RaceDetail({ race, teams, runners, payments, agents }: { race: A
       )}
       {tab === 'payments' && <Payments race={race} teams={teams} payments={payments} stats={stats} />}
       {tab === 'import' && <ImportPanel race={race} />}
+      {tab === 'page' && <PageEditor race={race} initial={{ slug: race.slug || '', access_code: race.access_code || '', page: parsePage(race.page) }} />}
       {tab === 'agents' && <AgentsAdmin agents={agents} teamName={(id) => teamById(id)?.name || '—'} />}
 
       {modal?.type === 'race' && <RaceForm race={race} onClose={() => setModal(null)} />}

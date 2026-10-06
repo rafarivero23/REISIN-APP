@@ -227,6 +227,14 @@ CREATE TABLE IF NOT EXISTS free_agents (
 );
 CREATE INDEX IF NOT EXISTS idx_free_agents_race ON free_agents(race_id);
 
+-- Race landing page: shareable short URL (/slug), an optional access
+-- password for the page (plain text on purpose: staff share it), and the
+-- page content as JSON {intro, links[], agenda[], sections[]}.
+ALTER TABLE races ADD COLUMN IF NOT EXISTS slug TEXT;
+ALTER TABLE races ADD COLUMN IF NOT EXISTS access_code TEXT;
+ALTER TABLE races ADD COLUMN IF NOT EXISTS page TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_races_slug ON races(lower(slug)) WHERE slug IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS agent_invites (
   id TEXT PRIMARY KEY,
   agent_id TEXT NOT NULL REFERENCES free_agents(id) ON DELETE CASCADE,

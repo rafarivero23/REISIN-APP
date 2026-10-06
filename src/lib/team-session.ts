@@ -78,3 +78,19 @@ export async function getAgentId(): Promise<string | null> {
 export function clearAgent() {
   cookies().set(AGENT, '', { path: '/', maxAge: 0 });
 }
+
+// Race page password. The cookie carries a fingerprint of the current
+// password, so changing it in admin locks everyone out again.
+const raceCookie = (raceId: string) => 'reisin_race_' + raceId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24);
+const fingerprint = async (code: string) => {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code.trim().toLowerCase()));
+  return Buffer.from(d).toString('hex').slice(0, 16);
+};
+export async function setRaceAccess(raceId: string, code: string) {
+  cookies().set(raceCookie(raceId), await sign({ k: 'race', r: raceId, f: await fingerprint(code) }, '180d'), cookieOpts(60 * 60 * 24 * 180));
+}
+export async function hasRaceAccess(raceId: string, code: string | null): Promise<boolean> {
+  if (!code) return true;
+  const p = await read(cookies().get(raceCookie(raceId))?.value, 'race');
+  return !!p && p.r === raceId && p.f === (await fingerprint(code));
+}

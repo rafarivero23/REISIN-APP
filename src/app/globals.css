@@ -246,3 +246,23 @@ a.btn-primary{color:var(--accent-ink)}
 
 /* Header bars stay dark in both themes so the white Reisin mark always reads. */
 .rail,.p-top,.mobile-bar{background:var(--header-bg)!important;color:#f3f4f1}
+
+/* race landing page */
+.rich{display:flex;flex-direction:column;gap:10px;font-size:15px;line-height:1.55}
+.rich ul{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.rich a{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.rich p{margin:0}
+.rp-intro{max-width:68ch;font-size:16px}
+.rp-links{gap:8px}
+.rp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:14px;align-items:start}
+.rp-grid h2{font-size:24px;margin-bottom:12px}
+.rp-agenda{grid-row:span 2}
+.rp-day+.rp-day{margin-top:14px}
+.rp-day ul{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column}
+.rp-day li{display:grid;grid-template-columns:76px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line);font-size:15px}
+.rp-time{color:var(--muted);font-size:14px;padding-top:1px}
+.rp-note{display:block;font-size:13px;margin-top:2px}
+.rp-note .rich{font-size:13px}
+.agenda-row{display:grid;grid-template-columns:130px 90px 1fr 1fr auto;gap:6px;align-items:center}
+@media (max-width:760px){.agenda-row{grid-template-columns:1fr 1fr}.agenda-row>span{grid-column:1/-1;justify-content:flex-end}}
+.save-bar{position:sticky;bottom:12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;box-shadow:var(--shadow)}
