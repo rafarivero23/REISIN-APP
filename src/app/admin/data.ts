@@ -27,5 +27,5 @@ export const toARunners = (rs: Runner[]): ARunner[] =>
 export const toAPayments = (ps: Payment[]): APayment[] =>
   ps.map((p) => ({
     id: p.id, team_id: p.team_id, runner_id: p.runner_id, kind: p.kind, source: p.source, external_id: p.external_id, quantity: p.quantity,
-    amount: p.amount, payer_name: p.payer_name, payer_email: p.payer_email, comment: p.comment, paid_at: p.paid_at, notes: p.notes,
+    amount: p.amount, payer_name: p.payer_name, payer_email: p.payer_email, comment: p.comment, paid_at: p.paid_at, notes: p.notes, resolution: p.resolution,
   }));

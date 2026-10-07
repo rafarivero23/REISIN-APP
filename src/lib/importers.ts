@@ -144,7 +144,7 @@ export async function importEcwid(raceId: string, rows: Record<string, string>[]
 // many are still unassigned.
 export async function rematch(raceId: string): Promise<number> {
   const pending = await many<{ id: string; payer_email: string | null; payer_name: string | null }>(
-    'SELECT id, payer_email, payer_name FROM payments WHERE race_id = ? AND team_id IS NULL ORDER BY paid_at', [raceId]);
+    'SELECT id, payer_email, payer_name FROM payments WHERE race_id = ? AND team_id IS NULL AND resolution IS NULL ORDER BY paid_at', [raceId]);
   if (!pending.length) return 0;
   const teams = await many<{ id: string; captain_email: string; captain_name: string }>('SELECT id, captain_email, captain_name FROM teams WHERE race_id = ?', [raceId]);
   const runners = await many<{ team_id: string; email: string; first_name: string; last_name: string }>(

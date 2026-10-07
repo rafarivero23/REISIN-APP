@@ -16,7 +16,7 @@ import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
-  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
+  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, resolvePayment, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
 /* Shapes passed from server components (no password hashes). */
@@ -28,7 +28,7 @@ export type ARace = {
 };
 export type APayment = {
   id: string; team_id: string | null; runner_id: string | null; kind: string; source: string; external_id: string | null; quantity: number;
-  amount: number; payer_name: string | null; payer_email: string | null; comment: string | null; paid_at: string; notes: string | null;
+  amount: number; payer_name: string | null; payer_email: string | null; comment: string | null; paid_at: string; notes: string | null; resolution: string | null;
 };
 export const sizeList = (r: ARace) => {
   const xs = (r.team_sizes || '').split(',').map((x) => parseInt(x, 10)).filter((n) => n > 0);
@@ -181,7 +181,7 @@ export function RaceDetail({ race, teams, runners, payments, agents }: { race: A
   const teamById = (id: string) => teams.find((x) => x.id === id);
   const runnersOfTeam = (id: string) => runners.filter((r) => r.team_id === id).sort((a, b) => (a.bib || 0) - (b.bib || 0));
   const stats = raceStats(race, teams, runners, payments);
-  const unassigned = payments.filter((p) => !p.team_id).length;
+  const unassigned = payments.filter((p) => !p.team_id && !p.resolution).length;
   const tabs: [string, string][] = [['summary', t('summary')], ['teams', `${t('teams')} · ${stats.teams}`], ['runners', `${t('runners')} · ${stats.runners}`],
     ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['agents', `${t('fa_tab')} · ${agents.filter((a) => a.status === 'open').length}`], ['captains', t('cap_tab') + ` · ${teams.filter((x) => x.code_sent_at).length}/${teams.length}`], ['page', t('pg_tab') + (race.access_code ? ' 🔒' : '')], ['import', t('importTab')]];
   // Hold races: a runner is "covered" when they fit inside the team's paid slots.
@@ -442,7 +442,8 @@ function Payments({ race, teams, payments, stats, openTeam }: { race: ARace; tea
   const [q, setQ] = useState('');
   const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));
   const teamName = (id: string | null) => teams.find((x) => x.id === id)?.name || '—';
-  const un = payments.filter((p) => !p.team_id);
+  const un = payments.filter((p) => !p.team_id && !p.resolution);
+  const resolved = payments.filter((p) => !p.team_id && p.resolution);
   const shown = payments.filter((p) => !q || `${p.payer_name} ${p.payer_email} ${p.comment} ${p.notes} ${teamName(p.team_id)} ${p.external_id}`.toLowerCase().includes(q.toLowerCase()));
   const concept = (p: APayment) => p.kind === 'team' ? (isHold(race) ? t('holdLabel') : t('team')) : p.kind === 'slots' ? `${p.quantity} ${t('slotsWord')}` : t('runnerFee');
   const TeamSelect = ({ p }: { p: APayment }) => (
@@ -457,6 +458,7 @@ function Payments({ race, teams, payments, stats, openTeam }: { race: ARace; tea
         <div className="kpi"><div className="label">{t('paid')}</div><div className="v num">{money(stats.revenue, lang)}</div><div className="s">{payments.length} {t('payments').toLowerCase()}</div></div>
         <div className="kpi"><div className="label">{t('pending')}</div><div className="v num">{money(stats.pending, lang)}</div></div>
         <div className="kpi"><div className="label">{t('unassigned')}</div><div className="v num">{un.length}</div><div className="s">{money(un.reduce((a, p) => a + p.amount, 0), lang)}</div></div>
+        {resolved.length > 0 && <div className="kpi"><div className="label">{t('res_kpi')}</div><div className="v num">{resolved.length}</div><div className="s">{money(resolved.reduce((a, p) => a + p.amount, 0), lang)}</div></div>}
       </div>
       {un.length > 0 && (
         <div className="card stack">
@@ -471,12 +473,40 @@ function Payments({ race, teams, payments, stats, openTeam }: { race: ARace; tea
                 <td className="num">{fmtDate(p.paid_at, lang)}</td>
                 <td><b>{p.payer_name || '—'}</b><div className="muted" style={{ fontSize: 12 }}>{p.payer_email}</div>{p.comment && <div style={{ fontSize: 12, marginTop: 2 }}>“{p.comment}”</div>}</td>
                 <td>{concept(p)}</td><td className="num" style={{ textAlign: 'right' }}>{money(p.amount, lang)}</td>
-                <td><TeamSelect p={p} />{p.kind !== 'runner' && <div style={{ marginTop: 6 }}><button type="button" className="btn btn-sm" onClick={() => makeTeam(p)}>+ {t('fromPay')}</button></div>}</td>
+                <td><TeamSelect p={p} />{p.kind !== 'runner' && <div style={{ marginTop: 6 }}><button type="button" className="btn btn-sm" onClick={() => makeTeam(p)}>+ {t('fromPay')}</button></div>}
+                  <div style={{ marginTop: 6 }}>
+                    <select value="" aria-label={t('res_mark')} onChange={(e) => e.target.value && act(() => resolvePayment(p.id, e.target.value))} style={{ maxWidth: 220, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)', fontSize: 13 }}>
+                      <option value="">{t('res_mark')}</option>
+                      {['not_formed', 'credit', 'refunded'].map((k) => <option key={k} value={k}>{t('res_' + k)}</option>)}
+                    </select>
+                  </div></td>
                 <td><NoteCell value={p.notes} onSave={(v) => act(() => savePaymentNotes(p.id, v))} /></td>
               </tr>
             ))}</tbody>
           </table></div>
         </div>
+      )}
+      {resolved.length > 0 && (
+        <details className="card stack">
+          <summary style={{ cursor: 'pointer' }}><h3 style={{ textTransform: 'uppercase', display: 'inline' }}>{t('res_title')} · {resolved.length}</h3>
+            <p className="muted" style={{ fontSize: 14, marginTop: 4 }}>{t('res_sub')}</p></summary>
+          <div className="tbl-wrap" style={{ marginTop: 12 }}><table>
+            <thead><tr><th>{t('date')}</th><th>{t('payer')}</th><th>{t('concept')}</th><th style={{ textAlign: 'right' }}>{t('amount')}</th><th>{t('status')}</th><th>{t('notes')}</th><th /></tr></thead>
+            <tbody>{resolved.map((p) => (
+              <tr key={p.id}>
+                <td className="num">{fmtDate(p.paid_at, lang)}</td>
+                <td><b>{p.payer_name || '—'}</b><div className="muted" style={{ fontSize: 12 }}>{p.payer_email}</div></td>
+                <td>{concept(p)}</td><td className="num" style={{ textAlign: 'right' }}>{money(p.amount, lang)}</td>
+                <td><select value={p.resolution || ''} aria-label={t('status')} onChange={(e) => act(() => resolvePayment(p.id, e.target.value || null))} style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)', fontSize: 13 }}>
+                  {['not_formed', 'credit', 'refunded'].map((k) => <option key={k} value={k}>{t('res_' + k)}</option>)}
+                  <option value="">↩ {t('res_undo')}</option>
+                </select></td>
+                <td><NoteCell value={p.notes} onSave={(v) => act(() => savePaymentNotes(p.id, v))} /></td>
+                <td />
+              </tr>
+            ))}</tbody>
+          </table></div>
+        </details>
       )}
       <div className="toolbar"><input className="search" type="search" placeholder={t('search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('search')} /></div>
       <div className="tbl-wrap">
@@ -490,7 +520,7 @@ function Payments({ race, teams, payments, stats, openTeam }: { race: ARace; tea
                   <td>{p.payer_name || '—'}<div className="muted" style={{ fontSize: 12 }}>{p.payer_email}{p.external_id?.startsWith('ecwid:') ? ` · #${p.external_id.slice(6)}` : ''}</div></td>
                   <td>{concept(p)}</td><td>{methodLabel(p.source, t)}</td>
                   <td className="num" style={{ textAlign: 'right' }}>{money(p.amount, lang)}</td>
-                  <td><TeamSelect p={p} /></td>
+                  <td>{!p.team_id && p.resolution ? <span className="chip plain">{t('res_' + p.resolution)}</span> : <TeamSelect p={p} />}</td>
                   <td><NoteCell value={p.notes} onSave={(v) => act(() => savePaymentNotes(p.id, v))} /></td>
                   <td style={{ textAlign: 'right' }}>{p.source === 'manual' && <DeleteButton onConfirm={() => act(() => removePayment(p.id), 'deleted')} />}</td>
                 </tr>

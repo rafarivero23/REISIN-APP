@@ -9,7 +9,7 @@ import { createSession, destroySession } from '@/lib/session';
 import {
   createRace, updateRace, deleteRace, getRace, getTeam, getRunner, createTeam, updateTeam, deleteTeam, updateRunner, deleteRunner,
   recordPayment, assignPayment, deletePayment, getPayment, findUserByEmail, createUser, deleteUser, getUserById, updateUserPassword,
-  sizeOptions, captainSizeOptions, setCodeSent, setRaceGroups, setPaymentNotes, setRunnerNotes, type RaceInput, type RunnerInput,
+  sizeOptions, captainSizeOptions, setPaymentResolution, setCodeSent, setRaceGroups, setPaymentNotes, setRunnerNotes, type RaceInput, type RunnerInput,
 } from '@/lib/repo';
 import { importCsvText, rematch } from '@/lib/importers';
 import { parseHalf } from '@/lib/groups';
@@ -203,6 +203,14 @@ export async function saveGroups(raceId: string, groups: { label: string; max: s
   }));
   if (!clean.length) return { error: 'required' };
   await setRaceGroups(raceId, JSON.stringify(clean));
+  refresh();
+  return {};
+}
+
+export async function resolvePayment(id: string, resolution: string | null): Promise<Result> {
+  await guard();
+  const r = resolution && ['not_formed', 'credit', 'refunded'].includes(resolution) ? resolution : null;
+  await setPaymentResolution(id, r);
   refresh();
   return {};
 }

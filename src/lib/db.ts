@@ -238,6 +238,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_races_slug ON races(lower(slug)) WHERE slug
 -- When staff sent the captain their code (null = not yet).
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS code_sent_at TEXT;
 
+-- Unassigned payments that won't go to a team: not_formed (team never
+-- formed) | credit (kept as credit, e.g. for another event) | refunded.
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS resolution TEXT;
+
 CREATE TABLE IF NOT EXISTS agent_invites (
   id TEXT PRIMARY KEY,
   agent_id TEXT NOT NULL REFERENCES free_agents(id) ON DELETE CASCADE,

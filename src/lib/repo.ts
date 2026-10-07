@@ -187,13 +187,13 @@ export async function feeForNewRunner(race: Race, team: Team) {
 export type Payment = {
   id: string; race_id: string; team_id: string | null; runner_id: string | null; kind: 'team' | 'slots' | 'runner';
   source: string; external_id: string | null; quantity: number; amount: number; payer_name: string | null;
-  payer_email: string | null; payer_phone: string | null; comment: string | null; paid_at: string; created_at: string; notes: string | null;
+  payer_email: string | null; payer_phone: string | null; comment: string | null; paid_at: string; created_at: string; notes: string | null; resolution: string | null;
 };
 export const paymentsOfRace = (raceId: string) => many<Payment>('SELECT * FROM payments WHERE race_id = ? ORDER BY paid_at DESC', [raceId]);
 export const listPayments = () => many<Payment>('SELECT * FROM payments');
 export const getPayment = (id: string) => one<Payment>('SELECT * FROM payments WHERE id = ?', [id]);
 
-type PaymentIn = Omit<Payment, 'id' | 'created_at' | 'notes' | 'paid_at' | 'runner_id' | 'team_id' | 'payer_name' | 'payer_email' | 'payer_phone' | 'comment' | 'external_id'> &
+type PaymentIn = Omit<Payment, 'id' | 'created_at' | 'notes' | 'resolution' | 'paid_at' | 'runner_id' | 'team_id' | 'payer_name' | 'payer_email' | 'payer_phone' | 'comment' | 'external_id'> &
   Partial<Pick<Payment, 'paid_at' | 'runner_id' | 'team_id' | 'payer_name' | 'payer_email' | 'payer_phone' | 'comment' | 'external_id'>>;
 
 // Records a payment once (external_id dedupes webhooks, redirects and
@@ -245,6 +245,7 @@ export async function addSlots(teamId: string, qty: number, method: string) {
 // Moves an imported payment to a team (or back to unassigned) and moves
 // its effect with it: slots follow the payment; a hold marks the team paid.
 export async function assignPayment(paymentId: string, teamId: string | null) {
+  if (teamId) await run('UPDATE payments SET resolution = NULL WHERE id = ?', [paymentId]);
   const p = await getPayment(paymentId);
   if (!p || p.team_id === teamId) return;
   if (p.team_id) {
@@ -279,6 +280,7 @@ export const setRaceGroups = (id: string, json: string) => run('UPDATE races SET
 export const setPaymentNotes = (id: string, notes: string | null) => run('UPDATE payments SET notes = ? WHERE id = ?', [notes, id]);
 export const setCodeSent = (ids: string[], at: string | null) =>
   ids.length ? run(`UPDATE teams SET code_sent_at = ? WHERE id IN (${ids.map(() => '?').join(',')})`, [at, ...ids]) : Promise.resolve();
+export const setPaymentResolution = (id: string, r: string | null) => run('UPDATE payments SET resolution = ? WHERE id = ? AND team_id IS NULL', [r, id]);
 export const setRunnerNotes = (id: string, notes: string | null) => run('UPDATE runners SET notes = ? WHERE id = ?', [notes, id]);
 export const updateUserPassword = (id: string, passwordHash: string) => run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, id]);
 export const getUserById = (id: string) => one<User>('SELECT * FROM users WHERE id = ?', [id]);
