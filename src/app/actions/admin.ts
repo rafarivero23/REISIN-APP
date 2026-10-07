@@ -11,7 +11,7 @@ import {
   recordPayment, assignPayment, deletePayment, getPayment, findUserByEmail, createUser, deleteUser, getUserById, updateUserPassword,
   sizeOptions, captainSizeOptions, setPaymentResolution, setRunnerWaiver, setCodeSent, setRaceGroups, setPaymentNotes, setRunnerNotes, type RaceInput, type RunnerInput,
 } from '@/lib/repo';
-import { importCsvText, rematch } from '@/lib/importers';
+import { importCsvText, rematch, importSolos } from '@/lib/importers';
 import { parseHalf } from '@/lib/groups';
 import { cleanLogo } from '@/lib/logo';
 import { newClaimCode, newId, now } from '@/lib/ids';
@@ -221,6 +221,29 @@ export async function setWaiverStaff(runnerId: string, accepted: boolean): Promi
   await setRunnerWaiver(runnerId, accepted ? now() : null, accepted ? `Marcada por staff (${me.email})` : null);
   refresh();
   return {};
+}
+
+/* ---------------- solo runners ---------------- */
+export async function importSolosRows(raceId: string, rows: Record<string, string>[]) {
+  await guard();
+  try {
+    const r = await importSolos(raceId, (rows || []).slice(0, 3000));
+    refresh();
+    return r;
+  } catch (e: any) {
+    return { error: ['solo_cols', 'race_not_found'].includes(e?.message) ? e.message : String(e?.message || e) };
+  }
+}
+export async function addSolo(raceId: string, f: { name: string; email: string; phone: string; amount: string | number }): Promise<Result> {
+  await guard();
+  const race = await getRace(raceId);
+  const name = str(f.name, 120), email = str(f.email, 160).toLowerCase();
+  if (!race || !name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { error: 'required' };
+  const id = await createTeam({ race_id: race.id, name, category: null, captain_name: name, captain_email: email, captain_phone: str(f.phone, 40) || null,
+    amount: Math.max(0, int(f.amount)), payment_status: 'paid', payment_method: 'manual', paid_at: now(), claim_code: newClaimCode(race.brand), team_size: 1, notes: null, is_solo: true });
+  if (int(f.amount) > 0) await recordPayment({ race_id: race.id, team_id: id, kind: 'team', source: 'manual', external_id: 'manual:' + newId(), quantity: 1, amount: int(f.amount), payer_name: name, payer_email: email });
+  refresh();
+  return { id };
 }
 
 /* ---------------- captain codes ---------------- */

@@ -3,7 +3,7 @@ import { Suspense } from 'react';
 import { getTeam, getRace, runnersOfTeam, isHoldRace, paidSlots, teamSizeOf, captainSizeOptions } from '@/lib/repo';
 import { getCaptainTeamId } from '@/lib/team-session';
 import { getT } from '@/lib/lang';
-import { CaptainDash } from '@/components/portal';
+import { CaptainDash, SoloDash } from '@/components/portal';
 import { CaptainAgents } from '@/components/agents';
 import { openAgents, invitesOfTeam } from '@/lib/agents';
 
@@ -15,6 +15,13 @@ export default async function CaptainPage() {
   if (!team || !race) {
     return (
       <div className="card empty">{t('p_captainSub')}<div style={{ marginTop: 12 }}><Link className="btn btn-primary" href="/">{t('p_pick')}</Link></div></div>
+    );
+  }
+  if (team.is_solo) {
+    const r = (await runnersOfTeam(team.id))[0];
+    return (
+      <SoloDash name={team.name} raceName={race.name} waiverText={race.waiver || ''} raceId={race.id} code={team.claim_code}
+        runner={r ? { id: r.id, bib: r.bib, first_name: r.first_name, last_name: r.last_name, shirt_size: r.shirt_size, waiver: !!r.waiver_accepted_at } : null} />
     );
   }
   const runners = (await runnersOfTeam(team.id)).map((r) => ({

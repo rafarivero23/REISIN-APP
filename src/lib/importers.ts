@@ -190,3 +190,101 @@ export async function importCsvText(raceId: string, text: string): Promise<Impor
   if (looksLikeEcwid(rows)) return importEcwid(raceId, rows);
   throw new Error('unknown_csv');
 }
+
+/* ---------------- Solo runners (any spreadsheet) ---------------- */
+// Columns are matched by name, so RedPodium, Ecwid or a hand-made sheet all
+// work. Only a name and an email are required; any runner details present
+// (birth date, shirt, emergency contact, waiver) register the solo directly.
+const norm = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+const COLS: Record<string, string[]> = {
+  first: ['nombre first name', 'first name', 'nombres', 'nombre s', 'first'],
+  last: ['nombre last name', 'last name', 'apellidos', 'apellido', 'last'],
+  full: ['nombre completo', 'full name', 'bill person name', 'billing name', 'corredor', 'name', 'nombre'],
+  email: ['mail', 'email', 'e mail', 'correo electronico', 'correo'],
+  phone: ['telefono', 'celular', 'whatsapp', 'phone', 'bill person phone', 'movil'],
+  gender: ['genero', 'sexo', 'gender'],
+  birth: ['fecha de nacimiento', 'fecha nacimiento', 'nacimiento', 'birth date', 'birthdate', 'dob'],
+  shirt: ['t shirt', 'talla de playera', 'talla', 'playera', 'shirt'],
+  ename: ['nombre contacto de emergencia', 'contacto de emergencia nombre', 'nombre de contacto de emergencia', 'contacto de emergencia', 'emergency contact name', 'emergency contact', 'emergencia'],
+  ephone: ['telefono de emergencia', 'telefono contacto de emergencia', 'telefono contacto emergencia', 'emergency phone', 'emergency contact phone'],
+  waiver: ['waiver', 'exoneracion', 'deslinde'],
+  id: ['registrant id', 'order number', 'numero de pedido', 'pedido', 'folio', 'id'],
+  amount: ['order total', 'total', 'monto', 'importe', 'amount', 'price', 'precio'],
+  status: ['registrant status', 'payment status', 'estatus', 'status'],
+};
+function mapCols(headers: string[]) {
+  const h = headers.map((x) => ({ raw: x, n: norm(x) }));
+  const used = new Set<string>();
+  const out: Record<string, string | undefined> = {};
+  // emergency phone first so "telefono" doesn't grab it; exact match beats "contains".
+  for (const key of ['ephone', 'ename', 'first', 'last', 'email', 'phone', 'gender', 'birth', 'shirt', 'waiver', 'id', 'amount', 'status', 'full']) {
+    for (const pass of ['exact', 'contains'] as const) {
+      if (out[key]) break;
+      for (const syn of COLS[key]) {
+        const hit = h.find((c) => !used.has(c.raw) && (pass === 'exact' || syn.length <= 4 ? c.n === syn : c.n.includes(syn)));
+        if (hit && !(key === 'phone' && /emergenc/.test(hit.n)) && !(key === 'full' && /emergenc|contacto/.test(hit.n))) { out[key] = hit.raw; used.add(hit.raw); break; }
+      }
+    }
+  }
+  return out;
+}
+function toDate(v: string) {
+  if (!v) return null;
+  let m = v.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+  m = v.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{2,4})$/); // dd/mm/yyyy (Mexico)
+  if (m) { const y = m[3].length === 2 ? (Number(m[3]) > 30 ? '19' : '20') + m[3] : m[3]; return `${y}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`; }
+  const d = new Date(v);
+  return isNaN(+d) ? null : d.toISOString().slice(0, 10);
+}
+const SHIRTS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+export async function importSolos(raceId: string, rows: Record<string, string>[]): Promise<ImportResult & { columns: Record<string, string | undefined> }> {
+  const race = await getRace(raceId);
+  if (!race) throw new Error('race_not_found');
+  const res: ImportResult = { kind: 'solos', teamsCreated: 0, runnersCreated: 0, paymentsCreated: 0, skipped: 0, unmatched: 0, warnings: [] };
+  const c = mapCols(Object.keys(rows[0] || {}));
+  if (!c.email || !(c.first || c.full)) throw new Error('solo_cols');
+  const g = (r: Record<string, string>, k: string) => (c[k] ? String(r[c[k]!] ?? '').trim() : '');
+  const existing = await many<{ id: string; captain_email: string; external_id: string | null }>('SELECT id, captain_email, external_id FROM teams WHERE race_id = ? AND is_solo', [race.id]);
+  const seenEmail = new Set(existing.map((x) => lc(x.captain_email)));
+  const seenExt = new Set(existing.map((x) => x.external_id).filter(Boolean));
+  for (const [i, r] of rows.entries()) {
+    if (/cancel/i.test(g(r, 'status'))) { res.skipped++; continue; }
+    const email = lc(g(r, 'email'));
+    let first = g(r, 'first'), last = g(r, 'last');
+    if (!first && g(r, 'full')) { if (last) first = g(r, 'full'); else { const w = g(r, 'full').split(/\s+/); first = w[0]; last = w.slice(1).join(' '); } }
+    if (!email || !first) { if (Object.values(r).some((v) => String(v).trim())) res.warnings.push(`Fila ${i + 2}: falta nombre o correo, se omitió`); res.skipped++; continue; }
+    const ext = g(r, 'id') ? 'solo:' + race.id + ':' + g(r, 'id') : null;
+    if ((ext && seenExt.has(ext)) || seenEmail.has(email)) { res.skipped++; continue; }
+    const name = `${first} ${last}`.trim();
+    const amount = Math.round(Number(g(r, 'amount').replace(/[^\d.]/g, '')) || 0);
+    const id = await createTeam({
+      race_id: race.id, name, category: null, captain_name: name, captain_email: email, captain_phone: g(r, 'phone') || null,
+      amount, payment_status: 'paid', payment_method: 'import', paid_at: now(), claim_code: newClaimCode(race.brand),
+      team_size: 1, notes: null, is_solo: true, external_id: ext,
+    });
+    seenEmail.add(email); if (ext) seenExt.add(ext);
+    res.teamsCreated++;
+    if (amount > 0 && await recordPayment({ race_id: race.id, team_id: id, kind: 'team', source: 'import', external_id: ext || 'solo:' + id, quantity: 1, amount,
+      payer_name: name, payer_email: email, payer_phone: g(r, 'phone') || null })) res.paymentsCreated++;
+    // Enough details to register them right away?
+    const gender = /^f/i.test(g(r, 'gender')) ? 'F' : /^m/i.test(g(r, 'gender')) ? 'M' : null;
+    const shirtRaw = g(r, 'shirt').toUpperCase().replace(/\s+/g, '');
+    const shirt = SHIRTS.find((s) => shirtRaw === s || shirtRaw.startsWith(s + ' ') || shirtRaw.endsWith('(' + s + ')')) || (shirtRaw || null);
+    const birth = toDate(g(r, 'birth'));
+    if (birth || shirt || g(r, 'ename')) {
+      const waived = /complet|si|sí|yes|true|acept/i.test(g(r, 'waiver'));
+      const top = await one<{ bib: number | null }>('SELECT max(bib) AS bib FROM runners WHERE race_id = ?', [race.id]);
+      const bib = Math.max(race.bib_start - 1, top?.bib || 0) + 1;
+      await run(
+        `INSERT INTO runners (id, race_id, team_id, bib, first_name, last_name, email, phone, birth_date, gender, shirt_size, emergency_name, emergency_phone,
+           waiver_accepted_at, waiver_text, fee, payment_status, payment_method, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [newId(), race.id, id, bib, first, last, email, g(r, 'phone') || null, birth, gender, shirt, g(r, 'ename') || null, g(r, 'ephone') || null,
+          waived ? now() : null, waived ? 'Aceptado (importado)' : null, 0, 'paid', 'import', now()]
+      );
+      res.runnersCreated++;
+    }
+  }
+  return { ...res, columns: c };
+}

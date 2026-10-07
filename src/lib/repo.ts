@@ -14,7 +14,7 @@ export type Team = {
   payment_status: 'pending' | 'paid'; payment_method: string | null; paid_at: string | null;
   stripe_session_id: string | null; claim_code: string; password_hash: string | null; created_at: string;
   team_size: number | null; extra_slots: number; notes: string | null; half_avg_min: number | null; logo: string | null; reg_type: string;
-  code_sent_at: string | null;
+  code_sent_at: string | null; is_solo: boolean; external_id: string | null;
 };
 export type Runner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string;
@@ -27,7 +27,7 @@ export type Runner = {
 // A team "counts" once it's paid, was added by staff, or a checkout for it
 // started in the last 30 minutes (so two people can't buy the last spot).
 // Abandoned checkouts drop out after 30 min and never show in the admin.
-export const LIVE_TEAM_SQL = `(payment_status = 'paid' OR payment_method = 'manual' OR created_at > ?)`;
+export const LIVE_TEAM_SQL = `(NOT is_solo AND (payment_status = 'paid' OR payment_method = 'manual' OR created_at > ?))`;
 const holdSince = () => new Date(Date.now() - 30 * 60 * 1000).toISOString();
 export const isListedTeam = (t: Pick<Team, 'payment_status' | 'payment_method'>) =>
   t.payment_status === 'paid' || t.payment_method === 'manual';
@@ -46,7 +46,7 @@ export async function liveTeamCount(raceId: string) {
 
 export async function listOpenRaces() {
   const races = await many<Race & { live: string }>(
-    `SELECT r.*, (SELECT count(*) FROM teams t WHERE t.race_id = r.id AND ${LIVE_TEAM_SQL.replace(/payment_|created_at/g, (m) => 't.' + m)}) AS live
+    `SELECT r.*, (SELECT count(*) FROM teams t WHERE t.race_id = r.id AND ${LIVE_TEAM_SQL.replace(/payment_|created_at|is_solo/g, (m) => 't.' + m)}) AS live
      FROM races r WHERE r.status = 'open' ORDER BY r.race_date NULLS LAST`,
     [holdSince()]
   );
@@ -76,6 +76,7 @@ export const deleteRace = (id: string) => run('DELETE FROM races WHERE id = ?', 
 
 /* ---------------- teams ---------------- */
 export const getTeam = (id: string) => one<Team>('SELECT * FROM teams WHERE id = ?', [id]);
+export const solosOfRace = (raceId: string) => many<Team>('SELECT * FROM teams WHERE race_id = ? AND is_solo ORDER BY name', [raceId]);
 export const teamsOfRace = (raceId: string) => many<Team>('SELECT * FROM teams WHERE race_id = ? ORDER BY name', [raceId]);
 export const listTeams = () => many<Team>('SELECT * FROM teams');
 export const findTeamByCode = (raceId: string, code: string) =>
@@ -84,20 +85,21 @@ export const findTeamByCode = (raceId: string, code: string) =>
 export async function listedTeamsWithCounts(raceId: string) {
   return many<Team & { members: string }>(
     `SELECT t.*, (SELECT count(*) FROM runners r WHERE r.team_id = t.id) AS members
-     FROM teams t WHERE t.race_id = ? AND (t.payment_status = 'paid' OR t.payment_method = 'manual') ORDER BY t.name`,
+     FROM teams t WHERE t.race_id = ? AND NOT t.is_solo AND (t.payment_status = 'paid' OR t.payment_method = 'manual') ORDER BY t.name`,
     [raceId]
   );
 }
 
-type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes' | 'half_avg_min' | 'logo' | 'reg_type' | 'code_sent_at'> &
+type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes' | 'half_avg_min' | 'logo' | 'reg_type' | 'code_sent_at' | 'is_solo' | 'external_id'> &
+  { is_solo?: boolean; external_id?: string | null } &
   { password_hash?: string | null; team_size?: number | null; notes?: string | null; created_at?: string; half_avg_min?: number | null; reg_type?: string };
 export async function createTeam(t: NewTeam) {
   const id = newId();
   await run(
     `INSERT INTO teams (id, race_id, name, category, captain_name, captain_email, captain_phone, amount, payment_status,
-       payment_method, paid_at, claim_code, password_hash, team_size, notes, half_avg_min, reg_type, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       payment_method, paid_at, claim_code, password_hash, team_size, notes, half_avg_min, reg_type, created_at, is_solo, external_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [id, t.race_id, t.name, t.category, t.captain_name, t.captain_email, t.captain_phone, t.amount, t.payment_status,
-      t.payment_method, t.paid_at, t.claim_code, t.password_hash ?? null, t.team_size ?? null, t.notes ?? null, t.half_avg_min ?? null, t.reg_type || 'presale', t.created_at || now()]
+      t.payment_method, t.paid_at, t.claim_code, t.password_hash ?? null, t.team_size ?? null, t.notes ?? null, t.half_avg_min ?? null, t.reg_type || 'presale', t.created_at || now(), !!t.is_solo, t.external_id ?? null]
   );
   return id;
 }
@@ -164,8 +166,8 @@ export const deleteRunner = (id: string) => run('DELETE FROM runners WHERE id = 
 // runner_fee (0 = included in the team price) and slots aren't used.
 export const isHoldRace = (r: Pick<Race, 'hold_slots'>) => (r.hold_slots || 0) > 0;
 export const teamSizeOf = (t: Pick<Team, 'team_size'>, r: Pick<Race, 'team_size'>) => t.team_size || r.team_size;
-export const paidSlots = (t: Pick<Team, 'payment_status' | 'extra_slots'>, r: Pick<Race, 'hold_slots'>) =>
-  (t.payment_status === 'paid' ? r.hold_slots || 0 : 0) + (t.extra_slots || 0);
+export const paidSlots = (t: Pick<Team, 'payment_status' | 'extra_slots'> & { is_solo?: boolean }, r: Pick<Race, 'hold_slots'>) =>
+  t.is_solo ? (t.payment_status === 'paid' ? 1 : 0) : (t.payment_status === 'paid' ? r.hold_slots || 0 : 0) + (t.extra_slots || 0);
 export function sizeOptions(r: Pick<Race, 'team_sizes' | 'team_size'>) {
   const xs = (r.team_sizes || '').split(',').map((x) => parseInt(x.trim(), 10)).filter((n) => n > 0);
   return xs.length ? Array.from(new Set(xs)).sort((a, b) => a - b) : [r.team_size];
@@ -179,6 +181,7 @@ export function captainSizeOptions(r: Pick<Race, 'team_sizes' | 'team_size'>) {
 }
 // What a runner joining this team now owes: 0 if a paid slot is free.
 export async function feeForNewRunner(race: Race, team: Team) {
+  if (team.is_solo) return team.payment_status === 'paid' ? { fee: 0, covered: true } : { fee: race.runner_fee || 0, covered: false };
   if (!isHoldRace(race)) return { fee: race.runner_fee || 0, covered: false };
   const n = await countRunners(team.id);
   return n < paidSlots(team, race) ? { fee: 0, covered: true } : { fee: race.runner_fee || 0, covered: false };

@@ -1,6 +1,6 @@
 // Shared by server pages and client components (must not live in a 'use client' file).
 type R = { capacity_teams: number; team_size: number; hold_slots?: number; runner_fee?: number };
-type T = { id?: string; amount: number; payment_status: string; team_size?: number | null; extra_slots?: number };
+type T = { id?: string; amount: number; payment_status: string; team_size?: number | null; extra_slots?: number; is_solo?: boolean };
 type Run = { team_id?: string; fee: number; payment_status: string };
 type P = { amount: number };
 
@@ -9,6 +9,7 @@ export const isHold = (r: Pick<R, 'hold_slots'>) => (r.hold_slots || 0) > 0;
 // Team-level slot accounting. Classic races: size only, no balance.
 export function teamSlots(t: T, r: R) {
   const size = t.team_size || r.team_size;
+  if (t.is_solo) return { size: 1, paid: t.payment_status === 'paid' ? 1 : 0, balance: t.payment_status === 'paid' ? 0 : t.amount };
   if (!isHold(r)) return { size, paid: t.payment_status === 'paid' ? size : 0, balance: t.payment_status === 'paid' ? 0 : t.amount };
   // The deposit is worth hold_slots runners, so what's owed is simply the
   // unpaid spots × runner fee (a team that paid every spot owes nothing,

@@ -9,8 +9,9 @@ export const toARace = (r: Race): ARace => ({
   team_sizes: r.team_sizes, hold_slots: r.hold_slots, start_groups: r.start_groups,
   slug: r.slug, access_code: r.access_code, page: r.page,
 });
-export const toATeams = (teams: Team[]): ATeam[] =>
-  teams.filter(isListedTeam).map((x) => ({
+export const toATeams = (teams: Team[]): ATeam[] => toATeamsAll(teams.filter((x) => isListedTeam(x) && !x.is_solo));
+const toATeamsAll = (teams: Team[]): ATeam[] =>
+  teams.map((x) => ({
     id: x.id, race_id: x.race_id, name: x.name, category: x.category, captain_name: x.captain_name, captain_email: x.captain_email,
     captain_phone: x.captain_phone, amount: x.amount, payment_status: x.payment_status, payment_method: x.payment_method, paid_at: x.paid_at,
     claim_code: x.claim_code, has_password: !!x.password_hash, created_at: x.created_at,
@@ -29,3 +30,5 @@ export const toAPayments = (ps: Payment[]): APayment[] =>
     id: p.id, team_id: p.team_id, runner_id: p.runner_id, kind: p.kind, source: p.source, external_id: p.external_id, quantity: p.quantity,
     amount: p.amount, payer_name: p.payer_name, payer_email: p.payer_email, comment: p.comment, paid_at: p.paid_at, notes: p.notes, resolution: p.resolution,
   }));
+
+export const toASolos = (teams: Team[]): ATeam[] => toATeamsAll(teams.filter((x) => x.is_solo));

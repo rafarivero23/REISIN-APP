@@ -9,7 +9,7 @@ import { fmtHalf } from '@/lib/groups';
 import { LogoInput } from './LogoInput';
 import {
   buyTeam, confirmTeam, captainLogin, captainLogout, setTeamPassword, captainPayRunner, captainPaySlots, confirmSlots, setTeamDetails, joinTeam, registerRunner,
-  confirmRunner, retryRunnerPayment, captainRunnerDetails, captainUpdateRunner, captainRemoveRunner, captainStartRegister, captainUpdateContact,
+  confirmRunner, retryRunnerPayment, captainRunnerDetails, captainUpdateRunner, captainRemoveRunner, captainStartRegister, captainUpdateContact, soloAcceptWaiver,
 } from '@/app/actions/portal';
 
 export type PublicRace = {
@@ -125,7 +125,7 @@ export function TeamCreated() {
 }
 
 /* ---------------- captain sign-in ---------------- */
-export function CaptainLoginForm({ raceId, brand }: { raceId: string; brand: string }) {
+export function CaptainLoginForm({ raceId, brand, solo }: { raceId: string; brand: string; solo?: boolean }) {
   const { t } = useT();
   const router = useRouter();
   const [code, setCode] = useState('');
@@ -139,12 +139,77 @@ export function CaptainLoginForm({ raceId, brand }: { raceId: string; brand: str
   return (
     <div className="card">
       <form className="stack" style={{ gap: 12 }} onSubmit={submit}>
-        <h2>{t('p_enterCode')}</h2>
-        <Field id="cl-code" label={t('captainCode')} value={code} onChange={setCode} req autoComplete="off" placeholder={brandPrefix(brand) + '-XXXXX'} style={{ textTransform: 'uppercase' }} />
+        <h2>{t(solo ? 'so_enterCode' : 'p_enterCode')}</h2>
+        {solo && <p className="muted" style={{ fontSize: 14, marginTop: -4 }}>{t('so_enterSub')}</p>}
+        <Field id="cl-code" label={t(solo ? 'so_code' : 'captainCode')} value={code} onChange={setCode} req autoComplete="off" placeholder={brandPrefix(brand) + '-XXXXX'} style={{ textTransform: 'uppercase' }} />
         <Err k={err} />
         <div><button className="btn btn-primary btn-lg" type="submit">{t('p_enter')}</button></div>
       </form>
       <p className="muted" style={{ fontSize: 13, marginTop: 12 }}>{t('p_noCode')}</p>
+    </div>
+  );
+}
+
+/* ---------------- solo runner dashboard ---------------- */
+export function SoloDash({ name, raceName, raceId, code, runner, waiverText }: {
+  name: string; raceName: string; raceId: string; code: string; waiverText: string;
+  runner: { id: string; bib: number | null; first_name: string; last_name: string; shirt_size: string | null; waiver: boolean } | null;
+}) {
+  const { t } = useT();
+  const router = useRouter();
+  const toast = useToast();
+  const [editing, setEditing] = useState(false);
+  const start = async () => {
+    const r = await captainStartRegister();
+    if ('error' in r) return toast(t(r.error));
+    router.push(`/r/${r.raceId}/register`);
+  };
+  return (
+    <>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <Link className="p-back" href={`/r/${raceId}`}>← {raceName}</Link>
+        <button type="button" className="p-back" onClick={async () => { await captainLogout(); router.push(`/r/${raceId}`); }}>{t('p_exit')}</button>
+      </div>
+      <div className="p-hero">
+        <div className="label">{t('so_title')} · {raceName}</div>
+        <h1>{name}</h1>
+        <div className="row"><span className="chip ok">{t('paid')}</span><span className="code">{code}</span></div>
+      </div>
+      {!runner ? (
+        <div className="card stack">
+          <h3>{t('so_finish')}</h3>
+          <p className="muted" style={{ fontSize: 14 }}>{t('so_finishSub')}</p>
+          <div><button type="button" className="btn btn-primary btn-lg" onClick={start}>{t('so_finishBtn')} →</button></div>
+        </div>
+      ) : (
+        <div className="card stack">
+          <div className="row" style={{ justifyContent: 'space-between' }}>
+            <div className="row"><Bib n={runner.bib} big /><div><b style={{ fontSize: 18 }}>{runner.first_name} {runner.last_name}</b>
+              <div className="muted" style={{ fontSize: 14 }}>{t('shirt')}: {runner.shirt_size || '—'}</div></div></div>
+            <div className="row" style={{ gap: 6 }}>
+              {runner.waiver ? <span className="chip ok">{t('regComplete')}</span> : <span className="chip warn">{t('reg_waiverMissing')}</span>}
+              <button type="button" className="btn btn-sm" aria-expanded={editing} onClick={() => setEditing(!editing)}>{editing ? t('cancel') : t('p_editRunner')}</button>
+            </div>
+          </div>
+          {editing && <RunnerEditor runnerId={runner.id} name={runner.first_name} noRemove onDone={() => { setEditing(false); router.refresh(); }} />}
+          {!runner.waiver && <SoloWaiver runnerId={runner.id} text={waiverText} />}
+        </div>
+      )}
+    </>
+  );
+}
+
+function SoloWaiver({ runnerId, text }: { runnerId: string; text: string }) {
+  const { t } = useT();
+  const router = useRouter();
+  const toast = useToast();
+  const [ok, setOk] = useState(false);
+  return (
+    <div className="stack" style={{ gap: 10, borderTop: '1px solid var(--line)', paddingTop: 12 }}>
+      <b>{t('waiver')}</b>
+      <div className="note" style={{ whiteSpace: 'pre-wrap', maxHeight: 220, overflow: 'auto', color: 'var(--ink)' }}>{text}</div>
+      <label className="check"><input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} /> <span>{t('p_waiverAccept')}</span></label>
+      <div><button type="button" className="btn btn-primary" disabled={!ok} onClick={async () => { const r = await soloAcceptWaiver(runnerId); if ('error' in r) return toast(t(r.error)); toast(t('saved')); router.refresh(); }}>{t('save')}</button></div>
     </div>
   );
 }
@@ -370,7 +435,7 @@ export function JoinForm({ raceId, teamSize, teams }: { raceId: string; teamSize
 export type RunnerForm = { first_name: string; last_name: string; email: string; phone: string; birth_date: string; gender: string; shirt_size: string; emergency_name: string; emergency_phone: string };
 export const EMPTY_RUNNER: RunnerForm = { first_name: '', last_name: '', email: '', phone: '', birth_date: '', gender: '', shirt_size: '', emergency_name: '', emergency_phone: '' };
 
-function RunnerEditor({ runnerId, name, onDone }: { runnerId: string; name: string; onDone: () => void }) {
+function RunnerEditor({ runnerId, name, onDone, noRemove }: { runnerId: string; name: string; onDone: () => void; noRemove?: boolean }) {
   const { t } = useT();
   const toast = useToast();
   const [f, setF] = useState<RunnerForm | null>(null);
@@ -398,7 +463,7 @@ function RunnerEditor({ runnerId, name, onDone }: { runnerId: string; name: stri
       <RunnerFields f={f} set={set} />
       <Err k={err} />
       <div className="full row" style={{ justifyContent: 'space-between' }}>
-        <button type="button" className="btn btn-ghost btn-sm" style={{ color: 'var(--bad)' }} onClick={remove}>{t('p_removeRunner')}</button>
+        {noRemove ? <span /> : <button type="button" className="btn btn-ghost btn-sm" style={{ color: 'var(--bad)' }} onClick={remove}>{t('p_removeRunner')}</button>}
         <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? <span className="spin" /> : t('save')}</button>
       </div>
     </form>
@@ -450,10 +515,10 @@ export function RunnerFields({ f, set }: { f: RunnerForm; set: (k: keyof RunnerF
   );
 }
 
-export function RegisterForm({ race, teamName, feeDue }: { race: PublicRace; teamName: string; feeDue: number }) {
+export function RegisterForm({ race, teamName, feeDue, prefill }: { race: PublicRace; teamName: string; feeDue: number; prefill?: Partial<RunnerForm> }) {
   const { t, lang } = useT();
   const router = useRouter();
-  const [f, setF] = useState<RunnerForm>(EMPTY_RUNNER);
+  const [f, setF] = useState<RunnerForm>({ ...EMPTY_RUNNER, ...prefill });
   const [waiver, setWaiver] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

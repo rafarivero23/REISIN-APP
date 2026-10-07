@@ -242,6 +242,12 @@ ALTER TABLE teams ADD COLUMN IF NOT EXISTS code_sent_at TEXT;
 -- formed) | credit (kept as credit, e.g. for another event) | refunded.
 ALTER TABLE payments ADD COLUMN IF NOT EXISTS resolution TEXT;
 
+-- Solo runners: a "team" of one (is_solo). Same code / portal flow as a
+-- captain, but kept out of team counts, capacity and the join list.
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS is_solo BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS external_id TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS ux_teams_external ON teams(external_id) WHERE external_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS agent_invites (
   id TEXT PRIMARY KEY,
   agent_id TEXT NOT NULL REFERENCES free_agents(id) ON DELETE CASCADE,

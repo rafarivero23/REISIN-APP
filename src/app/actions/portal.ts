@@ -5,7 +5,7 @@
 import { headers } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import {
-  getRace, getTeam, getRunner, updateRunner, deleteRunner, liveTeamCount, countRunners, createTeam, updateTeam, createRunner, recordPayment,
+  getRace, getTeam, getRunner, updateRunner, deleteRunner, setRunnerWaiver, liveTeamCount, countRunners, createTeam, updateTeam, createRunner, recordPayment,
   findTeamByCode, feeForNewRunner, isHoldRace, paidSlots, sizeOptions, captainSizeOptions, teamSizeOf, type Race, type RunnerInput,
 } from '@/lib/repo';
 import { newClaimCode, now } from '@/lib/ids';
@@ -340,5 +340,15 @@ export async function captainUpdateContact(f: { name?: string; email?: string; p
   const captain_name = clean(f.name, 120), captain_email = clean(f.email, 160).toLowerCase(), captain_phone = clean(f.phone, 40);
   if (!captain_name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(captain_email)) return { error: 'required' };
   await updateTeam(teamId, { captain_name, captain_email, captain_phone: captain_phone || null });
+  return { ok: true };
+}
+
+// A Solo runner accepts the waiver themselves (their account = their spot).
+export async function soloAcceptWaiver(runnerId: string): Promise<Err | { ok: true }> {
+  const r = await captainRunner(runnerId);
+  const team = r ? await getTeam(r.team_id) : null;
+  const race = team ? await getRace(team.race_id) : null;
+  if (!r || !team?.is_solo || !race) return { error: 'p_captainSub' };
+  await setRunnerWaiver(r.id, now(), race.waiver || '');
   return { ok: true };
 }

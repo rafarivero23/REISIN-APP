@@ -11,6 +11,7 @@ import { parseGroups, groupFor, categoryOf, fmtHalf, type StartGroup } from '@/l
 import { LogoInput } from './LogoInput';
 import { PageEditor } from './racepage';
 import { CaptainsPanel } from './captains';
+import { SolosPanel } from './solos';
 import { captainMessage, waLink, mailLink } from '@/lib/capmsg';
 import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
@@ -171,19 +172,19 @@ type Modal = { type: 'race' } | { type: 'teamForm'; id?: string } | { type: 'tea
 
 export type AAgent = { id: string; name: string; email: string; phone: string | null; gender: string | null; half_avg_min: number | null; city: string | null;
   message: string | null; paid_claim: boolean; status: string; team_id: string | null; notes: string | null; created_at: string };
-export function RaceDetail({ race, teams, runners, payments, agents }: { race: ARace; teams: ATeam[]; runners: ARunner[]; payments: APayment[]; agents: AAgent[] }) {
+export function RaceDetail({ race, teams, solos = [], runners, payments, agents }: { race: ARace; teams: ATeam[]; solos?: ATeam[]; runners: ARunner[]; payments: APayment[]; agents: AAgent[] }) {
   const { t, lang } = useT();
   const router = useRouter();
   const q = useSearchParams();
   const tab = q.get('tab') || 'summary';
   const [search, setSearch] = useState('');
   const [modal, setModal] = useState<Modal>(null);
-  const teamById = (id: string) => teams.find((x) => x.id === id);
+  const teamById = (id: string) => teams.find((x) => x.id === id) || solos.find((x) => x.id === id);
   const runnersOfTeam = (id: string) => runners.filter((r) => r.team_id === id).sort((a, b) => (a.bib || 0) - (b.bib || 0));
   const stats = raceStats(race, teams, runners, payments);
   const unassigned = payments.filter((p) => !p.team_id && !p.resolution).length;
   const tabs: [string, string][] = [['summary', t('summary')], ['teams', `${t('teams')} · ${stats.teams}`], ['runners', `${t('runners')} · ${stats.runners}`],
-    ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['agents', `${t('fa_tab')} · ${agents.filter((a) => a.status === 'open').length}`], ['captains', t('cap_tab') + ` · ${teams.filter((x) => x.code_sent_at).length}/${teams.length}`], ['page', t('pg_tab') + (race.access_code ? ' 🔒' : '')], ['import', t('importTab')]];
+    ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['agents', `${t('fa_tab')} · ${agents.filter((a) => a.status === 'open').length}`], ['solos', `${t('so_tab')} · ${solos.length}`], ['captains', t('cap_tab') + ` · ${teams.filter((x) => x.code_sent_at).length}/${teams.length}`], ['page', t('pg_tab') + (race.access_code ? ' 🔒' : '')], ['import', t('importTab')]];
   // Hold races: a runner is "covered" when they fit inside the team's paid slots.
   const groups = parseGroups(race.start_groups);
   const info = (tm: ATeam) => {
@@ -192,6 +193,7 @@ export function RaceDetail({ race, teams, runners, payments, agents }: { race: A
       missingRunners: Math.max(0, teamSlots(tm, race).size - rs.length), noWaiver: rs.filter((r) => !r.waiver_accepted_at).length };
   };
   const covered = new Set<string>();
+  for (const s of solos) if (s.payment_status === 'paid') runnersOfTeam(s.id).forEach((r) => covered.add(r.id));
   if (isHold(race)) for (const tm of teams) runnersOfTeam(tm.id).slice(0, teamSlots(tm, race).paid).forEach((r) => covered.add(r.id));
   const setTab = (k: string) => { setSearch(''); router.replace(k === 'summary' ? `/admin/races/${race.id}` : `/admin/races/${race.id}?tab=${k}`, { scroll: false }); };
   const csvHref = `/api/admin/races/${race.id}/csv`;
@@ -234,12 +236,13 @@ export function RaceDetail({ race, teams, runners, payments, agents }: { race: A
             <a className="btn btn-sm" href={csvHref}>{t('exportCsv')}</a>
           </div>
           <RunnersTable runners={runners.filter((x) => !search || `${x.first_name} ${x.last_name} ${x.email} ${teamById(x.team_id)?.name || ''} ${x.bib}`.toLowerCase().includes(search.toLowerCase()))}
-            teamName={(id) => teamById(id)?.name || '—'} open={(id) => setModal({ type: 'runner', id })} hold={isHold(race)} covered={covered} />
+            teamName={(id) => (solos.some((s) => s.id === id) ? 'SOLO' : teamById(id)?.name || '—')} open={(id) => setModal({ type: 'runner', id })} hold={isHold(race)} covered={covered} />
         </>
       )}
-      {tab === 'payments' && <Payments race={race} teams={teams} payments={payments} stats={stats} openTeam={(id) => setModal({ type: 'team', id })} />}
+      {tab === 'payments' && <Payments race={race} teams={teams} solos={solos} payments={payments} stats={stats} openTeam={(id) => setModal({ type: 'team', id })} />}
       {tab === 'import' && <ImportPanel race={race} />}
       {tab === 'captains' && <CaptainsPanel race={race} teams={teams} />}
+      {tab === 'solos' && <SolosPanel race={race} solos={solos} runners={runners} openRunner={(id) => setModal({ type: 'runner', id })} NoteCell={NoteCell} />}
       {tab === 'page' && <PageEditor race={race} initial={{ slug: race.slug || '', access_code: race.access_code || '', page: parsePage(race.page) }} />}
       {tab === 'agents' && <AgentsAdmin agents={agents} teamName={(id) => teamById(id)?.name || '—'} />}
 
@@ -442,7 +445,7 @@ function RunnersTable({ runners, teamName, open, hold, covered }: { runners: ARu
   );
 }
 
-function Payments({ race, teams, payments, stats, openTeam }: { race: ARace; teams: ATeam[]; payments: APayment[]; stats: Stats; openTeam: (id: string) => void }) {
+function Payments({ race, teams, solos = [], payments, stats, openTeam }: { race: ARace; teams: ATeam[]; solos?: ATeam[]; payments: APayment[]; stats: Stats; openTeam: (id: string) => void }) {
   const { t, lang } = useT();
   const { act } = useAct();
   const makeTeam = async (p: APayment) => {
@@ -458,8 +461,9 @@ function Payments({ race, teams, payments, stats, openTeam }: { race: ARace; tea
   const un = payments.filter((p) => !p.team_id && !p.resolution);
   const resolved = payments.filter((p) => !p.team_id && p.resolution);
   const shown = payments.filter((p) => !q || `${p.payer_name} ${p.payer_email} ${p.comment} ${p.notes} ${teamName(p.team_id)} ${p.external_id}`.toLowerCase().includes(q.toLowerCase()));
-  const concept = (p: APayment) => p.kind === 'team' ? (isHold(race) ? t('holdLabel') : t('team')) : p.kind === 'slots' ? `${p.quantity} ${t('slotsWord')}` : t('runnerFee');
-  const TeamSelect = ({ p }: { p: APayment }) => (
+  const concept = (p: APayment) => soloOf(p.team_id) ? 'Solo' : p.kind === 'team' ? (isHold(race) ? t('holdLabel') : t('team')) : p.kind === 'slots' ? `${p.quantity} ${t('slotsWord')}` : t('runnerFee');
+  const soloOf = (id: string | null) => (id ? solos.find((x) => x.id === id) : undefined);
+  const TeamSelect = ({ p }: { p: APayment }) => soloOf(p.team_id) ? <span className="chip plain">SOLO · {soloOf(p.team_id)!.name}</span> : (
     <select value={p.team_id || ''} onChange={(e) => act(() => setPaymentTeam(p.id, e.target.value || null))} aria-label={t('team')} style={{ maxWidth: 220, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)' }}>
       <option value="">— {t('unassigned')} —</option>
       {sortedTeams.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}

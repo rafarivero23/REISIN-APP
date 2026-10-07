@@ -20,8 +20,9 @@ export default async function RegisterPage({ params }: { params: { raceId: strin
   }
   return (
     <>
-      <Back href={`/r/${params.raceId}/join`} />
-      <RegisterForm race={res.race} teamName={team.name} feeDue={(await feeForNewRunner((await getRace(res.race.id))!, team)).fee} />
+      <Back href={team.is_solo ? '/captain' : `/r/${params.raceId}/join`} />
+      <RegisterForm race={res.race} teamName={team.is_solo ? 'Solo' : team.name}
+        prefill={team.is_solo ? { first_name: team.captain_name.split(/\s+/)[0] || '', last_name: team.captain_name.split(/\s+/).slice(1).join(' '), email: team.captain_email, phone: team.captain_phone || '' } : undefined} feeDue={(await feeForNewRunner((await getRace(res.race.id))!, team)).fee} />
     </>
   );
 }

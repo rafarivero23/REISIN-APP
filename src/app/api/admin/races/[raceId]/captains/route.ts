@@ -14,7 +14,7 @@ export async function GET(req: Request, { params }: { params: { raceId: string }
   if (!race) return new NextResponse('Not found', { status: 404 });
   const origin = new URL(req.url).origin;
   const tr = (k: string) => translate('es', k);
-  const teams = (await teamsOfRace(race.id)).filter(isListedTeam).sort((a, b) => a.name.localeCompare(b.name));
+  const teams = (await teamsOfRace(race.id)).filter((x) => isListedTeam(x) && !x.is_solo).sort((a, b) => a.name.localeCompare(b.name));
   const rows: unknown[][] = [['equipo', 'capitan', 'nombre', 'correo', 'telefono', 'codigo', 'enlace', 'contrasena_pagina', 'enviado', 'asunto', 'mensaje']];
   for (const x of teams) {
     const m = captainMessage(tr, x, race, origin, true);

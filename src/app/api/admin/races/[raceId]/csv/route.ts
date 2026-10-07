@@ -21,7 +21,7 @@ export async function GET(_req: Request, { params }: { params: { raceId: string 
   for (const x of runners) {
     const tm = teams.find((t) => t.id === x.team_id);
     const g = groupFor(tm?.half_avg_min, groups);
-    rows.push([x.bib, x.first_name, x.last_name, x.email, x.phone, x.birth_date, x.gender, x.shirt_size, tm?.name, tm ? cat(tm.id) : '', g?.label, g?.start, fmtHalf(tm?.half_avg_min), tm?.captain_name,
+    rows.push([x.bib, x.first_name, x.last_name, x.email, x.phone, x.birth_date, x.gender, x.shirt_size, tm?.is_solo ? 'SOLO' : tm?.name, tm ? cat(tm.id) : '', g?.label, g?.start, fmtHalf(tm?.half_avg_min), tm?.captain_name,
       x.emergency_name, x.emergency_phone, x.waiver_accepted_at, x.fee, x.payment_status, x.created_at]);
   }
   const csv = rows.map((r) => r.map((c) => { const s = c == null ? '' : String(c); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }).join(',')).join('\n');
