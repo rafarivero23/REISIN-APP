@@ -1,4 +1,5 @@
 'use client';
+import { PasswordInput } from '@/components/ui';
 import Link from 'next/link';
 import { useFormState, useFormStatus } from 'react-dom';
 import { login } from '@/app/actions/admin';
@@ -23,7 +24,7 @@ export default function LoginForm({ next }: { next: string }) {
         <div><h2>{t('login')}</h2><p className="muted" style={{ fontSize: 14, marginTop: 6 }}>{t('loginSubN')}</p></div>
         <input type="hidden" name="next" value={next} />
         <div className="field"><label htmlFor="l-email">{t('email')}</label><input id="l-email" name="email" type="email" required autoComplete="username" /></div>
-        <div className="field"><label htmlFor="l-pass">{t('password')}</label><input id="l-pass" name="password" type="password" required autoComplete="current-password" /></div>
+        <div className="field"><label htmlFor="l-pass">{t('password')}</label><PasswordInput id="l-pass" name="password" required autoComplete="current-password" /></div>
         {state?.error && <p className="err">{t(state.error)}</p>}
         <Submit />
         <Link href="/" className="btn btn-ghost">{t('openPortal')} ↗</Link>

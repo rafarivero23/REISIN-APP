@@ -310,3 +310,10 @@ a.btn-primary{color:var(--accent-ink)}
 :root{--f-title:"Baja Crossing","Barlow Condensed","Arial Narrow",system-ui,sans-serif}
 h1,h2,h3,.choice b,.choice a b,.race-card h3,.section-t{font-family:var(--f-title);font-weight:400;font-synthesis:none;letter-spacing:.02em;text-transform:uppercase}
 .hero h1{line-height:.95}
+
+/* password show/hide */
+.pw-wrap{position:relative;display:block}
+.pw-wrap input{width:100%;padding-right:46px}
+.pw-eye{all:unset;cursor:pointer;position:absolute;top:50%;right:6px;transform:translateY(-50%);width:36px;height:36px;display:grid;place-items:center;border-radius:6px;color:var(--muted)}
+.pw-eye:hover{color:var(--ink);background:var(--surface-2)}
+.pw-eye:focus-visible{outline:2px solid var(--accent)}
