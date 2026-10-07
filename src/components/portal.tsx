@@ -262,13 +262,21 @@ export function CaptainDash({ team, race, runners, slots }: {
       </div>
       <div className="card stack">
         <h3 style={{ textTransform: 'uppercase' }}>{t('p_teamDash')}</h3>
-        <form className="row" style={{ alignItems: 'flex-end' }} onSubmit={saveName}>
-          <Field id="cd-name" label={t('p_teamNameEdit')} value={nm.name} onChange={(v) => setNm((x) => ({ ...x, name: v }))} req maxLength={80} />
+        <form className="stack" style={{ gap: 8 }} onSubmit={saveName}>
+          <div className="row" style={{ alignItems: 'flex-end' }}>
+            <Field id="cd-name" label={t('p_teamNameEdit')} value={nm.name} onChange={(v) => setNm((x) => ({ ...x, name: v }))} req maxLength={80} />
+            {race.sizes.length > 1 && (
+              <Field id="cd-size" label={t('p_teamSizeEdit')} value={nm.size} onChange={(v) => setNm((x) => ({ ...x, size: v }))}
+                options={race.sizes.filter((n) => n >= minSize || String(n) === nm.size).map((n) => [String(n), `${n} ${t('runners').toLowerCase()}`])} />
+            )}
+            <button className="btn btn-sm btn-primary" type="submit" disabled={!nm.name.trim() || (nm.name === team.name && nm.size === String(slots.size))}>{t('save')}</button>
+          </div>
           {race.sizes.length > 1 && (
-            <Field id="cd-size" label={t('p_teamSizeEdit')} value={nm.size} onChange={(v) => setNm((x) => ({ ...x, size: v }))}
-              options={race.sizes.filter((n) => n >= minSize || String(n) === nm.size).map((n) => [String(n), String(n)])} />
+            <p className="muted" style={{ fontSize: 13 }}>
+              {t('p_sizeHelp').replace('{min}', String(minSize))}
+              {slots.hold && Number(nm.size) > slots.paid && <> {t('p_sizeCost').replace('{n}', String(Number(nm.size) - slots.paid)).replace('{x}', money((Number(nm.size) - slots.paid) * race.runner_fee, lang))}</>}
+            </p>
           )}
-          <button className="btn btn-sm" type="submit" disabled={!nm.name.trim() || (nm.name === team.name && nm.size === String(slots.size))}>{t('save')}</button>
         </form>
         <LogoInput current={team.logo} onChange={async (d) => { const r = await setTeamDetails({ logo: d }); if ('error' in r) toast(t(r.error)); else { toast(t('saved')); router.refresh(); } }} />
         <form className="row" style={{ alignItems: 'flex-end' }} onSubmit={saveHalf}>

@@ -9,7 +9,7 @@ import { createSession, destroySession } from '@/lib/session';
 import {
   createRace, updateRace, deleteRace, getRace, getTeam, getRunner, createTeam, updateTeam, deleteTeam, updateRunner, deleteRunner,
   recordPayment, assignPayment, deletePayment, getPayment, findUserByEmail, createUser, deleteUser, getUserById, updateUserPassword,
-  sizeOptions, setCodeSent, setRaceGroups, setPaymentNotes, setRunnerNotes, type RaceInput, type RunnerInput,
+  sizeOptions, captainSizeOptions, setCodeSent, setRaceGroups, setPaymentNotes, setRunnerNotes, type RaceInput, type RunnerInput,
 } from '@/lib/repo';
 import { importCsvText, rematch } from '@/lib/importers';
 import { parseHalf } from '@/lib/groups';
@@ -98,7 +98,7 @@ export async function saveTeam(id: string | null, raceId: string, f: Record<stri
   const payment_status = f.payment_status === 'paid' ? 'paid' : 'pending';
   const race = await getRace(raceId);
   if (!race) return { error: 'not_found' };
-  const sizes = sizeOptions(race);
+  const sizes = captainSizeOptions(race);
   const team_size = sizes.includes(int(f.team_size)) ? int(f.team_size) : sizes[sizes.length - 1];
   const base = { name, category: str(f.category, 60) || null, captain_name, captain_email, captain_phone: str(f.captain_phone, 40) || null,
     amount: Math.max(0, int(f.amount)), team_size, notes: str(f.notes, 1000) || null,

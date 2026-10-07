@@ -6,7 +6,7 @@ import { headers } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import {
   getRace, getTeam, getRunner, updateRunner, deleteRunner, liveTeamCount, countRunners, createTeam, updateTeam, createRunner, recordPayment,
-  findTeamByCode, feeForNewRunner, isHoldRace, paidSlots, sizeOptions, teamSizeOf, type Race, type RunnerInput,
+  findTeamByCode, feeForNewRunner, isHoldRace, paidSlots, sizeOptions, captainSizeOptions, teamSizeOf, type Race, type RunnerInput,
 } from '@/lib/repo';
 import { newClaimCode, now } from '@/lib/ids';
 import { stripe } from '@/lib/stripe';
@@ -175,7 +175,7 @@ export async function setTeamDetails(input: { half?: string; logo?: string | nul
     if (input.size !== undefined) {
       const size = Number(input.size);
       const min = Math.max(await countRunners(team.id), paidSlots(team, race));
-      if (!sizeOptions(race).includes(size)) return { error: 'required' };
+      if (!captainSizeOptions(race).includes(size)) return { error: 'required' };
       if (size < min) return { error: 'p_sizeTooSmall' };
       await updateTeam(teamId, { team_size: size });
     }

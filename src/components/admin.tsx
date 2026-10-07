@@ -32,7 +32,7 @@ export type APayment = {
 };
 export const sizeList = (r: ARace) => {
   const xs = (r.team_sizes || '').split(',').map((x) => parseInt(x, 10)).filter((n) => n > 0);
-  return xs.length ? xs : [r.team_size];
+  return xs.length > 1 ? Array.from(new Set(xs)).sort((a, b) => a - b) : Array.from({ length: Math.max(r.team_size, ...xs) }, (_, i) => i + 1);
 };
 export type ATeam = {
   id: string; race_id: string; name: string; category: string | null; captain_name: string; captain_email: string;

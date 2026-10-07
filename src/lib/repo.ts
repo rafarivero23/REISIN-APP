@@ -170,6 +170,13 @@ export function sizeOptions(r: Pick<Race, 'team_sizes' | 'team_size'>) {
   const xs = (r.team_sizes || '').split(',').map((x) => parseInt(x.trim(), 10)).filter((n) => n > 0);
   return xs.length ? Array.from(new Set(xs)).sort((a, b) => a - b) : [r.team_size];
 }
+// Sizes a captain can switch to. Uses the race's allowed sizes; if the race
+// only lists one, any size from 1 up to the race maximum.
+export function captainSizeOptions(r: Pick<Race, 'team_sizes' | 'team_size'>) {
+  const xs = sizeOptions(r);
+  if (xs.length > 1) return xs;
+  return Array.from({ length: Math.max(1, Math.max(...xs, r.team_size)) }, (_, i) => i + 1);
+}
 // What a runner joining this team now owes: 0 if a paid slot is free.
 export async function feeForNewRunner(race: Race, team: Team) {
   if (!isHoldRace(race)) return { fee: race.runner_fee || 0, covered: false };
