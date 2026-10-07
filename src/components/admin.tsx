@@ -188,7 +188,8 @@ export function RaceDetail({ race, teams, runners, payments, agents }: { race: A
   const groups = parseGroups(race.start_groups);
   const info = (tm: ATeam) => {
     const rs = runnersOfTeam(tm.id);
-    return { cat: categoryOf(rs.map((r) => r.gender)), group: groupFor(tm.half_avg_min, groups), complete: regComplete(teamSlots(tm, race).size, rs) };
+    return { cat: categoryOf(rs.map((r) => r.gender)), group: groupFor(tm.half_avg_min, groups), complete: regComplete(teamSlots(tm, race).size, rs),
+      missingRunners: Math.max(0, teamSlots(tm, race).size - rs.length), noWaiver: rs.filter((r) => !r.waiver_accepted_at).length };
   };
   const covered = new Set<string>();
   if (isHold(race)) for (const tm of teams) runnersOfTeam(tm.id).slice(0, teamSlots(tm, race).paid).forEach((r) => covered.add(r.id));
@@ -318,7 +319,7 @@ function GroupsCard({ race, teams, info, groups }: { race: ARace; teams: ATeam[]
   );
 }
 
-type Info = (tm: ATeam) => { cat: string | null; group: StartGroup | null; complete: boolean };
+type Info = (tm: ATeam) => { cat: string | null; group: StartGroup | null; complete: boolean; missingRunners: number; noWaiver: number };
 function Summary({ race, teams, runners, stats, info, groups }: { race: ARace; teams: ATeam[]; runners: ARunner[]; stats: Stats; info: Info; groups: StartGroup[] }) {
   const { t, lang } = useT();
   const copy = useCopy();
@@ -371,7 +372,7 @@ function TeamsTable({ race, teams, count, open, info }: { race: ARace; teams: AT
                   <td>{x.captain_name}<div className="muted" style={{ fontSize: 12 }}>{x.captain_email}</div></td>
                   <td><CatChip c={inf.cat} /></td>
                   <td><GroupChip g={inf.group} />{x.half_avg_min && <div className="muted num" style={{ fontSize: 12 }}>{fmtHalf(x.half_avg_min)}</div>}</td>
-                  <td className="num">{n}/{sl.size}{n > sl.size && <span className="chip bad" style={{ marginLeft: 6 }}>+{n - sl.size}</span>}<div>{inf.complete ? <span className="chip ok">{t('regComplete')}</span> : <span className="chip warn">{t('regIncomplete')}</span>}</div></td>
+                  <td className="num">{n}/{sl.size}{n > sl.size && <span className="chip bad" style={{ marginLeft: 6 }}>+{n - sl.size}</span>}<div><RegChip i={inf} /></div></td>
                   {hold && <td className="num"><SlotBar paid={sl.paid} size={sl.size} /></td>}
                   <td className="num" style={{ textAlign: 'right' }}>{sl.balance > 0 ? money(sl.balance, lang) : <span className="chip ok">{t('paid')}</span>}</td>
                   <td><span className="chip plain">{t(x.reg_type === 'full' ? 'full' : 'presale')}</span></td>
@@ -386,6 +387,18 @@ function TeamsTable({ race, teams, count, open, info }: { race: ARace; teams: AT
         </table>
       ) : <div className="empty">{t('noTeams')}</div>}
     </div>
+  );
+}
+
+// Why a team's registration isn't complete: missing runners and/or waivers.
+function RegChip({ i }: { i: { complete: boolean; missingRunners: number; noWaiver: number } }) {
+  const { t } = useT();
+  if (i.complete) return <span className="chip ok">{t('regComplete')}</span>;
+  return (
+    <>
+      {i.missingRunners > 0 && <span className="chip warn" title={t('regIncomplete')}>{t('reg_missingRunners').replace('{n}', String(i.missingRunners))}</span>}
+      {i.noWaiver > 0 && <span className="chip warn" title={t('regIncomplete')}>{t('reg_noWaiver').replace('{n}', String(i.noWaiver))}</span>}
+    </>
   );
 }
 
@@ -684,7 +697,7 @@ function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, o
       <div className="row"><PayChip status={x.payment_status} /><span className="chip plain num">{runners.length}/{sl.size} {t('runners').toLowerCase()}</span>
         {hold && <SlotBar paid={sl.paid} size={sl.size} />}{sl.balance > 0 && <span className="chip warn num">{t('balance')}: {money(sl.balance, lang)}</span>}</div>
       <div className="row"><CatChip c={info.cat} /><GroupChip g={info.group} /><span className="chip plain num">{t('halfAvg').split(' ')[0]}: {fmtHalf(x.half_avg_min)}</span>
-        <span className="chip plain">{t(x.reg_type === 'full' ? 'full' : 'presale')}</span>{info.complete ? <span className="chip ok">{t('regComplete')}</span> : <span className="chip warn">{t('regIncomplete')}</span>}</div>
+        <span className="chip plain">{t(x.reg_type === 'full' ? 'full' : 'presale')}</span><RegChip i={info} /></div>
       <LogoInput current={logoSrc(x)} onChange={async (d) => { await act(() => setTeamLogoAdmin(x.id, d)); }} />
       <div><div className="label" style={{ marginBottom: 4 }}>{t('notes')}</div><NoteCell wide value={x.notes} onSave={(v) => act(() => saveTeamNotes(x.id, v))} /></div>
       <div className="card">
@@ -736,7 +749,7 @@ function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, o
               <tr key={y.id} className="click" onClick={() => onRunner(y.id)}>
                 <td><Bib n={y.bib} /></td>
                 <td><b>{y.first_name} {y.last_name}</b><div className="muted" style={{ fontSize: 12 }}>{y.email}</div></td>
-                <td>{y.fee > 0 && <PayChip status={y.payment_status} />}</td>
+                <td>{y.fee > 0 && <PayChip status={y.payment_status} />}{!y.waiver_accepted_at && <span className="chip warn">{t('reg_waiverMissing')}</span>}</td>
               </tr>
             ))}
           </tbody></table></div>
