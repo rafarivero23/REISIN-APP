@@ -281,6 +281,8 @@ export const setPaymentNotes = (id: string, notes: string | null) => run('UPDATE
 export const setCodeSent = (ids: string[], at: string | null) =>
   ids.length ? run(`UPDATE teams SET code_sent_at = ? WHERE id IN (${ids.map(() => '?').join(',')})`, [at, ...ids]) : Promise.resolve();
 export const setPaymentResolution = (id: string, r: string | null) => run('UPDATE payments SET resolution = ? WHERE id = ? AND team_id IS NULL', [r, id]);
+export const setRunnerWaiver = (id: string, at: string | null, text: string | null) =>
+  run('UPDATE runners SET waiver_accepted_at = ?, waiver_text = ? WHERE id = ?', [at, text, id]);
 export const setRunnerNotes = (id: string, notes: string | null) => run('UPDATE runners SET notes = ? WHERE id = ?', [notes, id]);
 export const updateUserPassword = (id: string, passwordHash: string) => run('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, id]);
 export const getUserById = (id: string) => one<User>('SELECT * FROM users WHERE id = ?', [id]);

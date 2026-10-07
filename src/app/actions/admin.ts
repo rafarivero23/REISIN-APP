@@ -9,7 +9,7 @@ import { createSession, destroySession } from '@/lib/session';
 import {
   createRace, updateRace, deleteRace, getRace, getTeam, getRunner, createTeam, updateTeam, deleteTeam, updateRunner, deleteRunner,
   recordPayment, assignPayment, deletePayment, getPayment, findUserByEmail, createUser, deleteUser, getUserById, updateUserPassword,
-  sizeOptions, captainSizeOptions, setPaymentResolution, setCodeSent, setRaceGroups, setPaymentNotes, setRunnerNotes, type RaceInput, type RunnerInput,
+  sizeOptions, captainSizeOptions, setPaymentResolution, setRunnerWaiver, setCodeSent, setRaceGroups, setPaymentNotes, setRunnerNotes, type RaceInput, type RunnerInput,
 } from '@/lib/repo';
 import { importCsvText, rematch } from '@/lib/importers';
 import { parseHalf } from '@/lib/groups';
@@ -211,6 +211,14 @@ export async function resolvePayment(id: string, resolution: string | null): Pro
   await guard();
   const r = resolution && ['not_formed', 'credit', 'refunded'].includes(resolution) ? resolution : null;
   await setPaymentResolution(id, r);
+  refresh();
+  return {};
+}
+
+// Staff marks a waiver as signed (e.g. signed on paper or in RedPodium) or clears it.
+export async function setWaiverStaff(runnerId: string, accepted: boolean): Promise<Result> {
+  const me = await guard();
+  await setRunnerWaiver(runnerId, accepted ? now() : null, accepted ? `Marcada por staff (${me.email})` : null);
   refresh();
   return {};
 }

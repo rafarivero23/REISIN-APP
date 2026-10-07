@@ -85,7 +85,15 @@ export async function importRedPodium(raceId: string, rows: Record<string, strin
       .map((r) => words(r.first_name)[0] + ' ' + words(r.last_name)[0]));
     for (const m of members) {
       const ext = 'redpodium:' + m['Registrant ID'];
-      if (await one('SELECT 1 FROM runners WHERE external_id = ?', [ext])) { res.skipped++; continue; }
+      const prev = await one<{ id: string; waiver_accepted_at: string | null }>('SELECT id, waiver_accepted_at FROM runners WHERE external_id = ?', [ext]);
+      if (prev) {
+        // Re-import: pick up waivers signed in RedPodium since the last import.
+        if (!prev.waiver_accepted_at && lc(m['Waiver']) === 'completed') {
+          await run('UPDATE runners SET waiver_accepted_at = ?, waiver_text = ? WHERE id = ?', [toIso(m['Date Completed'] || m['Registration Date']), 'Aceptado en RedPodium', prev.id]);
+          res.warnings.push(`${m['Nombre (First Name)']} ${m['Nombre (Last Name)']}: exoneración actualizada`);
+        }
+        res.skipped++; continue;
+      }
       const nk = words(m['Nombre (First Name)'])[0] + ' ' + words(m['Nombre (Last Name)'])[0];
       if (seen.has(nk)) { res.warnings.push(`${m['Team Name'].trim()}: ${m['Nombre (First Name)']} ${m['Nombre (Last Name)']} repetido, se omitió`); res.skipped++; continue; }
       seen.add(nk);

@@ -16,7 +16,7 @@ import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
-  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, resolvePayment, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
+  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, resolvePayment, setWaiverStaff, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
 /* Shapes passed from server components (no password hashes). */
@@ -797,7 +797,9 @@ function RunnerDrawer({ runner: x, race, team, onClose, onTeam }: { runner: ARun
           <dt>{t('gender')}</dt><dd>{genderLabel(x.gender, t)}</dd>
           <dt>{t('shirt')}</dt><dd>{x.shirt_size || '—'}</dd>
           <dt>{t('emergency')}</dt><dd>{x.emergency_name || '—'} · {x.emergency_phone}</dd>
-          <dt>{t('waiverOk')}</dt><dd>{x.waiver_accepted_at ? fmtDT(x.waiver_accepted_at, lang) : '✗'}</dd>
+          <dt>{t('waiverOk')}</dt><dd>{x.waiver_accepted_at
+            ? <>{fmtDT(x.waiver_accepted_at, lang)} <button type="button" className="btn btn-ghost btn-sm" onClick={() => confirm(t('wv_clearConfirm')) && act(() => setWaiverStaff(x.id, false))}>{t('wv_clear')}</button></>
+            : <><span className="chip warn">✗ {t('reg_waiverMissing')}</span> <button type="button" className="btn btn-sm btn-primary" onClick={() => act(() => setWaiverStaff(x.id, true))}>{t('wv_mark')}</button></>}</dd>
           <dt>{t('payment')}</dt><dd>{x.fee > 0 ? <><PayChip status={x.payment_status} /> {money(x.fee, lang)}</> : t('p_included')}</dd>
           <dt>{t('registered')}</dt><dd>{fmtDT(x.created_at, lang)}</dd>
         </dl>
