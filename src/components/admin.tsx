@@ -17,7 +17,7 @@ import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
-  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, resolvePayment, setWaiverStaff, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
+  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, resolvePayment, setWaiverStaff, staffWaiverLink, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
 /* Shapes passed from server components (no password hashes). */
@@ -765,6 +765,27 @@ function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, o
 }
 
 /* ---------------- runner drawer ---------------- */
+// Gets the runner's personal signing link and opens WhatsApp / email with it.
+function WaiverAsk({ runner, race, team }: { runner: ARunner; race: ARace; team?: ATeam }) {
+  const { t } = useT();
+  const copy = useCopy();
+  const [msg, setMsg] = useState<string | null>(null);
+  const load = async () => {
+    const { path } = await staffWaiverLink(runner.id);
+    const m = t('wv_msg').replace('{name}', runner.first_name).replace('{race}', race.name).replace('{team}', team?.name || 'Solo').replace('{url}', window.location.origin + path);
+    setMsg(m);
+  };
+  if (!msg) return <button type="button" className="btn btn-sm btn-primary" onClick={load}>{t('wv_send')}</button>;
+  const wa = waLink(runner.phone, msg), mail = mailLink(runner.email, `${race.name} · ${t('wv_title')}`, msg);
+  return (
+    <span className="row" style={{ gap: 4, display: 'inline-flex' }}>
+      {wa && <a className="btn btn-sm btn-primary" href={wa} target="_blank" rel="noreferrer">WhatsApp</a>}
+      {mail && <a className="btn btn-sm" href={mail}>{t('email')}</a>}
+      <button type="button" className="btn btn-sm btn-ghost" onClick={() => copy(msg)}>{t('copy')}</button>
+    </span>
+  );
+}
+
 function RunnerDrawer({ runner: x, race, team, onClose, onTeam }: { runner: ARunner; race: ARace; team?: ATeam; onClose: () => void; onTeam: (id: string) => void }) {
   const { t, lang } = useT();
   const { act } = useAct();
@@ -803,7 +824,7 @@ function RunnerDrawer({ runner: x, race, team, onClose, onTeam }: { runner: ARun
           <dt>{t('emergency')}</dt><dd>{x.emergency_name || '—'} · {x.emergency_phone}</dd>
           <dt>{t('waiverOk')}</dt><dd>{x.waiver_accepted_at
             ? <>{fmtDT(x.waiver_accepted_at, lang)} <button type="button" className="btn btn-ghost btn-sm" onClick={() => confirm(t('wv_clearConfirm')) && act(() => setWaiverStaff(x.id, false))}>{t('wv_clear')}</button></>
-            : <><span className="chip warn">✗ {t('reg_waiverMissing')}</span> <button type="button" className="btn btn-sm btn-primary" onClick={() => act(() => setWaiverStaff(x.id, true))}>{t('wv_mark')}</button></>}</dd>
+            : <><span className="chip warn">✗ {t('reg_waiverMissing')}</span> <WaiverAsk runner={x} race={race} team={team} /> <button type="button" className="btn btn-sm" onClick={() => act(() => setWaiverStaff(x.id, true))}>{t('wv_mark')}</button></>}</dd>
           <dt>{t('payment')}</dt><dd>{x.fee > 0 ? <><PayChip status={x.payment_status} /> {money(x.fee, lang)}</> : t('p_included')}</dd>
           <dt>{t('registered')}</dt><dd>{fmtDT(x.created_at, lang)}</dd>
         </dl>

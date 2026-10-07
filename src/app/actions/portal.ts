@@ -13,8 +13,10 @@ import { stripe } from '@/lib/stripe';
 import { splitCats } from '@/lib/format';
 import { parseHalf } from '@/lib/groups';
 import { cleanLogo } from '@/lib/logo';
+import { waiverToken, readWaiverToken } from '@/lib/team-session';
 import { setCaptain, getCaptainTeamId, clearCaptain, setMember, getMemberTeamId, signPayToken, verifyPayToken } from '@/lib/team-session';
 import { one } from '@/lib/db';
+import { translate } from '@/lib/dict';
 
 type Err = { error: string };
 const clean = (v: unknown, max = 200) => (v == null ? '' : String(v).trim().slice(0, max));
@@ -349,6 +351,22 @@ export async function soloAcceptWaiver(runnerId: string): Promise<Err | { ok: tr
   const team = r ? await getTeam(r.team_id) : null;
   const race = team ? await getRace(team.race_id) : null;
   if (!r || !team?.is_solo || !race) return { error: 'p_captainSub' };
-  await setRunnerWaiver(r.id, now(), race.waiver || '');
+  await setRunnerWaiver(r.id, now(), race.waiver || translate('es', 'w_default'));
   return { ok: true };
+}
+
+export async function acceptWaiverByToken(token: string): Promise<Err | { ok: true }> {
+  const id = await readWaiverToken(String(token || ''));
+  const r = id ? await getRunner(id) : null;
+  const race = r ? await getRace(r.race_id) : null;
+  if (!r || !race) return { error: 'not_found' };
+  if (!r.waiver_accepted_at) await setRunnerWaiver(r.id, now(), race.waiver || translate('es', 'w_default'));
+  return { ok: true };
+}
+
+// Captain gets each teammate's personal waiver link to forward.
+export async function captainWaiverLink(runnerId: string): Promise<Err | { path: string }> {
+  const r = await captainRunner(runnerId);
+  if (!r) return { error: 'p_captainSub' };
+  return { path: '/w/' + (await waiverToken(r.id)) };
 }

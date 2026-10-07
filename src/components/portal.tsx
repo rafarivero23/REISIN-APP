@@ -9,7 +9,7 @@ import { fmtHalf } from '@/lib/groups';
 import { LogoInput } from './LogoInput';
 import {
   buyTeam, confirmTeam, captainLogin, captainLogout, setTeamPassword, captainPayRunner, captainPaySlots, confirmSlots, setTeamDetails, joinTeam, registerRunner,
-  confirmRunner, retryRunnerPayment, captainRunnerDetails, captainUpdateRunner, captainRemoveRunner, captainStartRegister, captainUpdateContact, soloAcceptWaiver,
+  confirmRunner, retryRunnerPayment, captainRunnerDetails, captainUpdateRunner, captainRemoveRunner, captainStartRegister, captainUpdateContact, soloAcceptWaiver, captainWaiverLink,
 } from '@/app/actions/portal';
 
 export type PublicRace = {
@@ -214,8 +214,27 @@ function SoloWaiver({ runnerId, text }: { runnerId: string; text: string }) {
   );
 }
 
+function AskSign({ runner, raceName, teamName }: { runner: DashRunner; raceName: string; teamName: string }) {
+  const { t } = useT();
+  const copy = useCopy();
+  const toast = useToast();
+  const [msg, setMsg] = useState<string | null>(null);
+  const load = async () => {
+    const r = await captainWaiverLink(runner.id);
+    if ('error' in r) return toast(t(r.error));
+    setMsg(t('wv_msg').replace('{name}', runner.first_name).replace('{race}', raceName).replace('{team}', teamName).replace('{url}', window.location.origin + r.path));
+  };
+  if (!msg) return <button type="button" className="btn btn-sm" onClick={load}>{t('wv_send')}</button>;
+  return (
+    <span className="row" style={{ gap: 4 }}>
+      <a className="btn btn-sm btn-primary" href={`https://wa.me/?text=${encodeURIComponent(msg)}`} target="_blank" rel="noreferrer">WhatsApp</a>
+      <button type="button" className="btn btn-sm" onClick={() => copy(msg)}>{t('copy')}</button>
+    </span>
+  );
+}
+
 /* ---------------- captain dashboard ---------------- */
-type DashRunner = { id: string; bib: number | null; first_name: string; last_name: string; shirt_size: string | null; fee: number; payment_status: string };
+type DashRunner = { id: string; bib: number | null; first_name: string; last_name: string; shirt_size: string | null; fee: number; payment_status: string; waiver: boolean };
 export function CaptainDash({ team, race, runners, slots }: {
   team: { name: string; category: string | null; payment_status: string; claim_code: string; has_password: boolean; half_avg_min: number | null; logo: string | null;
     captain_name: string; captain_email: string; captain_phone: string | null };
@@ -361,7 +380,8 @@ export function CaptainDash({ team, race, runners, slots }: {
             {runners.map((y) => (
               <div key={y.id} style={{ borderBottom: '1px solid var(--line)', padding: '10px 0' }}>
                 <div className="it" style={{ border: 0, padding: 0 }}>
-                  <div className="row"><Bib n={y.bib} /><div><b>{y.first_name} {y.last_name}</b><div className="muted" style={{ fontSize: 13 }}>{t('shirt')}: {y.shirt_size || '—'}</div></div></div>
+                  <div className="row"><Bib n={y.bib} /><div><b>{y.first_name} {y.last_name}</b><div className="muted" style={{ fontSize: 13 }}>{t('shirt')}: {y.shirt_size || '—'}</div>
+                    {!y.waiver && <div className="row" style={{ gap: 6, marginTop: 4 }}><span className="chip warn">{t('reg_waiverMissing')}</span><AskSign runner={y} raceName={race.name} teamName={team.name} /></div>}</div></div>
                   <div className="row" style={{ gap: 6 }}>
                     {!slots.hold && y.fee > 0 && y.payment_status !== 'paid'
                       ? <button type="button" className="btn btn-sm btn-primary" onClick={() => payFor(y)}>{t('p_payFor')} · {money(y.fee, lang)}</button>

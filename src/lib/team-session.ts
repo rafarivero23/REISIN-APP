@@ -94,3 +94,12 @@ export async function hasRaceAccess(raceId: string, code: string | null): Promis
   const p = await read(cookies().get(raceCookie(raceId))?.value, 'race');
   return !!p && p.r === raceId && p.f === (await fingerprint(code));
 }
+
+// Personal waiver link for one runner (no login needed): /w/<token>.
+export async function waiverToken(runnerId: string) {
+  return sign({ k: 'waiver', r: runnerId }, '365d');
+}
+export async function readWaiverToken(token: string): Promise<string | null> {
+  const p = await read(token, 'waiver');
+  return (p?.r as string) ?? null;
+}

@@ -15,6 +15,7 @@ import { importCsvText, rematch, importSolos } from '@/lib/importers';
 import { parseHalf } from '@/lib/groups';
 import { cleanLogo } from '@/lib/logo';
 import { newClaimCode, newId, now } from '@/lib/ids';
+import { waiverToken } from '@/lib/team-session';
 
 type Result = { error?: string; id?: string };
 const int = (v: unknown, d = 0) => (Number.isFinite(Number(v)) && String(v) !== '' ? Math.round(Number(v)) : d);
@@ -244,6 +245,11 @@ export async function addSolo(raceId: string, f: { name: string; email: string; 
   if (int(f.amount) > 0) await recordPayment({ race_id: race.id, team_id: id, kind: 'team', source: 'manual', external_id: 'manual:' + newId(), quantity: 1, amount: int(f.amount), payer_name: name, payer_email: email });
   refresh();
   return { id };
+}
+
+export async function staffWaiverLink(runnerId: string): Promise<{ path: string }> {
+  await guard();
+  return { path: '/w/' + (await waiverToken(runnerId)) };
 }
 
 /* ---------------- captain codes ---------------- */

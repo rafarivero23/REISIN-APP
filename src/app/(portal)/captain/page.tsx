@@ -20,12 +20,12 @@ export default async function CaptainPage() {
   if (team.is_solo) {
     const r = (await runnersOfTeam(team.id))[0];
     return (
-      <SoloDash name={team.name} raceName={race.name} waiverText={race.waiver || ''} raceId={race.id} code={team.claim_code}
+      <SoloDash name={team.name} raceName={race.name} waiverText={race.waiver || t('w_default')} raceId={race.id} code={team.claim_code}
         runner={r ? { id: r.id, bib: r.bib, first_name: r.first_name, last_name: r.last_name, shirt_size: r.shirt_size, waiver: !!r.waiver_accepted_at } : null} />
     );
   }
   const runners = (await runnersOfTeam(team.id)).map((r) => ({
-    id: r.id, bib: r.bib, first_name: r.first_name, last_name: r.last_name, shirt_size: r.shirt_size, fee: r.fee, payment_status: r.payment_status,
+    id: r.id, bib: r.bib, first_name: r.first_name, last_name: r.last_name, shirt_size: r.shirt_size, fee: r.fee, payment_status: r.payment_status, waiver: !!r.waiver_accepted_at,
   }));
   const [agents, invs] = await Promise.all([openAgents(race.id), invitesOfTeam(team.id)]);
   const invited = new Set(invs.filter((i) => i.status === 'pending').map((i) => i.agent_id));
