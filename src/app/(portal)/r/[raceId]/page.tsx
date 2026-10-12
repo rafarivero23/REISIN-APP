@@ -6,6 +6,7 @@ import { getRace } from '@/lib/repo';
 import { getCurrentUser } from '@/lib/auth-guard';
 import { hasRaceAccess } from '@/lib/team-session';
 import { parsePage } from '@/lib/racepage';
+import { checkpointsOf } from '@/lib/timing';
 import { RichText } from '@/components/RichText';
 import { RaceGate } from '@/components/racepage';
 import { Back, loadOpenRace, Closed } from '../../shared';
@@ -21,6 +22,7 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
   if ('closed' in res) return <Closed name={res.closed} />;
   const r = res.race;
   const page = parsePage(raw.page);
+  const showBoard = raw.board_public && (await checkpointsOf(raw.id)).length > 0;
   const hero = (
     <PhotoHero photo={page.cover || defaultCover(r.brand)} size="lg" top={<Back href="/" />}>
       <span className={'brand-chip ' + brandKey(r.brand)}>{r.brand}</span>
@@ -47,8 +49,9 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
     <>
       {hero}
       {page.intro && <div className="rp-intro"><RichText text={page.intro} /></div>}
-      {page.links.length > 0 && (
+      {(page.links.length > 0 || showBoard) && (
         <div className="row rp-links">
+          {showBoard && <Link className="btn btn-primary" href={`/r/${raw.slug || r.id}/leaderboard`}><span className="live-dot" aria-hidden style={{ marginRight: 8 }} />{t('lb_title')}</Link>}
           {page.links.map((l, i) => (
             <a key={i} className="btn" href={l.url} target={l.url.startsWith('mailto:') ? undefined : '_blank'} rel="noopener noreferrer">{l.label} ↗</a>
           ))}

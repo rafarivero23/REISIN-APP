@@ -12,6 +12,7 @@ import { LogoInput } from './LogoInput';
 import { PageEditor } from './racepage';
 import { CaptainsPanel } from './captains';
 import { SolosPanel } from './solos';
+import { TimingPanel } from './timing-admin';
 import { captainMessage, waLink, mailLink } from '@/lib/capmsg';
 import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
@@ -25,7 +26,7 @@ export type ARace = {
   id: string; name: string; brand: string; status: string; race_date: string | null; location: string | null;
   team_price: number; runner_fee: number; team_size: number; capacity_teams: number; categories: string;
   bib_start: number; waiver: string | null; team_sizes: string; hold_slots: number; start_groups: string;
-  slug: string | null; access_code: string | null; page: string | null;
+  slug: string | null; access_code: string | null; page: string | null; timing_code: string | null; board_public: boolean;
 };
 export type APayment = {
   id: string; team_id: string | null; runner_id: string | null; kind: string; source: string; external_id: string | null; quantity: number;
@@ -39,7 +40,7 @@ export type ATeam = {
   id: string; race_id: string; name: string; category: string | null; captain_name: string; captain_email: string;
   captain_phone: string | null; amount: number; payment_status: string; payment_method: string | null; paid_at: string | null;
   claim_code: string; has_password: boolean; created_at: string; team_size: number | null; extra_slots: number; notes: string | null;
-  half_avg_min: number | null; reg_type: string; logo_v: string | null; code_sent_at: string | null;
+  half_avg_min: number | null; reg_type: string; logo_v: string | null; code_sent_at: string | null; team_no: number | null; is_solo: boolean;
 };
 export type ARunner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string; email: string;
@@ -172,7 +173,7 @@ type Modal = { type: 'race' } | { type: 'teamForm'; id?: string } | { type: 'tea
 
 export type AAgent = { id: string; name: string; email: string; phone: string | null; gender: string | null; half_avg_min: number | null; city: string | null;
   message: string | null; paid_claim: boolean; status: string; team_id: string | null; notes: string | null; created_at: string };
-export function RaceDetail({ race, teams, solos = [], runners, payments, agents }: { race: ARace; teams: ATeam[]; solos?: ATeam[]; runners: ARunner[]; payments: APayment[]; agents: AAgent[] }) {
+export function RaceDetail({ race, teams, solos = [], runners, payments, agents, checkpoints = [] }: { race: ARace; teams: ATeam[]; solos?: ATeam[]; runners: ARunner[]; payments: APayment[]; agents: AAgent[]; checkpoints?: { id: string; num: number; name: string; km: number | null }[] }) {
   const { t, lang } = useT();
   const router = useRouter();
   const q = useSearchParams();
@@ -184,7 +185,7 @@ export function RaceDetail({ race, teams, solos = [], runners, payments, agents 
   const stats = raceStats(race, teams, runners, payments);
   const unassigned = payments.filter((p) => !p.team_id && !p.resolution).length;
   const tabs: [string, string][] = [['summary', t('summary')], ['teams', `${t('teams')} · ${stats.teams}`], ['runners', `${t('runners')} · ${stats.runners}`],
-    ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['agents', `${t('fa_tab')} · ${agents.filter((a) => a.status === 'open').length}`], ['solos', `${t('so_tab')} · ${solos.length}`], ['captains', t('cap_tab') + ` · ${teams.filter((x) => x.code_sent_at).length}/${teams.length}`], ['page', t('pg_tab') + (race.access_code ? ' 🔒' : '')], ['import', t('importTab')]];
+    ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['agents', `${t('fa_tab')} · ${agents.filter((a) => a.status === 'open').length}`], ['solos', `${t('so_tab')} · ${solos.length}`], ['captains', t('cap_tab') + ` · ${teams.filter((x) => x.code_sent_at).length}/${teams.length}`], ['timing', t('tm_tab')], ['page', t('pg_tab') + (race.access_code ? ' 🔒' : '')], ['import', t('importTab')]];
   // Hold races: a runner is "covered" when they fit inside the team's paid slots.
   const groups = parseGroups(race.start_groups);
   const info = (tm: ATeam) => {
@@ -243,6 +244,7 @@ export function RaceDetail({ race, teams, solos = [], runners, payments, agents 
       {tab === 'import' && <ImportPanel race={race} />}
       {tab === 'captains' && <CaptainsPanel race={race} teams={teams} />}
       {tab === 'solos' && <SolosPanel race={race} solos={solos} runners={runners} openRunner={(id) => setModal({ type: 'runner', id })} NoteCell={NoteCell} />}
+      {tab === 'timing' && <TimingPanel race={race} teams={teams} solos={solos} checkpoints={checkpoints} />}
       {tab === 'page' && <PageEditor race={race} initial={{ slug: race.slug || '', access_code: race.access_code || '', page: parsePage(race.page) }} />}
       {tab === 'agents' && <AgentsAdmin agents={agents} teamName={(id) => teamById(id)?.name || '—'} />}
 

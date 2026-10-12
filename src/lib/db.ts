@@ -248,6 +248,33 @@ ALTER TABLE teams ADD COLUMN IF NOT EXISTS is_solo BOOLEAN NOT NULL DEFAULT fals
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS external_id TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS ux_teams_external ON teams(external_id) WHERE external_id IS NOT NULL;
 
+-- Live timing. Checkpoints per race (num 0 = start line is implicit: each
+-- team's start is a check-in at the start). timing_code = staff passcode
+-- for the check-in page. team_no = number on the team's car / bib.
+CREATE TABLE IF NOT EXISTS race_checkpoints (
+  id TEXT PRIMARY KEY,
+  race_id TEXT NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  num INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  km NUMERIC,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_checkpoints_race ON race_checkpoints(race_id);
+CREATE TABLE IF NOT EXISTS checkins (
+  id TEXT PRIMARY KEY,
+  race_id TEXT NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  team_id TEXT NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  checkpoint_id TEXT NOT NULL,
+  at TEXT NOT NULL,
+  by_name TEXT,
+  created_at TEXT NOT NULL,
+  UNIQUE (team_id, checkpoint_id)
+);
+CREATE INDEX IF NOT EXISTS idx_checkins_race ON checkins(race_id);
+ALTER TABLE races ADD COLUMN IF NOT EXISTS timing_code TEXT;
+ALTER TABLE races ADD COLUMN IF NOT EXISTS board_public BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS team_no INTEGER;
+
 CREATE TABLE IF NOT EXISTS agent_invites (
   id TEXT PRIMARY KEY,
   agent_id TEXT NOT NULL REFERENCES free_agents(id) ON DELETE CASCADE,

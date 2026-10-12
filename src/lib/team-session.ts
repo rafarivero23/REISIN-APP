@@ -103,3 +103,14 @@ export async function readWaiverToken(token: string): Promise<string | null> {
   const p = await read(token, 'waiver');
   return (p?.r as string) ?? null;
 }
+
+// Staff timing page (check-ins). Cookie tied to the current passcode.
+const timingCookie = (raceId: string) => 'reisin_timing_' + raceId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 24);
+export async function setTimingAccess(raceId: string, code: string, name: string) {
+  cookies().set(timingCookie(raceId), await sign({ k: 'timing', r: raceId, f: await fingerprint(code), n: name }, '7d'), cookieOpts(60 * 60 * 24 * 7));
+}
+export async function timingAccess(raceId: string, code: string | null): Promise<{ name: string } | null> {
+  if (!code) return null;
+  const p = await read(cookies().get(timingCookie(raceId))?.value, 'timing');
+  return p && p.r === raceId && p.f === (await fingerprint(code)) ? { name: String(p.n || '') } : null;
+}
