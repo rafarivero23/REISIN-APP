@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth-guard';
 import { getRace, teamsOfRace, runnersOfRace } from '@/lib/repo';
-import { parseGroups, groupFor, categoryOf, fmtHalf } from '@/lib/groups';
+import { parseGroups, groupFor, categoryOf, categoryLabel, fmtHalf } from '@/lib/groups';
+import { translate } from '@/lib/dict';
+import { teamSlots } from '@/lib/stats';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +19,13 @@ export async function GET(_req: Request, { params }: { params: { raceId: string 
     'contacto_emergencia', 'telefono_emergencia', 'exoneracion', 'cuota', 'pago', 'registrado',
   ]];
   const groups = parseGroups(race.start_groups);
-  const cat = (teamId: string) => categoryOf(runners.filter((r) => r.team_id === teamId).map((r) => r.gender));
+  const tr = (k: string) => translate('es', k);
+  const cat = (teamId: string) => {
+    const tm = teams.find((x) => x.id === teamId);
+    if (!tm) return '';
+    const b = categoryOf(runners.filter((r) => r.team_id === teamId).map((r) => r.gender), tm.is_solo);
+    return categoryLabel(tm.is_solo ? 'solo' : String(teamSlots(tm, race).size), b, tr);
+  };
   for (const x of runners) {
     const tm = teams.find((t) => t.id === x.team_id);
     const g = groupFor(tm?.half_avg_min, groups);

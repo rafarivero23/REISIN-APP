@@ -47,7 +47,6 @@ export function BuyForm({ race }: { race: PublicRace }) {
       <h2 style={{ marginBottom: 16 }}>{t('p_buy')}</h2>
       <form className="form" onSubmit={submit}>
         <Field id="b-name" label={t('p_teamName')} value={f.name} onChange={set('name')} req full />
-        <Field id="b-cat" label={t('category')} value={f.category} onChange={set('category')} options={cs.length ? cs : ['—']} />
         <Field id="b-cname" label={t('p_captainName')} value={f.captainName} onChange={set('captainName')} req />
         <Field id="b-cemail" label={t('email')} type="email" value={f.captainEmail} onChange={set('captainEmail')} req />
         <Field id="b-cphone" label={t('phone')} type="tel" value={f.captainPhone} onChange={set('captainPhone')} req />

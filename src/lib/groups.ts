@@ -29,11 +29,21 @@ export function parseHalf(v: string | null | undefined): number | null {
 }
 export const fmtHalf = (min: number | null | undefined) => (min ? `${Math.floor(min / 60)}:${String(min % 60).padStart(2, '0')}` : '—');
 
-// Varonil if everyone is male, Femenil if everyone is female, otherwise Mixto.
-export function categoryOf(genders: (string | null)[]): 'varonil' | 'femenil' | 'mixto' | null {
+// Reisin rules: Femenil = every runner is a woman; Mixto = at least 2
+// women; otherwise Varonil. A Solo is Varonil or Femenil by their gender.
+export type Branch = 'varonil' | 'femenil' | 'mixto';
+export function categoryOf(genders: (string | null)[], solo = false): Branch | null {
   const g = genders.filter(Boolean);
   if (!g.length) return null;
-  if (g.every((x) => x === 'M')) return 'varonil';
-  if (g.every((x) => x === 'F')) return 'femenil';
-  return 'mixto';
+  const women = g.filter((x) => x === 'F').length;
+  if (solo) return women ? 'femenil' : 'varonil';
+  if (women === g.length) return 'femenil';
+  if (women >= 2) return 'mixto';
+  return 'varonil';
+}
+// Division = team size (4 / 5 / 6 integrantes) or Solo.
+export const divisionOf = (size: number | null | undefined, solo: boolean) => (solo ? 'solo' : size ? String(size) : '');
+export function categoryLabel(div: string, branch: string | null, t: (k: string) => string) {
+  const d = div === 'solo' ? 'Solo' : div ? `${div} ${t('cat_members')}` : '';
+  return [d, branch ? t(branch) : ''].filter(Boolean).join(' · ') || '—';
 }

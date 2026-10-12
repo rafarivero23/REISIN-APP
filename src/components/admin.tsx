@@ -7,7 +7,7 @@ import { Drawer, Field, PayChip, Bib, DeleteButton, useToast, useCopy } from './
 import { RunnerFields, type RunnerForm } from './portal';
 import { money, fmtDate, fmtDT, splitCats, BRANDS } from '@/lib/format';
 import { raceStats, teamSlots, isHold, regComplete } from '@/lib/stats';
-import { parseGroups, groupFor, categoryOf, fmtHalf, type StartGroup } from '@/lib/groups';
+import { parseGroups, groupFor, categoryOf, categoryLabel, fmtHalf, type StartGroup } from '@/lib/groups';
 import { LogoInput } from './LogoInput';
 import { PageEditor } from './racepage';
 import { CaptainsPanel } from './captains';
@@ -72,9 +72,10 @@ export function GroupChip({ g }: { g: StartGroup | null }) {
   if (!g) return <span className="chip plain">{t('noGroup')}</span>;
   return <span className="chip plain" style={{ background: g.color, color: '#fff' }}>{t('group')} {g.label}</span>;
 }
-export function CatChip({ c }: { c: string | null }) {
+export function CatChip({ c, div }: { c: string | null; div?: string | number }) {
   const { t } = useT();
-  return c ? <span className={'chip plain cat-' + c}>{t(c)}</span> : <span className="muted">—</span>;
+  if (!c && !div) return <span className="muted">—</span>;
+  return <span className={'chip plain cat-' + (c || 'none')} style={{ whiteSpace: 'nowrap' }}>{div ? categoryLabel(String(div), c, t) : t(c!)}</span>;
 }
 const logoSrc = (x: { id: string; logo_v: string | null }) => (x.logo_v ? `/api/logo/${x.id}?v=${x.logo_v}` : null);
 
@@ -190,7 +191,7 @@ export function RaceDetail({ race, teams, solos = [], runners, payments, agents,
   const groups = parseGroups(race.start_groups);
   const info = (tm: ATeam) => {
     const rs = runnersOfTeam(tm.id);
-    return { cat: categoryOf(rs.map((r) => r.gender)), group: groupFor(tm.half_avg_min, groups), complete: regComplete(teamSlots(tm, race).size, rs),
+    return { cat: categoryOf(rs.map((r) => r.gender)), div: teamSlots(tm, race).size, group: groupFor(tm.half_avg_min, groups), complete: regComplete(teamSlots(tm, race).size, rs),
       missingRunners: Math.max(0, teamSlots(tm, race).size - rs.length), noWaiver: rs.filter((r) => !r.waiver_accepted_at).length };
   };
   const covered = new Set<string>();
@@ -219,7 +220,7 @@ export function RaceDetail({ race, teams, solos = [], runners, payments, agents,
         {tabs.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{l}</button>)}
       </div>
 
-      {tab === 'summary' && <Summary race={race} teams={teams} runners={runners} stats={stats} info={info} groups={groups} />}
+      {tab === 'summary' && <Summary race={race} teams={teams} runners={runners} stats={stats} info={info} groups={groups} solos={solos} />}
       {tab === 'teams' && (
         <>
           <div className="toolbar">
@@ -324,8 +325,34 @@ function GroupsCard({ race, teams, info, groups }: { race: ARace; teams: ATeam[]
   );
 }
 
-type Info = (tm: ATeam) => { cat: string | null; group: StartGroup | null; complete: boolean; missingRunners: number; noWaiver: number };
-function Summary({ race, teams, runners, stats, info, groups }: { race: ARace; teams: ATeam[]; runners: ARunner[]; stats: Stats; info: Info; groups: StartGroup[] }) {
+type Info = (tm: ATeam) => { cat: string | null; div: number; group: StartGroup | null; complete: boolean; missingRunners: number; noWaiver: number };
+// Teams per division (4/5/6 + Solo) × branch, from registered runners.
+function CategoryMatrix({ teams, info, solos, soloCat }: { teams: ATeam[]; info: Info; solos: ATeam[]; soloCat: (id: string) => string | null }) {
+  const { t } = useT();
+  const divs = Array.from(new Set(teams.map((x) => info(x).div))).sort((a, b) => a - b);
+  const branches = ['varonil', 'mixto', 'femenil'] as const;
+  const n = (d: number, b: string | null) => teams.filter((x) => info(x).div === d && info(x).cat === b).length;
+  return (
+    <div className="tbl-wrap"><table>
+      <thead><tr><th>{t('category')}</th>{branches.map((b) => <th key={b} style={{ textAlign: 'right' }}>{t(b)}</th>)}<th style={{ textAlign: 'right' }}>{t('cat_noData')}</th></tr></thead>
+      <tbody>
+        {divs.map((d) => (
+          <tr key={d}><td><b>{d} {t('cat_members')}</b></td>{branches.map((b) => <td key={b} className="num" style={{ textAlign: 'right' }}>{n(d, b) || '·'}</td>)}<td className="num muted" style={{ textAlign: 'right' }}>{n(d, null) || '·'}</td></tr>
+        ))}
+        {solos.length > 0 && (
+          <tr><td><b>Solo</b></td>
+            <td className="num" style={{ textAlign: 'right' }}>{solos.filter((s) => soloCat(s.id) === 'varonil').length || '·'}</td>
+            <td className="muted" style={{ textAlign: 'right' }}>—</td>
+            <td className="num" style={{ textAlign: 'right' }}>{solos.filter((s) => soloCat(s.id) === 'femenil').length || '·'}</td>
+            <td className="num muted" style={{ textAlign: 'right' }}>{solos.filter((s) => !soloCat(s.id)).length || '·'}</td></tr>
+        )}
+      </tbody>
+    </table></div>
+  );
+}
+
+function Summary({ race, teams, runners, stats, info, groups, solos = [] }: { race: ARace; teams: ATeam[]; runners: ARunner[]; stats: Stats; info: Info; groups: StartGroup[]; solos?: ATeam[] }) {
+  const soloCat = (id: string) => categoryOf(runners.filter((r) => r.team_id === id).map((r) => r.gender), true);
   const { t, lang } = useT();
   const copy = useCopy();
   const [link, setLink] = useState(`/r/${race.id}`);
@@ -344,8 +371,7 @@ function Summary({ race, teams, runners, stats, info, groups }: { race: ARace; t
       <div className="split">
         <div className="card">
           <h3 style={{ textTransform: 'uppercase', marginBottom: 10 }}>{t('categories')}</h3>
-          <div className="list">{(['femenil', 'varonil', 'mixto'] as const).map((c) => <div className="it" key={c}><CatChip c={c} /><b className="num">{teams.filter((x) => info(x).cat === c).length} {t('teams').toLowerCase()}</b></div>)}</div>
-          {cats.length > 0 && <div className="muted" style={{ fontSize: 12, marginTop: 6 }}>{cats.map((c) => `${c}: ${teams.filter((x) => x.category === c).length}`).join(' · ')}</div>}
+          <CategoryMatrix teams={teams} info={info} solos={solos} soloCat={soloCat} />
           <h3 style={{ textTransform: 'uppercase', margin: '18px 0 10px' }}>{t('shirt')}</h3>
           {Object.keys(shirts).length ? <div className="row">{Object.entries(shirts).map(([k, n]) => <span key={k} className="chip plain">{k} · <b className="num">{n}</b></span>)}</div> : <p className="muted">—</p>}
         </div>
@@ -375,7 +401,7 @@ function TeamsTable({ race, teams, count, open, info }: { race: ARace; teams: AT
                 <tr key={x.id} className="click" onClick={() => open(x.id)}>
                   <td><div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>{lg && <img src={lg} alt="" style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 4 }} />}<b>{x.name}</b></div></td>
                   <td>{x.captain_name}<div className="muted" style={{ fontSize: 12 }}>{x.captain_email}</div></td>
-                  <td><CatChip c={inf.cat} /></td>
+                  <td><CatChip c={inf.cat} div={inf.div} /></td>
                   <td><GroupChip g={inf.group} />{x.half_avg_min && <div className="muted num" style={{ fontSize: 12 }}>{fmtHalf(x.half_avg_min)}</div>}</td>
                   <td className="num">{n}/{sl.size}{n > sl.size && <span className="chip bad" style={{ marginLeft: 6 }}>+{n - sl.size}</span>}<div><RegChip i={inf} /></div></td>
                   {hold && <td className="num"><SlotBar paid={sl.paid} size={sl.size} /></td>}
@@ -702,7 +728,7 @@ function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, o
     <Drawer title={x.name} sub={`${race.name} · ${x.category || ''}`} onClose={onClose}>
       <div className="row"><PayChip status={x.payment_status} /><span className="chip plain num">{runners.length}/{sl.size} {t('runners').toLowerCase()}</span>
         {hold && <SlotBar paid={sl.paid} size={sl.size} />}{sl.balance > 0 && <span className="chip warn num">{t('balance')}: {money(sl.balance, lang)}</span>}</div>
-      <div className="row"><CatChip c={info.cat} /><GroupChip g={info.group} /><span className="chip plain num">{t('halfAvg').split(' ')[0]}: {fmtHalf(x.half_avg_min)}</span>
+      <div className="row"><CatChip c={info.cat} div={info.div} /><GroupChip g={info.group} /><span className="chip plain num">{t('halfAvg').split(' ')[0]}: {fmtHalf(x.half_avg_min)}</span>
         <span className="chip plain">{t(x.reg_type === 'full' ? 'full' : 'presale')}</span><RegChip i={info} /></div>
       <LogoInput current={logoSrc(x)} onChange={async (d) => { await act(() => setTeamLogoAdmin(x.id, d)); }} />
       <div><div className="label" style={{ marginBottom: 4 }}>{t('notes')}</div><NoteCell wide value={x.notes} onSave={(v) => act(() => saveTeamNotes(x.id, v))} /></div>

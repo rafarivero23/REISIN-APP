@@ -4,7 +4,7 @@ export type Checkin = { id: string; team_id: string; checkpoint_id: string; at: 
 export const START = 'start'; // checkpoint_id used for the start line
 
 export type BoardTeam = {
-  id: string; no: number | null; name: string; logo: string | null; category: string | null; group: string | null; groupColor: string | null;
+  id: string; no: number | null; name: string; logo: string | null; category: string | null; div: string; group: string | null; groupColor: string | null;
   start: string | null; times: Record<string, number>; // checkpoint id → elapsed ms since start
   last: number; lastMs: number | null; // furthest checkpoint num reached (0 = started, -1 = not started)
 };

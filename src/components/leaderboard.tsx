@@ -4,13 +4,14 @@ import { useRouter } from 'next/navigation';
 import { useT } from './I18n';
 import { fmtElapsed, rankTeams, type Board, type BoardTeam } from '@/lib/timing-shared';
 
-const CATS = ['all', 'varonil', 'femenil', 'mixto', 'solo'] as const;
-const catLabel = (c: string | null, t: (k: string) => string) => (c === 'solo' ? 'Solo' : c ? t(c) : '—');
+import { categoryLabel } from '@/lib/groups';
+const BRANCHES = ['all', 'varonil', 'mixto', 'femenil'] as const;
 
 export function Leaderboard({ board }: { board: Board }) {
   const { t } = useT();
   const router = useRouter();
-  const [cat, setCat] = useState<(typeof CATS)[number]>('all');
+  const [cat, setCat] = useState<(typeof BRANCHES)[number]>('all');
+  const [div, setDiv] = useState<string>('all');
   const [cp, setCp] = useState<string>('all'); // 'all' = overall ranking, else a checkpoint id
   const [q, setQ] = useState('');
   const [ago, setAgo] = useState(0);
@@ -25,15 +26,16 @@ export function Leaderboard({ board }: { board: Board }) {
   }, [board.updated]);
 
   const cps = board.checkpoints;
-  const present = new Set(board.teams.map((x) => x.category || ''));
+  const present = new Set(board.teams.filter((x) => div === 'all' || x.div === div).map((x) => x.category || ''));
+  const divs = Array.from(new Set(board.teams.map((x) => x.div).filter(Boolean))).sort((a, b) => (a === 'solo' ? 1 : b === 'solo' ? -1 : Number(a) - Number(b)));
   const rows = useMemo(() => {
-    let list = board.teams.filter((x) => cat === 'all' || x.category === cat);
+    let list = board.teams.filter((x) => (cat === 'all' || x.category === cat) && (div === 'all' || x.div === div));
     if (cp !== 'all') {
       const cpNum = cps.find((c) => c.id === cp)?.num ?? 0;
       list = rankTeams(list.map((x) => ({ ...x, last: x.times[cp] != null ? cpNum : -1, lastMs: x.times[cp] ?? null })));
     }
     return list;
-  }, [board.teams, cat, cp, cps]);
+  }, [board.teams, cat, div, cp, cps]);
   // Positions are computed on the filtered ranking, then the search narrows the view.
   const ranked = rows.map((x, i) => ({ ...x, pos: (cp === 'all' ? x.last >= 0 : x.times[cp] != null) ? i + 1 : null }));
   const shown = ranked.filter((x) => !q || `${x.no ?? ''} ${x.name}`.toLowerCase().includes(q.toLowerCase()));
@@ -51,9 +53,14 @@ export function Leaderboard({ board }: { board: Board }) {
         <button type="button" className="btn btn-sm" onClick={() => router.refresh()}>↻ {t('lb_refresh')}</button>
       </div>
       <div className="lb-filters">
+        <div className="seg" role="tablist" aria-label={t('cat_division')}>
+          {['all', ...divs].map((d) => (
+            <button key={d} type="button" role="tab" aria-selected={div === d} onClick={() => { setDiv(d); if (d === 'solo' && cat === 'mixto') setCat('all'); }}>{d === 'all' ? t('lb_all') : d === 'solo' ? 'Solo' : `${d} ${t('cat_membersShort')}`}</button>
+          ))}
+        </div>
         <div className="seg" role="tablist" aria-label={t('category')}>
-          {CATS.filter((c) => c === 'all' || present.has(c)).map((c) => (
-            <button key={c} type="button" role="tab" aria-selected={cat === c} onClick={() => setCat(c)}>{c === 'all' ? t('lb_all') : catLabel(c, t)}</button>
+          {BRANCHES.filter((c) => c === 'all' || present.has(c) || cat === c).map((c) => (
+            <button key={c} type="button" role="tab" aria-selected={cat === c} onClick={() => setCat(c)}>{c === 'all' ? t('lb_all') : t(c)}</button>
           ))}
         </div>
         <select value={cp} onChange={(e) => setCp(e.target.value)} aria-label={t('lb_checkpoint')}>
@@ -91,7 +98,7 @@ export function Leaderboard({ board }: { board: Board }) {
                     </div>
                   </div>
                 </td>
-                <td><span className={'chip plain cat-' + (x.category || 'none')}>{catLabel(x.category, t)}</span></td>
+                <td><span className={'chip plain cat-' + (x.category || 'none')} style={{ whiteSpace: 'nowrap' }}>{categoryLabel(x.div, x.category, t)}</span></td>
                 {cp === 'all' && <td style={{ whiteSpace: 'nowrap' }}>{lastLabel(x)}{x.last > 0 && <div className="muted num" style={{ fontSize: 12 }}>{fmtElapsed(x.lastMs)}</div>}</td>}
                 {cps.map((c) => {
                   const v = x.times[c.id];
