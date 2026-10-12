@@ -20,5 +20,6 @@ export function rankTeams<T extends Pick<BoardTeam, 'last' | 'lastMs' | 'no' | '
 export function fmtElapsed(ms: number | null | undefined) {
   if (ms == null || !(ms >= 0)) return '—';
   const s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
-  return `${h}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}`;
+  const hh = h >= 24 ? `${Math.floor(h / 24)}d ${String(h % 24).padStart(2, '0')}` : String(h); // multi-day events
+  return `${hh}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}`;
 }

@@ -16,7 +16,9 @@ const store = {
   get<V>(key: string, d: V): V { try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as V) : d; } catch { return d; } },
   set(key: string, v: unknown) { try { localStorage.setItem(key, JSON.stringify(v)); } catch {} },
 };
-const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+const hms = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+const dayOf = (iso: string) => new Date(iso).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' });
+const stamp = (iso: string) => `${dayOf(iso)} · ${hms(iso)}`;
 const toLocalInput = (iso: string) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 19); };
 const fromLocalInput = (v: string) => new Date(v).toISOString();
 
@@ -59,6 +61,9 @@ export function CheckinApp({ raceId, raceName, staff, teams, checkpoints, checki
   const [queue, setQueue] = useState<Op[]>([]);
   const [q, setQ] = useState('');
   const [edit, setEdit] = useState<string | null>(null);
+  const [pick, setPick] = useState<T | null>(null);
+  const [day, setDay] = useState('');
+  const [hour, setHour] = useState('');
   const [online, setOnline] = useState(true);
   const [undo, setUndo] = useState<{ team: string; cp: string; name: string } | null>(null);
   const flushing = useRef(false);
@@ -106,21 +111,32 @@ export function CheckinApp({ raceId, raceName, staff, teams, checkpoints, checki
   const pendingKeys = new Set(queue.map((o) => `${o.team}|${o.cp}`));
   const push = (op: Op) => { saveQueue([...store.get<Op[]>(qKey, []), op]); setTimeout(flush, 0); };
 
-  const tap = (team: T) => {
-    const key = `${team.id}|${cp}`;
-    if (times.has(key)) { setEdit(edit === team.id ? null : team.id); return; }
-    const at = new Date().toISOString();
-    push({ k: 'set', team: team.id, cp, at });
-    setUndo({ team: team.id, cp, name: team.name });
-    setQ(''); search.current?.focus();
+  const nowParts = () => { const v = toLocalInput(new Date().toISOString()); return { d: v.slice(0, 10), h: v.slice(11, 19) }; };
+  useEffect(() => { const n = nowParts(); setDay(n.d); setHour(n.h); }, []);
+  const setNow = () => { const n = nowParts(); setDay(n.d); setHour(n.h); };
+
+  const submit = () => {
+    if (!pick || !day || !hour) return;
+    const at = fromLocalInput(`${day}T${hour.length === 5 ? hour + ':00' : hour}`);
+    if (isNaN(Date.parse(at))) return toast(t('tm_badTime'));
+    push({ k: 'set', team: pick.id, cp, at });
+    setUndo({ team: pick.id, cp, name: pick.name });
+    setPick(null); setQ('');
+    setHour(nowParts().h); // keep the chosen date (multi-day events), reset the clock
+    setTimeout(() => search.current?.focus(), 0);
   };
-  useEffect(() => { if (!undo) return; const id = setTimeout(() => setUndo(null), 6000); return () => clearTimeout(id); }, [undo]);
+  useEffect(() => { if (!undo) return; const id = setTimeout(() => setUndo(null), 8000); return () => clearTimeout(id); }, [undo]);
 
   const cpObj = checkpoints.find((c) => c.id === cp);
-  const filtered = teams.filter((x) => !q || (/^\d+$/.test(q.trim()) ? String(x.no ?? '') === q.trim() || String(x.no ?? '').startsWith(q.trim()) : x.name.toLowerCase().includes(q.toLowerCase())));
+  const qq = q.trim().toLowerCase();
+  const matches = !qq ? [] : teams.filter((x) => (/^\d+$/.test(qq) ? String(x.no ?? '').startsWith(qq) : x.name.toLowerCase().includes(qq)))
+    .sort((a, b) => Number(String(b.no ?? '') === qq) - Number(String(a.no ?? '') === qq)).slice(0, 6);
   const done = teams.filter((x) => times.has(`${x.id}|${cp}`));
-  const recent = done.map((x) => ({ x, at: times.get(`${x.id}|${cp}`)! })).sort((a, b) => b.at.localeCompare(a.at)).slice(0, 8);
+  const todo = teams.filter((x) => !times.has(`${x.id}|${cp}`));
+  const log = done.map((x) => ({ x, at: times.get(`${x.id}|${cp}`)! })).sort((a, b) => b.at.localeCompare(a.at));
   const startOf = (id: string) => times.get(`${id}|${START}`);
+  const already = pick ? times.get(`${pick.id}|${cp}`) : undefined;
+  const cpLabel = (id: string) => (id === START ? t('tm_start') : (() => { const c = checkpoints.find((x) => x.id === id); return c ? `PC ${c.num} · ${c.name}${c.km != null ? ` · km ${c.km}` : ''}` : ''; })());
 
   return (
     <div className="stack ck">
@@ -132,55 +148,93 @@ export function CheckinApp({ raceId, raceName, staff, teams, checkpoints, checki
         </div>
       </div>
 
-      <div className="ck-cps" role="tablist" aria-label={t('lb_checkpoint')}>
-        <button type="button" role="tab" aria-selected={cp === START} onClick={() => setCp(START)}>{t('tm_start')}</button>
-        {checkpoints.map((c) => (
-          <button key={c.id} type="button" role="tab" aria-selected={cp === c.id} onClick={() => setCp(c.id)}>PC {c.num}<span>{c.name}</span></button>
-        ))}
-      </div>
+      <form className="card ck-form" onSubmit={(e) => { e.preventDefault(); submit(); }}>
+        <label className="ck-lbl" htmlFor="ck-cp">{t('lb_checkpoint')}</label>
+        <select id="ck-cp" className="ck-input" value={cp} onChange={(e) => setCp(e.target.value)}>
+          <option value={START}>{t('tm_start')}</option>
+          {checkpoints.map((c) => <option key={c.id} value={c.id}>{cpLabel(c.id)}</option>)}
+        </select>
 
-      <div className="card ck-head">
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-          <h2>{cp === START ? t('tm_start') : `PC ${cpObj?.num} · ${cpObj?.name}`}</h2>
-          <b className="num">{done.length}/{teams.length}</b>
+        <label className="ck-lbl" htmlFor="ck-team">{t('team')}</label>
+        {pick ? (
+          <div className="ck-picked">
+            <span className="ck-no num">{pick.no ?? '–'}</span>
+            <b>{pick.name}</b>
+            <button type="button" className="btn btn-ghost btn-sm" aria-label={t('cancel')} onClick={() => { setPick(null); setTimeout(() => search.current?.focus(), 0); }}>✕</button>
+          </div>
+        ) : (
+          <div className="ck-combo">
+            <input id="ck-team" ref={search} className="ck-input" type="search" autoComplete="off" placeholder={t('tm_search')} value={q} onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); if (matches.length) setPick(matches[0]); } }} />
+            {matches.length > 0 && (
+              <div className="ck-sugg" role="listbox">
+                {matches.map((x) => {
+                  const at = times.get(`${x.id}|${cp}`);
+                  return (
+                    <button key={x.id} type="button" role="option" aria-selected={false} onClick={() => setPick(x)}>
+                      <span className="ck-no num">{x.no ?? '–'}</span>
+                      <span className="ck-name"><b>{x.name}</b><small className="muted">{x.solo ? 'Solo' : x.group ? `${t('group')} ${x.group}` : ''}{at ? ` · ✓ ${stamp(at)}` : ''}</small></span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {qq && !matches.length && <p className="muted" style={{ fontSize: 13, marginTop: 6 }}>{t('noTeams')}</p>}
+          </div>
+        )}
+
+        <div className="ck-when">
+          <div><label className="ck-lbl" htmlFor="ck-day">{t('tm_date')}</label><input id="ck-day" className="ck-input" type="date" value={day} onChange={(e) => setDay(e.target.value)} required /></div>
+          <div><label className="ck-lbl" htmlFor="ck-hour">{t('tm_time')}</label><input id="ck-hour" className="ck-input" type="time" step={1} value={hour} onChange={(e) => setHour(e.target.value)} required /></div>
         </div>
-        {cpObj?.km != null && <div className="muted">km {cpObj.km}</div>}
-        {cp === START && <WaveStart raceId={raceId} waves={waves} onDone={() => router.refresh()} />}
-      </div>
-
-      <input ref={search} className="search ck-search" type="search" inputMode="search" placeholder={t('tm_search')} value={q} onChange={(e) => setQ(e.target.value)}
-        aria-label={t('tm_search')} onKeyDown={(e) => { if (e.key === 'Enter' && filtered.length === 1) tap(filtered[0]); }} />
+        <button type="button" className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }} onClick={setNow}>⟲ {t('tm_now')}</button>
+        {already && <p className="note" style={{ color: 'var(--ink)' }}>{t('tm_replace').replace('{t}', stamp(already))}</p>}
+        <button type="submit" className="btn btn-primary btn-lg ck-go" disabled={!pick || !day || !hour}>{t('tm_save')}</button>
+      </form>
 
       {undo && (
         <div className="note row ck-undo" style={{ justifyContent: 'space-between', color: 'var(--ink)' }}>
-          <span>✓ {undo.name} · {clock(times.get(`${undo.team}|${undo.cp}`) || new Date().toISOString())}</span>
+          <span>✓ {undo.name} · {stamp(times.get(`${undo.team}|${undo.cp}`) || new Date().toISOString())}</span>
           <button type="button" className="btn btn-sm" onClick={() => { push({ k: 'del', team: undo.team, cp: undo.cp }); setUndo(null); }}>{t('tm_undo')}</button>
         </div>
       )}
 
-      <div className="ck-list">
-        {filtered.map((x) => {
-          const key = `${x.id}|${cp}`, at = times.get(key), st = startOf(x.id);
-          return (
-            <div key={x.id} className={'ck-row' + (at ? ' done' : '')}>
-              <button type="button" className="ck-tap" onClick={() => tap(x)} aria-label={`${x.name}: ${at ? t('tm_edit') : t('tm_record')}`}>
-                <span className="ck-no num">{x.no ?? '–'}</span>
-                <span className="ck-name"><b>{x.name}</b><small className="muted">{x.solo ? 'Solo' : x.group ? `${t('group')} ${x.group}` : ''}{cp !== START && !st ? ` · ${t('tm_noStart')}` : ''}</small></span>
-                <span className="ck-time num">{at ? <>{clock(at)}{pendingKeys.has(key) && ' ⏳'}{cp !== START && st && <small>{fmtElapsed(Date.parse(at) - Date.parse(st))}</small>}</> : <span className="ck-plus">＋</span>}</span>
-              </button>
-              {edit === x.id && at && <TimeEditor at={at} onSave={(v) => { push({ k: 'set', team: x.id, cp, at: v }); setEdit(null); }}
-                onDelete={() => { if (confirm(t('tm_delConfirm'))) { push({ k: 'del', team: x.id, cp }); setEdit(null); } }} onCancel={() => setEdit(null)} />}
-            </div>
-          );
-        })}
-        {!filtered.length && <div className="empty">{t('noTeams')}</div>}
+      {cp === START && (
+        <details className="card"><summary style={{ cursor: 'pointer' }}><b>{t('tm_wave')}</b></summary>
+          <WaveStart raceId={raceId} waves={waves} onDone={() => router.refresh()} />
+        </details>
+      )}
+
+      <div className="card stack" style={{ gap: 8 }}>
+        <div className="row" style={{ justifyContent: 'space-between' }}>
+          <h3>{t('tm_logTitle')}</h3><b className="num">{done.length}/{teams.length}</b>
+        </div>
+        <div className="muted" style={{ fontSize: 13, marginTop: -6 }}>{cpLabel(cp)}</div>
+        {log.length ? (
+          <div className="ck-list">
+            {log.map(({ x, at }) => {
+              const key = `${x.id}|${cp}`, st = startOf(x.id);
+              return (
+                <div key={x.id} className="ck-row done">
+                  <button type="button" className="ck-tap" onClick={() => setEdit(edit === x.id ? null : x.id)} aria-label={`${x.name}: ${t('tm_edit')}`}>
+                    <span className="ck-no num">{x.no ?? '–'}</span>
+                    <span className="ck-name"><b>{x.name}</b><small className="muted">{x.solo ? 'Solo' : x.group ? `${t('group')} ${x.group}` : ''}</small></span>
+                    <span className="ck-time num">{hms(at)}{pendingKeys.has(key) && ' ⏳'}<small>{dayOf(at)}{cp !== START && st ? ` · ${fmtElapsed(Date.parse(at) - Date.parse(st))}` : ''}</small></span>
+                  </button>
+                  {edit === x.id && <TimeEditor at={at} onSave={(v) => { push({ k: 'set', team: x.id, cp, at: v }); setEdit(null); }}
+                    onDelete={() => { if (confirm(t('tm_delConfirm'))) { push({ k: 'del', team: x.id, cp }); setEdit(null); } }} onCancel={() => setEdit(null)} />}
+                </div>
+              );
+            })}
+          </div>
+        ) : <p className="muted">{t('tm_logEmpty')}</p>}
       </div>
 
-      {recent.length > 0 && (
-        <details className="card">
-          <summary style={{ cursor: 'pointer' }}><b>{t('tm_recent')}</b></summary>
+      {todo.length > 0 && done.length > 0 && (
+        <details className="card"><summary style={{ cursor: 'pointer' }}><b>{t('tm_missing')} · {todo.length}</b></summary>
           <div className="list" style={{ marginTop: 8 }}>
-            {recent.map(({ x, at }) => <div className="it" key={x.id}><span>#{x.no ?? '–'} {x.name}</span><span className="num">{clock(at)}</span></div>)}
+            {todo.map((x) => <button key={x.id} type="button" className="it" style={{ all: 'unset', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid var(--line)' }}
+              onClick={() => { setPick(x); window.scrollTo({ top: 0, behavior: 'smooth' }); }}><span>#{x.no ?? '–'} {x.name}</span><span className="muted">＋</span></button>)}
           </div>
         </details>
       )}

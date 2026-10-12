@@ -370,3 +370,20 @@ h1,h2,h3,.choice b,.choice a b,.race-card h3,.section-t{font-family:var(--f-titl
 .ck-undo{position:sticky;top:72px;z-index:3}
 .lb-first td.lb-sticky{background:color-mix(in srgb,var(--bib) 14%,var(--surface))}
 @media (max-width:640px){.lb-team{min-width:150px}}
+/* check-in form (one link, mobile first) */
+.ck-form{display:flex;flex-direction:column;gap:6px}
+.ck-lbl{font-size:13px;font-weight:600;margin-top:8px}
+.ck-input{width:100%;box-sizing:border-box;font:inherit;font-size:17px;padding:13px 14px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);min-height:50px}
+.ck-input:focus{outline:2px solid var(--accent);outline-offset:0}
+.ck-combo{position:relative}
+.ck-sugg{display:flex;flex-direction:column;margin-top:6px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.ck-sugg button{all:unset;cursor:pointer;display:grid;grid-template-columns:52px 1fr;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--line);min-height:48px}
+.ck-sugg button:first-child{border-top:0}
+.ck-sugg button:hover,.ck-sugg button:focus-visible{background:var(--surface-2);outline:none}
+.ck-picked{display:grid;grid-template-columns:52px 1fr auto;gap:10px;align-items:center;padding:8px 10px;border:2px solid var(--accent);border-radius:10px;min-height:50px}
+.ck-when{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.ck-go{width:100%;margin-top:8px;min-height:54px;font-size:18px}
+@media (max-width:360px){.ck-when{grid-template-columns:1fr}}
+.ck-when>div{min-width:0}
+.ck-when .ck-input{min-width:0;-webkit-appearance:none;appearance:none}
+.ck-time{white-space:nowrap}
