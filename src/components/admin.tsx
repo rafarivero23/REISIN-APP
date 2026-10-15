@@ -174,7 +174,7 @@ type Modal = { type: 'race' } | { type: 'teamForm'; id?: string } | { type: 'tea
 
 export type AAgent = { id: string; name: string; email: string; phone: string | null; gender: string | null; half_avg_min: number | null; city: string | null;
   message: string | null; paid_claim: boolean; status: string; team_id: string | null; notes: string | null; created_at: string };
-export function RaceDetail({ race, teams, solos = [], runners, payments, agents, checkpoints = [] }: { race: ARace; teams: ATeam[]; solos?: ATeam[]; runners: ARunner[]; payments: APayment[]; agents: AAgent[]; checkpoints?: { id: string; num: number; name: string; km: number | null }[] }) {
+export function RaceDetail({ race, teams, solos = [], runners, payments, agents, checkpoints = [], photos = [] }: { race: ARace; teams: ATeam[]; solos?: ATeam[]; runners: ARunner[]; payments: APayment[]; agents: AAgent[]; checkpoints?: { id: string; num: number; name: string; km: number | null }[]; photos?: { id: string; w: number; h: number }[] }) {
   const { t, lang } = useT();
   const router = useRouter();
   const q = useSearchParams();
@@ -246,7 +246,7 @@ export function RaceDetail({ race, teams, solos = [], runners, payments, agents,
       {tab === 'captains' && <CaptainsPanel race={race} teams={teams} />}
       {tab === 'solos' && <SolosPanel race={race} solos={solos} runners={runners} openRunner={(id) => setModal({ type: 'runner', id })} NoteCell={NoteCell} />}
       {tab === 'timing' && <TimingPanel race={race} teams={teams} solos={solos} checkpoints={checkpoints} />}
-      {tab === 'page' && <PageEditor race={race} initial={{ slug: race.slug || '', access_code: race.access_code || '', page: parsePage(race.page) }} />}
+      {tab === 'page' && <PageEditor race={race} initial={{ slug: race.slug || '', access_code: race.access_code || '', page: parsePage(race.page) }} uploads={photos} />}
       {tab === 'agents' && <AgentsAdmin agents={agents} teamName={(id) => teamById(id)?.name || '—'} />}
 
       {modal?.type === 'race' && <RaceForm race={race} onClose={() => setModal(null)} />}

@@ -387,3 +387,5 @@ h1,h2,h3,.choice b,.choice a b,.race-card h3,.section-t{font-family:var(--f-titl
 .ck-when>div{min-width:0}
 .ck-when .ck-input{min-width:0;-webkit-appearance:none;appearance:none}
 .ck-time{white-space:nowrap}
+.ph-del{all:unset;cursor:pointer;position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;display:grid;place-items:center;font-size:13px}
+.ph-del:focus-visible{outline:2px solid #fff}

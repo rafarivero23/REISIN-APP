@@ -16,9 +16,13 @@ export const PHOTOS: Photo[] = [
   { id: 'crowd-rocks', label: 'Público', pos: '50% 40%', wide: false, w: 533, h: 800 },
 ];
 const byId = new Map(PHOTOS.map((p) => [p.id, p]));
-export const getPhoto = (id: string | null | undefined) => (id ? byId.get(id) : undefined);
-export const photoSrc = (id: string, small = false) => `/photos/${id}${small ? '-sm' : ''}.jpg`;
-export const isPhoto = (id: unknown): id is string => typeof id === 'string' && byId.has(id);
+// Uploaded photos have ids like "u:<uuid>" and live in the database.
+const UP = /^u:[a-z0-9-]{8,64}$/i;
+export const isUpload = (id: string) => UP.test(id);
+export const getPhoto = (id: string | null | undefined): Photo | undefined =>
+  !id ? undefined : byId.get(id) || (isUpload(id) ? { id, label: '', pos: '50% 50%', wide: false, w: 800, h: 600 } : undefined);
+export const photoSrc = (id: string, small = false) => (isUpload(id) ? `/api/photo/${id.slice(2)}${small ? '?s=sm' : ''}` : `/photos/${id}${small ? '-sm' : ''}.jpg`);
+export const isPhoto = (id: unknown): id is string => typeof id === 'string' && (byId.has(id) || UP.test(id));
 // Default cover when a race hasn't picked one.
 export const defaultCover = (brand: string) => (/baja/i.test(brand) ? 'aerial-duo' : 'sunset-road');
 export const HOME_COVER = 'sunset-road';

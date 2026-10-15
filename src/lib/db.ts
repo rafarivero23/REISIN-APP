@@ -275,6 +275,18 @@ ALTER TABLE races ADD COLUMN IF NOT EXISTS timing_code TEXT;
 ALTER TABLE races ADD COLUMN IF NOT EXISTS board_public BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS team_no INTEGER;
 
+-- Photos uploaded per race (resized in the browser, stored as JPEG bytes).
+CREATE TABLE IF NOT EXISTS race_photos (
+  id TEXT PRIMARY KEY,
+  race_id TEXT NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  lg BYTEA NOT NULL,
+  sm BYTEA NOT NULL,
+  w INTEGER NOT NULL,
+  h INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_race_photos_race ON race_photos(race_id);
+
 CREATE TABLE IF NOT EXISTS agent_invites (
   id TEXT PRIMARY KEY,
   agent_id TEXT NOT NULL REFERENCES free_agents(id) ON DELETE CASCADE,

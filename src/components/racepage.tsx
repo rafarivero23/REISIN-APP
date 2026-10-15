@@ -6,7 +6,8 @@ import { Field, useToast, useCopy } from './ui';
 import { RichText } from './RichText';
 import { unlockRace, saveRacePage } from '@/app/actions/racepage';
 import { BAJA_TEMPLATE, cleanSlug, type PageData } from '@/lib/racepage';
-import { PHOTOS, photoSrc, defaultCover } from '@/lib/photos';
+import { PHOTOS, photoSrc, defaultCover, type Photo } from '@/lib/photos';
+import { uploadRacePhoto, deleteRacePhoto } from '@/app/actions/photos';
 
 /* ---------- portal: password gate ---------- */
 export function RaceGate({ raceId }: { raceId: string }) {
@@ -52,7 +53,7 @@ const move = <T,>(list: T[], i: number, d: number) => {
   return n;
 };
 
-export function PageEditor({ race, initial }: { race: { id: string; name: string; brand: string }; initial: Draft }) {
+export function PageEditor({ race, initial, uploads = [] }: { race: { id: string; name: string; brand: string }; initial: Draft; uploads?: { id: string; w: number; h: number }[] }) {
   const { t } = useT();
   const router = useRouter();
   const toast = useToast();
@@ -67,6 +68,7 @@ export function PageEditor({ race, initial }: { race: { id: string; name: string
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setD(initial), [initKey]);
   const p = d.page;
+  const library: Photo[] = [...uploads.map((u) => ({ id: u.id, label: '', pos: '50% 50%', wide: u.w > u.h, w: u.w, h: u.h })), ...PHOTOS];
   const setPage = (fn: (p: PageData) => PageData) => setD((x) => ({ ...x, page: fn(x.page) }));
   const savedSlug = initial.slug;
   const url = `${origin}/${savedSlug || 'r/' + race.id}`;
@@ -97,7 +99,7 @@ export function PageEditor({ race, initial }: { race: { id: string; name: string
             <label htmlFor="pg-slug">{t('pg_url')}</label>
             <div className="row" style={{ flexWrap: 'nowrap', gap: 0 }}>
               <span className="muted" style={{ fontSize: 14, padding: '0 6px 0 0', whiteSpace: 'nowrap' }}>{origin.replace(/^https?:\/\//, '')}/</span>
-              <input id="pg-slug" value={d.slug} placeholder="baja-crossing-2026" onChange={(e) => setD((x) => ({ ...x, slug: e.target.value }))} onBlur={() => setD((x) => ({ ...x, slug: cleanSlug(x.slug) }))} style={{ flex: 1 }} />
+              <input id="pg-slug" value={d.slug} placeholder={cleanSlug(race.name)} onChange={(e) => setD((x) => ({ ...x, slug: e.target.value }))} onBlur={() => setD((x) => ({ ...x, slug: cleanSlug(x.slug) }))} style={{ flex: 1 }} />
             </div>
             <span className="hint">{t('pg_urlHint')}</span>
           </div>
@@ -126,10 +128,12 @@ export function PageEditor({ race, initial }: { race: { id: string; name: string
             <button type="button" className="btn btn-sm" onClick={() => { if (!p.sections.length || confirm(t('pg_templateConfirm'))) setPage(() => BAJA_TEMPLATE); }}>{t('pg_template')}</button>
           )}
         </div>
+        <PhotoUploader raceId={race.id} uploads={uploads} onAdded={(ids) => setPage((x) => ({ ...x, photos: [...ids, ...x.photos] }))}
+          onRemoved={(id) => setPage((x) => ({ ...x, photos: x.photos.filter((y) => y !== id), cover: x.cover === id ? '' : x.cover }))} />
         <div className="stack" style={{ gap: 8 }}>
           <div><div className="label">{t('pg_cover')}</div><p className="muted" style={{ fontSize: 13, marginTop: 2 }}>{t('pg_coverSub')}</p></div>
           <div className="photo-pick" role="radiogroup" aria-label={t('pg_cover')}>
-            {PHOTOS.map((ph) => {
+            {library.map((ph) => {
               const on = (p.cover || defaultCover(race.brand)) === ph.id;
               return (
                 <button key={ph.id} type="button" role="radio" aria-checked={on} aria-pressed={on} title={ph.label} onClick={() => setPage((x) => ({ ...x, cover: ph.id }))}>
@@ -143,12 +147,12 @@ export function PageEditor({ race, initial }: { race: { id: string; name: string
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <div><div className="label">{t('pg_photos')} · {p.photos.length}</div><p className="muted" style={{ fontSize: 13, marginTop: 2 }}>{t('pg_photosSub')}</p></div>
             <span className="row" style={{ gap: 4 }}>
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPage((x) => ({ ...x, photos: PHOTOS.map((ph) => ph.id) }))}>{t('pg_all')}</button>
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPage((x) => ({ ...x, photos: library.map((ph) => ph.id) }))}>{t('pg_all')}</button>
               <button type="button" className="btn btn-ghost btn-sm" onClick={() => setPage((x) => ({ ...x, photos: [] }))}>{t('pg_none')}</button>
             </span>
           </div>
           <div className="photo-pick">
-            {PHOTOS.map((ph) => {
+            {library.map((ph) => {
               const on = p.photos.includes(ph.id);
               return (
                 <button key={ph.id} type="button" aria-pressed={on} title={ph.label}
@@ -221,6 +225,64 @@ export function PageEditor({ race, initial }: { race: { id: string; name: string
         {dirty && <button type="button" className="btn" onClick={() => { setD(initial); setErr(null); }}>{t('cancel')}</button>}
         <button type="button" className="btn btn-primary" disabled={busy || !dirty} onClick={save}>{busy ? <span className="spin" /> : t('save')}</button>
       </div>
+    </div>
+  );
+}
+
+/* ---------- photo uploads ---------- */
+// Resize in the browser (1600px + 800px JPEG) so uploads stay small and fast.
+async function resize(file: File, max: number, q: number): Promise<{ url: string; w: number; h: number }> {
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions);
+  const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+  const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);
+  const c = document.createElement('canvas'); c.width = w; c.height = h;
+  c.getContext('2d')!.drawImage(bmp, 0, 0, w, h);
+  return { url: c.toDataURL('image/jpeg', q), w, h };
+}
+
+function PhotoUploader({ raceId, uploads, onAdded, onRemoved }: { raceId: string; uploads: { id: string }[]; onAdded: (ids: string[]) => void; onRemoved: (id: string) => void }) {
+  const { t } = useT();
+  const router = useRouter();
+  const toast = useToast();
+  const [busy, setBusy] = useState<string | null>(null);
+  const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith('image/'));
+    e.target.value = '';
+    if (!files.length) return;
+    const added: string[] = [];
+    for (const [i, f] of files.entries()) {
+      setBusy(`${i + 1}/${files.length}`);
+      try {
+        const lg = await resize(f, 1600, 0.82), sm = await resize(f, 800, 0.78);
+        const r = await uploadRacePhoto(raceId, lg.url, sm.url, lg.w, lg.h);
+        if (r.error || !r.id) toast(`${f.name}: ${t(r.error || 'ph_bad')}`); else added.push(r.id);
+      } catch { toast(`${f.name}: ${t('ph_bad')}`); }
+    }
+    setBusy(null);
+    if (added.length) { onAdded(added); toast(t('ph_added').replace('{n}', String(added.length))); router.refresh(); }
+  };
+  return (
+    <div className="stack" style={{ gap: 8 }}>
+      <div className="row" style={{ justifyContent: 'space-between' }}>
+        <div><div className="label">{t('ph_title')} · {uploads.length}</div><p className="muted" style={{ fontSize: 13, marginTop: 2 }}>{t('ph_sub')}</p></div>
+        <label className="btn btn-primary btn-sm" style={{ cursor: 'pointer' }}>
+          {busy ? <><span className="spin" /> {busy}</> : `↑ ${t('ph_upload')}`}
+          <input type="file" accept="image/*" multiple hidden onChange={pick} disabled={!!busy} />
+        </label>
+      </div>
+      {uploads.length > 0 && (
+        <div className="photo-pick">
+          {uploads.map((u) => (
+            <div key={u.id} style={{ position: 'relative', aspectRatio: '4/3', borderRadius: 8, overflow: 'hidden' }}>
+              <img src={photoSrc(u.id, true)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+              <button type="button" className="ph-del" aria-label={t('del')} onClick={async () => {
+                if (!confirm(t('ph_delConfirm'))) return;
+                await deleteRacePhoto(raceId, u.id); onRemoved(u.id); router.refresh();
+              }}>✕</button>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
