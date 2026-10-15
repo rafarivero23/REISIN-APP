@@ -9,12 +9,13 @@ import { createSession, destroySession } from '@/lib/session';
 import {
   createRace, updateRace, deleteRace, getRace, getTeam, getRunner, createTeam, updateTeam, deleteTeam, updateRunner, deleteRunner,
   recordPayment, assignPayment, deletePayment, getPayment, findUserByEmail, createUser, deleteUser, getUserById, updateUserPassword,
-  sizeOptions, captainSizeOptions, setPaymentResolution, setRunnerWaiver, setCodeSent, setRaceGroups, setPaymentNotes, setRunnerNotes, type RaceInput, type RunnerInput,
+  sizeOptions, captainSizeOptions, setPaymentResolution, setRunnerWaiver, settleAmount, setCodeSent, setRaceGroups, setPaymentNotes, setRunnerNotes, type RaceInput, type RunnerInput,
 } from '@/lib/repo';
 import { importCsvText, rematch, importSolos } from '@/lib/importers';
 import { parseHalf } from '@/lib/groups';
 import { cleanLogo } from '@/lib/logo';
 import { newClaimCode, newId, now } from '@/lib/ids';
+import { run } from '@/lib/db';
 import { waiverToken } from '@/lib/team-session';
 
 type Result = { error?: string; id?: string };
@@ -250,6 +251,26 @@ export async function addSolo(raceId: string, f: { name: string; email: string; 
 export async function staffWaiverLink(runnerId: string): Promise<{ path: string }> {
   await guard();
   return { path: '/w/' + (await waiverToken(runnerId)) };
+}
+
+/* ---------------- settlement ---------------- */
+export async function saveSettleAmounts(raceId: string, amounts: Record<string, string | number>): Promise<Result> {
+  await guard();
+  const clean: Record<string, number> = {};
+  for (const [k, v] of Object.entries(amounts || {})) { const n = Math.round(Number(v)); if (/^\d+$/.test(k) && n > 0) clean[k] = n; }
+  await run('UPDATE races SET settle_amounts = ? WHERE id = ?', [Object.keys(clean).length ? JSON.stringify(clean) : null, raceId]);
+  refresh();
+  return {};
+}
+export async function teamMarkSettled(id: string): Promise<Result> {
+  await guard();
+  const t = await getTeam(id);
+  const race = t ? await getRace(t.race_id) : null;
+  if (!t || !race) return { error: 'not_found' };
+  await recordPayment({ race_id: t.race_id, team_id: t.id, kind: 'settle', source: 'manual', external_id: 'manual:' + newId(), quantity: 1,
+    amount: settleAmount(t, race), payer_name: t.captain_name, payer_email: t.captain_email });
+  refresh();
+  return {};
 }
 
 /* ---------------- captain codes ---------------- */

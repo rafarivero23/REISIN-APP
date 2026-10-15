@@ -7,7 +7,7 @@ export const toARace = (r: Race): ARace => ({
   id: r.id, name: r.name, brand: r.brand, status: r.status, race_date: r.race_date, location: r.location, team_price: r.team_price,
   runner_fee: r.runner_fee, team_size: r.team_size, capacity_teams: r.capacity_teams, categories: r.categories, bib_start: r.bib_start, waiver: r.waiver,
   team_sizes: r.team_sizes, hold_slots: r.hold_slots, start_groups: r.start_groups,
-  slug: r.slug, access_code: r.access_code, page: r.page, timing_code: r.timing_code, board_public: r.board_public,
+  slug: r.slug, access_code: r.access_code, page: r.page, timing_code: r.timing_code, board_public: r.board_public, settle_amounts: r.settle_amounts,
 });
 export const toATeams = (teams: Team[]): ATeam[] => toATeamsAll(teams.filter((x) => isListedTeam(x) && !x.is_solo));
 const toATeamsAll = (teams: Team[]): ATeam[] =>
@@ -16,7 +16,7 @@ const toATeamsAll = (teams: Team[]): ATeam[] =>
     captain_phone: x.captain_phone, amount: x.amount, payment_status: x.payment_status, payment_method: x.payment_method, paid_at: x.paid_at,
     claim_code: x.claim_code, has_password: !!x.password_hash, created_at: x.created_at,
     team_size: x.team_size, extra_slots: x.extra_slots, notes: x.notes, half_avg_min: x.half_avg_min, reg_type: x.reg_type,
-    logo_v: x.logo ? String(x.logo.length) : null, code_sent_at: x.code_sent_at, team_no: x.team_no, is_solo: x.is_solo,
+    logo_v: x.logo ? String(x.logo.length) : null, code_sent_at: x.code_sent_at, team_no: x.team_no, is_solo: x.is_solo, settled_at: x.settled_at,
   }));
 export const toARunners = (rs: Runner[]): ARunner[] =>
   rs.map((x) => ({

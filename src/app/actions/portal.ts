@@ -6,7 +6,7 @@ import { headers } from 'next/headers';
 import bcrypt from 'bcryptjs';
 import {
   getRace, getTeam, getRunner, updateRunner, deleteRunner, setRunnerWaiver, liveTeamCount, countRunners, createTeam, updateTeam, createRunner, recordPayment,
-  findTeamByCode, feeForNewRunner, isHoldRace, paidSlots, sizeOptions, captainSizeOptions, teamSizeOf, type Race, type RunnerInput,
+  findTeamByCode, feeForNewRunner, isHoldRace, paidSlots, sizeOptions, captainSizeOptions, settleAmount, teamSizeOf, type Race, type RunnerInput,
 } from '@/lib/repo';
 import { newClaimCode, now } from '@/lib/ids';
 import { stripe } from '@/lib/stripe';
@@ -37,7 +37,7 @@ async function openRace(raceId: string): Promise<Race | Err> {
 }
 
 type Checkout = { url: string } | { simulated: true; payToken: string };
-type Kind = 'team' | 'runner' | 'slots';
+type Kind = 'team' | 'runner' | 'slots' | 'settle';
 // kind/id: what the payment is for. slots → id is the team, qty = slots.
 async function checkout(kind: Kind, id: string, unit: number, qty: number, label: string, email: string, successPath: string, cancelPath: string): Promise<Checkout> {
   const s = stripe();
@@ -70,6 +70,10 @@ export async function settle(kind: Kind, id: string, qty: number, amount: number
   }
   const t = await getTeam(id);
   if (!t) return false;
+  if (kind === 'settle') {
+    if (!amount) { const race = await getRace(t.race_id); amount = race ? settleAmount(t, race) : 0; }
+    return recordPayment({ race_id: t.race_id, team_id: t.id, kind: 'settle', source, external_id: externalId, quantity: 1, amount, payer_name: payer?.name || t.captain_name, payer_email: payer?.email || t.captain_email });
+  }
   if (!amount) amount = qty * ((await getRace(t.race_id))?.runner_fee || 0);
   return recordPayment({ race_id: t.race_id, team_id: t.id, kind: 'slots', source, external_id: externalId, quantity: qty, amount, payer_name: payer?.name || t.captain_name, payer_email: payer?.email || t.captain_email });
 }
@@ -205,6 +209,23 @@ export async function captainPaySlots(qty: number): Promise<Err | Checkout> {
   const n = Math.max(1, Math.min(Math.floor(Number(qty)) || 1, left));
   if (left <= 0) return { error: 'paid' };
   return checkout('slots', team.id, race.runner_fee, n, `${race.name} — ${n} lugar(es) equipo ${team.name}`, team.captain_email, `/captain?slots=${team.id}`, '/captain');
+}
+
+// Captain pays the whole remaining balance ("liquidación") in one go.
+export async function captainPaySettle(): Promise<Err | Checkout> {
+  const teamId = await getCaptainTeamId();
+  const team = teamId ? await getTeam(teamId) : null;
+  const race = team ? await getRace(team.race_id) : null;
+  if (!team || !race) return { error: 'p_captainSub' };
+  const amount = settleAmount(team, race);
+  if (amount <= 0) return { error: 'paid' };
+  return checkout('settle', team.id, amount, 1, `${race.name} — Liquidación equipo ${team.name}`, team.captain_email, `/captain?settle=${team.id}`, '/captain');
+}
+export async function confirmSettle(input: { sessionId?: string; payToken?: string }) {
+  const teamId = await getCaptainTeamId();
+  if (!teamId) return { error: 'p_captainSub' } as Err;
+  const ok = await confirmPayment('settle', teamId, input);
+  return ok ? { ok: true as const } : ({ error: 'p_notPaid' } as Err);
 }
 
 export async function confirmSlots(input: { sessionId?: string; payToken?: string }) {

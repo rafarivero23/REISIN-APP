@@ -127,16 +127,17 @@ export async function importEcwid(raceId: string, rows: Record<string, string>[]
   const res: ImportResult = { kind: 'ecwid', teamsCreated: 0, runnersCreated: 0, paymentsCreated: 0, skipped: 0, unmatched: 0, warnings: [] };
   for (const o of rows) {
     const product = o['name'] || '';
-    const isHold = /hold|apartado/i.test(product);
-    const isRunner = /runner|corredor/i.test(product);
-    if (!isHold && !isRunner) { res.skipped++; continue; }
+    const isSettle = /liquidaci|saldo|restante/i.test(product);
+    const isHold = !isSettle && /hold|apartado/i.test(product);
+    const isRunner = !isSettle && /runner|corredor/i.test(product);
+    if (!isHold && !isRunner && !isSettle) { res.skipped++; continue; }
     if (o['payment_status'] && !/paid|pagad/i.test(o['payment_status'])) { res.skipped++; continue; }
     const price = Number(o['price']) || race.runner_fee;
     const total = Number(o['order_total'] || o['total']) || price;
     const qty = Number(o['quantity']) || Math.max(1, Math.round(total / price));
     const created = await recordPayment({
-      race_id: race.id, team_id: null, kind: isHold ? 'team' : 'slots', source: 'ecwid', external_id: 'ecwid:' + o['order_number'],
-      quantity: isHold ? 1 : qty, amount: Math.round(total), payer_name: o['bill_person_name'] || o['shipto_person_name'] || null,
+      race_id: race.id, team_id: null, kind: isSettle ? 'settle' : isHold ? 'team' : 'slots', source: 'ecwid', external_id: 'ecwid:' + o['order_number'],
+      quantity: isHold || isSettle ? 1 : qty, amount: Math.round(total), payer_name: o['bill_person_name'] || o['shipto_person_name'] || null,
       payer_email: lc(o['email']), payer_phone: (o['bill_person_phone'] || '').replace(/[^\d+]/g, '') || null,
       comment: (o['order_comments'] || '').replace(/<br\s*\/?>/gi, ' · ') || null, paid_at: toIso(o['timestamp']),
     });

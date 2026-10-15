@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { getTeam, getRace, runnersOfTeam, isHoldRace, paidSlots, teamSizeOf, captainSizeOptions } from '@/lib/repo';
+import { getTeam, getRace, runnersOfTeam, isHoldRace, paidSlots, teamSizeOf, captainSizeOptions, settleAmount } from '@/lib/repo';
 import { getCaptainTeamId } from '@/lib/team-session';
 import { getT } from '@/lib/lang';
 import { CaptainDash, SoloDash } from '@/components/portal';
@@ -39,6 +39,7 @@ export default async function CaptainPage() {
           half_avg_min: team.half_avg_min, captain_name: team.captain_name, captain_email: team.captain_email, captain_phone: team.captain_phone, logo: team.logo ? `/api/logo/${team.id}?v=${team.logo.length}` : null }}
         race={{ id: race.id, name: race.name, team_size: race.team_size, runner_fee: race.runner_fee, sizes: captainSizeOptions(race) }}
         slots={{ hold: isHoldRace(race), size: teamSizeOf(team, race), paid: paidSlots(team, race) }}
+        settle={{ amount: settleAmount(team, race), settled: !!team.settled_at }}
         runners={runners}
       />
       <div style={{ marginTop: 20 }}><CaptainAgents agents={capAgents} spotsLeft={spotsLeft} /></div>

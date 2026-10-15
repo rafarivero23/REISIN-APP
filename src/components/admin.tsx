@@ -18,7 +18,7 @@ import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
-  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, resolvePayment, setWaiverStaff, staffWaiverLink, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
+  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, resolvePayment, setWaiverStaff, staffWaiverLink, saveSettleAmounts, teamMarkSettled, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
 /* Shapes passed from server components (no password hashes). */
@@ -26,7 +26,7 @@ export type ARace = {
   id: string; name: string; brand: string; status: string; race_date: string | null; location: string | null;
   team_price: number; runner_fee: number; team_size: number; capacity_teams: number; categories: string;
   bib_start: number; waiver: string | null; team_sizes: string; hold_slots: number; start_groups: string;
-  slug: string | null; access_code: string | null; page: string | null; timing_code: string | null; board_public: boolean;
+  slug: string | null; access_code: string | null; page: string | null; timing_code: string | null; board_public: boolean; settle_amounts: string | null;
 };
 export type APayment = {
   id: string; team_id: string | null; runner_id: string | null; kind: string; source: string; external_id: string | null; quantity: number;
@@ -40,7 +40,7 @@ export type ATeam = {
   id: string; race_id: string; name: string; category: string | null; captain_name: string; captain_email: string;
   captain_phone: string | null; amount: number; payment_status: string; payment_method: string | null; paid_at: string | null;
   claim_code: string; has_password: boolean; created_at: string; team_size: number | null; extra_slots: number; notes: string | null;
-  half_avg_min: number | null; reg_type: string; logo_v: string | null; code_sent_at: string | null; team_no: number | null; is_solo: boolean;
+  half_avg_min: number | null; reg_type: string; logo_v: string | null; code_sent_at: string | null; team_no: number | null; is_solo: boolean; settled_at: string | null;
 };
 export type ARunner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string; email: string;
@@ -246,6 +246,7 @@ export function RaceDetail({ race, teams, solos = [], runners, payments, agents,
       {tab === 'captains' && <CaptainsPanel race={race} teams={teams} />}
       {tab === 'solos' && <SolosPanel race={race} solos={solos} runners={runners} openRunner={(id) => setModal({ type: 'runner', id })} NoteCell={NoteCell} />}
       {tab === 'timing' && <TimingPanel race={race} teams={teams} solos={solos} checkpoints={checkpoints} />}
+      {tab === 'page' && <SettleEditor race={race} />}
       {tab === 'page' && <PageEditor race={race} initial={{ slug: race.slug || '', access_code: race.access_code || '', page: parsePage(race.page) }} uploads={photos} />}
       {tab === 'agents' && <AgentsAdmin agents={agents} teamName={(id) => teamById(id)?.name || '—'} />}
 
@@ -405,7 +406,7 @@ function TeamsTable({ race, teams, count, open, info }: { race: ARace; teams: AT
                   <td><GroupChip g={inf.group} />{x.half_avg_min && <div className="muted num" style={{ fontSize: 12 }}>{fmtHalf(x.half_avg_min)}</div>}</td>
                   <td className="num">{n}/{sl.size}{n > sl.size && <span className="chip bad" style={{ marginLeft: 6 }}>+{n - sl.size}</span>}<div><RegChip i={inf} /></div></td>
                   {hold && <td className="num"><SlotBar paid={sl.paid} size={sl.size} /></td>}
-                  <td className="num" style={{ textAlign: 'right' }}>{sl.balance > 0 ? money(sl.balance, lang) : <span className="chip ok">{t('paid')}</span>}</td>
+                  <td className="num" style={{ textAlign: 'right' }}>{x.settled_at ? <span className="chip ok">{t('st_settled')}</span> : sl.balance > 0 ? money(sl.balance, lang) : <span className="chip ok">{t('paid')}</span>}</td>
                   <td><span className="chip plain">{t(x.reg_type === 'full' ? 'full' : 'presale')}</span></td>
                   <td>{lg ? <span className="chip ok">✓</span> : <span className="chip">—</span>}</td>
                   <td>{x.has_password ? <span className="chip ok">{t('set')}</span> : <span className="chip">{t('notSet')}</span>}</td>
@@ -489,7 +490,7 @@ function Payments({ race, teams, solos = [], payments, stats, openTeam }: { race
   const un = payments.filter((p) => !p.team_id && !p.resolution);
   const resolved = payments.filter((p) => !p.team_id && p.resolution);
   const shown = payments.filter((p) => !q || `${p.payer_name} ${p.payer_email} ${p.comment} ${p.notes} ${teamName(p.team_id)} ${p.external_id}`.toLowerCase().includes(q.toLowerCase()));
-  const concept = (p: APayment) => soloOf(p.team_id) ? 'Solo' : p.kind === 'team' ? (isHold(race) ? t('holdLabel') : t('team')) : p.kind === 'slots' ? `${p.quantity} ${t('slotsWord')}` : t('runnerFee');
+  const concept = (p: APayment) => soloOf(p.team_id) ? 'Solo' : p.kind === 'team' ? (isHold(race) ? t('holdLabel') : t('team')) : p.kind === 'slots' ? `${p.quantity} ${t('slotsWord')}` : p.kind === 'settle' ? t('st_admin') : t('runnerFee');
   const soloOf = (id: string | null) => (id ? solos.find((x) => x.id === id) : undefined);
   const TeamSelect = ({ p }: { p: APayment }) => soloOf(p.team_id) ? <span className="chip plain">SOLO · {soloOf(p.team_id)!.name}</span> : (
     <select value={p.team_id || ''} onChange={(e) => act(() => setPaymentTeam(p.id, e.target.value || null))} aria-label={t('team')} style={{ maxWidth: 220, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)' }}>
@@ -717,6 +718,31 @@ function CaptainMessage({ team, race }: { team: ATeam; race: ARace }) {
   );
 }
 
+// Settlement amount per team size (Página tab).
+function SettleEditor({ race }: { race: ARace }) {
+  const { t, lang } = useT();
+  const { act } = useAct();
+  const sizes = sizeList(race).filter((n) => n > 1);
+  const init = (() => { try { return JSON.parse(race.settle_amounts || '{}') as Record<string, number>; } catch { return {}; } })();
+  const [f, setF] = useState<Record<string, string>>(Object.fromEntries(sizes.map((n) => [String(n), init[String(n)] ? String(init[String(n)]) : ''])));
+  const auto = (n: number) => Math.max(0, n - (isHold(race) ? race.hold_slots : 0)) * (race.runner_fee || 0);
+  return (
+    <div className="card stack" style={{ marginBottom: 16 }}>
+      <div><h3>{t('st_admin')}</h3><p className="muted" style={{ fontSize: 14, marginTop: 4, maxWidth: '75ch' }}>{t('st_adminSub')}</p></div>
+      <div className="row" style={{ gap: 12, alignItems: 'flex-end' }}>
+        {sizes.map((n) => (
+          <div className="field" key={n} style={{ minWidth: 150 }}>
+            <label htmlFor={'st-' + n}>{n} {t('cat_members')}</label>
+            <input id={'st-' + n} type="number" min={0} inputMode="numeric" value={f[String(n)] || ''} placeholder={`${t('st_auto')}: ${money(auto(n), lang)}`}
+              onChange={(e) => setF((x) => ({ ...x, [String(n)]: e.target.value }))} />
+          </div>
+        ))}
+        <button type="button" className="btn btn-primary" onClick={() => act(() => saveSettleAmounts(race.id, f))}>{t('save')}</button>
+      </div>
+    </div>
+  );
+}
+
 function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, onRunner }: { team: ATeam; race: ARace; runners: ARunner[]; payments: APayment[]; info: ReturnType<Info>; onClose: () => void; onEdit: () => void; onRunner: (id: string) => void }) {
   const { t, lang } = useT();
   const { act } = useAct();
@@ -746,6 +772,7 @@ function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, o
       <CaptainMessage team={x} race={race} />
       <div className="row">
         {x.payment_status !== 'paid' && <button type="button" className="btn btn-primary btn-sm" onClick={() => act(() => teamMarkPaid(x.id))}>{t('markPaid')}</button>}
+        {!x.settled_at && !x.is_solo && <button type="button" className="btn btn-sm" onClick={() => confirm(t('st_markConfirm')) && act(() => teamMarkSettled(x.id))}>{t('st_markDone')}</button>}
         <button type="button" className="btn btn-sm" onClick={onEdit}>{t('edit')}</button>
         <button type="button" className="btn btn-sm" onClick={() => act(() => teamNewCode(x.id))}>{t('newCode')}</button>
         {x.has_password && <button type="button" className="btn btn-sm" onClick={() => act(() => teamClearPassword(x.id))}>{t('resetPass')}</button>}

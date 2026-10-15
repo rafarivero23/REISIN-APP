@@ -9,7 +9,7 @@ import { fmtHalf } from '@/lib/groups';
 import { LogoInput } from './LogoInput';
 import {
   buyTeam, confirmTeam, captainLogin, captainLogout, setTeamPassword, captainPayRunner, captainPaySlots, confirmSlots, setTeamDetails, joinTeam, registerRunner,
-  confirmRunner, retryRunnerPayment, captainRunnerDetails, captainUpdateRunner, captainRemoveRunner, captainStartRegister, captainUpdateContact, soloAcceptWaiver, captainWaiverLink,
+  confirmRunner, retryRunnerPayment, captainRunnerDetails, captainUpdateRunner, captainRemoveRunner, captainStartRegister, captainUpdateContact, soloAcceptWaiver, captainWaiverLink, captainPaySettle, confirmSettle,
 } from '@/app/actions/portal';
 
 export type PublicRace = {
@@ -234,11 +234,11 @@ function AskSign({ runner, raceName, teamName }: { runner: DashRunner; raceName:
 
 /* ---------------- captain dashboard ---------------- */
 type DashRunner = { id: string; bib: number | null; first_name: string; last_name: string; shirt_size: string | null; fee: number; payment_status: string; waiver: boolean };
-export function CaptainDash({ team, race, runners, slots }: {
+export function CaptainDash({ team, race, runners, slots, settle }: {
   team: { name: string; category: string | null; payment_status: string; claim_code: string; has_password: boolean; half_avg_min: number | null; logo: string | null;
     captain_name: string; captain_email: string; captain_phone: string | null };
   race: { id: string; name: string; team_size: number; runner_fee: number; sizes: number[] }; runners: DashRunner[];
-  slots: { hold: boolean; size: number; paid: number };
+  slots: { hold: boolean; size: number; paid: number }; settle?: { amount: number; settled: boolean };
 }) {
   const { t, lang } = useT();
   const router = useRouter();
@@ -257,6 +257,7 @@ export function CaptainDash({ team, race, runners, slots }: {
     const paid = q.get('paid'), sid = q.get('session_id'), sl = q.get('slots');
     if (paid && sid) confirmRunner({ runnerId: paid, sessionId: sid }).then(() => router.replace('/captain'));
     if (sl && sid) confirmSlots({ sessionId: sid }).then(() => router.replace('/captain'));
+    if (q.get('settle') && sid) confirmSettle({ sessionId: sid }).then(() => router.replace('/captain'));
   }, [q, router]);
   const paySlots = async () => {
     const res = await captainPaySlots(Number(qty));
@@ -265,6 +266,13 @@ export function CaptainDash({ team, race, runners, slots }: {
     setSimSlots(res.payToken);
   };
   const [simSlots, setSimSlots] = useState<string | null>(null);
+  const [simSettle, setSimSettle] = useState<string | null>(null);
+  const paySettle = async () => {
+    const res = await captainPaySettle();
+    if ('error' in res) return toast(t(res.error));
+    if ('url' in res) { window.location.href = res.url; return; }
+    setSimSettle(res.payToken);
+  };
   const [editing, setEditing] = useState<string | null>(null);
   const addRunner = async () => {
     const r = await captainStartRegister();
@@ -314,7 +322,21 @@ export function CaptainDash({ team, race, runners, slots }: {
       <div className="slots" aria-label={`${runners.length}/${slots.size}`}>
         {Array.from({ length: slots.size }, (_, i) => <span key={i} className={'slot' + (i < runners.length ? ' f' : '')} style={slots.hold && i >= slots.paid ? { opacity: 0.45 } : undefined} />)}
       </div>
-      {slots.hold && team.payment_status === 'paid' && (
+      {settle && (settle.settled ? (
+        <div className="card row" style={{ justifyContent: 'space-between' }}>
+          <div><div className="label">{t('st_title')}</div><b style={{ fontFamily: 'var(--f-display)', fontSize: 24 }}>✓ {t('st_done')}</b></div>
+        </div>
+      ) : settle.amount > 0 && (
+        <div className="card row st-card" style={{ justifyContent: 'space-between' }}>
+          <div>
+            <div className="label">{t('st_title')}</div>
+            <b className="num" style={{ fontFamily: 'var(--f-display)', fontSize: 30 }}>{money(settle.amount, lang)}</b>
+            <div className="muted" style={{ fontSize: 13 }}>{t('st_sub').replace('{n}', String(slots.size))}</div>
+          </div>
+          <button type="button" className="btn btn-primary btn-lg" onClick={paySettle}>{t('st_pay')}</button>
+        </div>
+      ))}
+      {slots.hold && !settle?.settled && team.payment_status === 'paid' && (
         <div className="card row" style={{ justifyContent: 'space-between' }}>
           <div>
             <div className="label">{t('p_slotsPaid')}</div>
@@ -398,6 +420,10 @@ export function CaptainDash({ team, race, runners, slots }: {
         <TestCheckout amount={sim.runner.fee} concept={`${t('p_feeDue')} · ${sim.runner.first_name} ${sim.runner.last_name}`}
           onClose={() => setSim(null)}
           onPay={async () => { await confirmRunner({ runnerId: sim.runner.id, payToken: sim.payToken }); setSim(null); toast(t('p_paidOk')); router.refresh(); }} />
+      )}
+      {simSettle && settle && (
+        <TestCheckout amount={settle.amount} concept={`${t('st_title')} · ${team.name}`} onClose={() => setSimSettle(null)}
+          onPay={async () => { await confirmSettle({ payToken: simSettle }); setSimSettle(null); toast(t('p_paidOk')); router.refresh(); }} />
       )}
       {simSlots && (
         <TestCheckout amount={Number(qty) * race.runner_fee} concept={`${qty} ${t('slotsWord')} · ${team.name}`}

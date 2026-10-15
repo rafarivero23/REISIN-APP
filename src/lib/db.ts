@@ -287,6 +287,11 @@ CREATE TABLE IF NOT EXISTS race_photos (
 );
 CREATE INDEX IF NOT EXISTS idx_race_photos_race ON race_photos(race_id);
 
+-- Team settlement ("liquidación"): fixed amount per team size set by staff
+-- (JSON {"4":20000,...}); a paid settlement marks the team fully paid.
+ALTER TABLE races ADD COLUMN IF NOT EXISTS settle_amounts TEXT;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS settled_at TEXT;
+
 CREATE TABLE IF NOT EXISTS agent_invites (
   id TEXT PRIMARY KEY,
   agent_id TEXT NOT NULL REFERENCES free_agents(id) ON DELETE CASCADE,

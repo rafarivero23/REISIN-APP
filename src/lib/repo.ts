@@ -6,7 +6,7 @@ export type Race = {
   race_date: string | null; location: string | null; team_price: number; runner_fee: number;
   team_size: number; capacity_teams: number; categories: string; bib_start: number;
   waiver: string | null; created_at: string; team_sizes: string; hold_slots: number; start_groups: string;
-  slug: string | null; access_code: string | null; page: string | null; timing_code: string | null; board_public: boolean;
+  slug: string | null; access_code: string | null; page: string | null; timing_code: string | null; board_public: boolean; settle_amounts: string | null;
 };
 export type Team = {
   id: string; race_id: string; name: string; category: string | null; captain_name: string;
@@ -14,7 +14,7 @@ export type Team = {
   payment_status: 'pending' | 'paid'; payment_method: string | null; paid_at: string | null;
   stripe_session_id: string | null; claim_code: string; password_hash: string | null; created_at: string;
   team_size: number | null; extra_slots: number; notes: string | null; half_avg_min: number | null; logo: string | null; reg_type: string;
-  code_sent_at: string | null; is_solo: boolean; external_id: string | null; team_no: number | null;
+  code_sent_at: string | null; is_solo: boolean; external_id: string | null; team_no: number | null; settled_at: string | null;
 };
 export type Runner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string;
@@ -53,7 +53,7 @@ export async function listOpenRaces() {
   return races.map((r) => ({ ...r, teams_left: Math.max(0, r.capacity_teams - Number(r.live)) }));
 }
 
-export type RaceInput = Omit<Race, 'id' | 'created_at' | 'start_groups' | 'slug' | 'access_code' | 'page' | 'timing_code' | 'board_public'>;
+export type RaceInput = Omit<Race, 'id' | 'created_at' | 'start_groups' | 'slug' | 'access_code' | 'page' | 'timing_code' | 'board_public' | 'settle_amounts'>;
 export async function createRace(input: RaceInput) {
   const id = newId();
   await run(
@@ -90,7 +90,7 @@ export async function listedTeamsWithCounts(raceId: string) {
   );
 }
 
-type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes' | 'half_avg_min' | 'logo' | 'reg_type' | 'code_sent_at' | 'is_solo' | 'external_id' | 'team_no'> &
+type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes' | 'half_avg_min' | 'logo' | 'reg_type' | 'code_sent_at' | 'is_solo' | 'external_id' | 'team_no' | 'settled_at'> &
   { is_solo?: boolean; external_id?: string | null } &
   { password_hash?: string | null; team_size?: number | null; notes?: string | null; created_at?: string; half_avg_min?: number | null; reg_type?: string };
 export async function createTeam(t: NewTeam) {
@@ -105,7 +105,7 @@ export async function createTeam(t: NewTeam) {
 }
 
 const TEAM_FIELDS = ['name', 'category', 'captain_name', 'captain_email', 'captain_phone', 'amount', 'payment_status',
-  'payment_method', 'paid_at', 'stripe_session_id', 'claim_code', 'password_hash', 'team_size', 'extra_slots', 'notes', 'half_avg_min', 'logo', 'reg_type', 'team_no'] as const;
+  'payment_method', 'paid_at', 'stripe_session_id', 'claim_code', 'password_hash', 'team_size', 'extra_slots', 'notes', 'half_avg_min', 'logo', 'reg_type', 'team_no', 'settled_at'] as const;
 export async function updateTeam(id: string, patch: Partial<Pick<Team, (typeof TEAM_FIELDS)[number]>>) {
   const keys = TEAM_FIELDS.filter((k) => k in patch);
   if (!keys.length) return;
@@ -166,8 +166,20 @@ export const deleteRunner = (id: string) => run('DELETE FROM runners WHERE id = 
 // runner_fee (0 = included in the team price) and slots aren't used.
 export const isHoldRace = (r: Pick<Race, 'hold_slots'>) => (r.hold_slots || 0) > 0;
 export const teamSizeOf = (t: Pick<Team, 'team_size'>, r: Pick<Race, 'team_size'>) => t.team_size || r.team_size;
-export const paidSlots = (t: Pick<Team, 'payment_status' | 'extra_slots'> & { is_solo?: boolean }, r: Pick<Race, 'hold_slots'>) =>
-  t.is_solo ? (t.payment_status === 'paid' ? 1 : 0) : (t.payment_status === 'paid' ? r.hold_slots || 0 : 0) + (t.extra_slots || 0);
+export const paidSlots = (t: Pick<Team, 'payment_status' | 'extra_slots'> & { is_solo?: boolean; settled_at?: string | null; team_size?: number | null }, r: Pick<Race, 'hold_slots'> & { team_size?: number }) =>
+  t.settled_at ? (t.team_size || r.team_size || 0) : t.is_solo ? (t.payment_status === 'paid' ? 1 : 0) : (t.payment_status === 'paid' ? r.hold_slots || 0 : 0) + (t.extra_slots || 0);
+// Settlement for a team: staff-set fixed amount for its size, else what's
+// left (unpaid spots × runner fee). 0 = nothing to settle.
+export function parseSettle(json: string | null | undefined): Record<string, number> {
+  try { const o = JSON.parse(json || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; }
+}
+export function settleAmount(team: Team, race: Race): number {
+  if (team.settled_at || team.is_solo) return 0;
+  const size = teamSizeOf(team, race);
+  const fixed = Number(parseSettle(race.settle_amounts)[String(size)]);
+  if (fixed > 0) return fixed;
+  return Math.max(0, size - paidSlots(team, race)) * (race.runner_fee || 0);
+}
 export function sizeOptions(r: Pick<Race, 'team_sizes' | 'team_size'>) {
   const xs = (r.team_sizes || '').split(',').map((x) => parseInt(x.trim(), 10)).filter((n) => n > 0);
   return xs.length ? Array.from(new Set(xs)).sort((a, b) => a - b) : [r.team_size];
@@ -188,7 +200,7 @@ export async function feeForNewRunner(race: Race, team: Team) {
 }
 
 export type Payment = {
-  id: string; race_id: string; team_id: string | null; runner_id: string | null; kind: 'team' | 'slots' | 'runner';
+  id: string; race_id: string; team_id: string | null; runner_id: string | null; kind: 'team' | 'slots' | 'runner' | 'settle';
   source: string; external_id: string | null; quantity: number; amount: number; payer_name: string | null;
   payer_email: string | null; payer_phone: string | null; comment: string | null; paid_at: string; created_at: string; notes: string | null; resolution: string | null;
 };
@@ -223,6 +235,7 @@ async function applyPayment(p: PaymentIn) {
     if (race && isHoldRace(race) && p.team_id) await run('UPDATE teams SET extra_slots = extra_slots + 1 WHERE id = ?', [p.team_id]);
   }
   if (p.kind === 'slots' && p.team_id) await addSlots(p.team_id, p.quantity, p.source);
+  if (p.kind === 'settle' && p.team_id) await updateTeam(p.team_id, { settled_at: p.paid_at || now() });
 }
 
 // Adds paid slots to a team, covers runners still owing their fee, and
@@ -257,11 +270,16 @@ export async function assignPayment(paymentId: string, teamId: string | null) {
       const other = await one('SELECT 1 FROM payments WHERE team_id = ? AND kind = ? AND id <> ?', [p.team_id, 'team', p.id]);
       if (!other) await updateTeam(p.team_id, { payment_status: 'pending', payment_method: 'manual', paid_at: null });
     }
+    if (p.kind === 'settle') {
+      const other = await one('SELECT 1 FROM payments WHERE team_id = ? AND kind = ? AND id <> ?', [p.team_id, 'settle', p.id]);
+      if (!other) await updateTeam(p.team_id, { settled_at: null });
+    }
   }
   await run('UPDATE payments SET team_id = ? WHERE id = ?', [teamId, paymentId]);
   if (!teamId) return;
   if (p.kind === 'slots') await addSlots(teamId, p.quantity, p.source);
   if (p.kind === 'team') await updateTeam(teamId, { payment_status: 'paid', payment_method: p.source, paid_at: p.paid_at });
+  if (p.kind === 'settle') await updateTeam(teamId, { settled_at: p.paid_at });
 }
 export const deletePayment = async (id: string) => {
   await assignPayment(id, null);
