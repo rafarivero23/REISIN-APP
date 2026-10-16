@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic';
 // Marks teams / runner fees paid when Stripe Checkout completes, even if the
 // buyer closes the tab before coming back to the site.
 // Stripe → Developers → Webhooks → endpoint https://YOUR-DOMAIN/api/stripe/webhook,
-// event checkout.session.completed. Signing secret → STRIPE_WEBHOOK_SECRET.
+// events checkout.session.completed + checkout.session.async_payment_succeeded. Signing secret → STRIPE_WEBHOOK_SECRET.
 export async function POST(req: Request) {
   const s = stripe();
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
     const session = event.data.object;
     const kind = session.metadata?.kind, id = session.metadata?.id;
-    if (session.payment_status === 'paid' && id && (kind === 'team' || kind === 'runner' || kind === 'slots')) {
+    if (session.payment_status === 'paid' && id && (kind === 'team' || kind === 'runner' || kind === 'slots' || kind === 'settle')) {
       // Same entry the success redirect writes; external_id = session id, so it lands once.
       await settle(kind, id, Number(session.metadata?.qty || 1), Math.round((session.amount_total || 0) / 100), 'stripe', session.id,
         { name: session.customer_details?.name, email: session.customer_details?.email });
