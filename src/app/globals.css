@@ -240,9 +240,12 @@ a.btn-primary{color:var(--accent-ink)}
 
 .brand-logo{height:30px;width:auto;display:block}
 .brand-logo.sm{height:22px}
+.brand-wordmark{height:24px;width:auto;display:block}
+.brand-wordmark.sm{height:18px}
+.login .brand-wordmark{height:30px;margin:0 auto}
 .login .brand-logo{height:34px}
 
-.login .brand-logo{filter:var(--logo-on-surface)}
+.login .brand-logo,.login .brand-wordmark{filter:var(--logo-on-surface)}
 
 /* Header bars stay dark in both themes so the white Reisin mark always reads. */
 .rail,.p-top,.mobile-bar{background:var(--header-bg)!important;color:#f3f4f1}

@@ -19,7 +19,7 @@ export default function LoginForm({ next }: { next: string }) {
       <div className="login-photo" aria-hidden><img src="/photos/golden-runner.jpg" alt="" style={{ objectPosition: '55% 60%' }} /></div>
       <form className="card stack" action={action}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
-          <div className="brand"><img src="/reisin-mark-white.png" alt="Reisin" className="brand-logo" /><div><div className="brand-name">Reisin</div><div className="brand-sub">{t('admin')}</div></div></div>
+          <div className="brand"><img src="/reisin-wordmark-white.png" alt="Reisin" className="brand-wordmark" /></div>
         </div>
         <div><h2>{t('login')}</h2><p className="muted" style={{ fontSize: 14, marginTop: 6 }}>{t('loginSubN')}</p></div>
         <input type="hidden" name="next" value={next} />

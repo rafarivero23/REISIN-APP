@@ -11,8 +11,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <header className="p-top">
         <div className="in">
           <Link href="/" className="brand" style={{ color: 'inherit', textDecoration: 'none' }}>
-            <img src="/reisin-mark-white.png" alt="Reisin" className="brand-logo" />
-            <div><div className="brand-name">Reisin</div><div className="brand-sub">{t('portal')}</div></div>
+            <img src="/reisin-wordmark-white.png" alt="Reisin" className="brand-wordmark" />
           </Link>
           <LangToggle />
         </div>
