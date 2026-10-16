@@ -153,7 +153,7 @@ export function RaceForm({ race, onClose }: { race?: ARace; onClose: () => void 
         <Field id="r-size" label={t('teamSizeMax')} type="number" min="1" value={f.team_size} onChange={set('team_size')} />
         <Field id="r-sizes" label={t('teamSizes')} value={f.team_sizes || ''} onChange={set('team_sizes')} hint={t('teamSizesHint')} placeholder="4,5,6" />
         <Field id="r-hold" label={t('holdSlots')} type="number" min="0" value={f.hold_slots ?? 0} onChange={set('hold_slots')} hint={t('holdSlotsHint')} />
-        <Field id="r-cap" label={t('capacity')} type="number" min="1" value={f.capacity_teams} onChange={set('capacity_teams')} />
+        <Field id="r-cap" label={t('capacity')} type="number" min="0" value={f.capacity_teams} onChange={set('capacity_teams')} hint={t('capacityHint')} />
         <Field id="r-cats" label={t('categories')} value={f.categories || ''} onChange={set('categories')} hint={t('categoriesHint')} />
         <Field id="r-bib" label={t('bibStart')} type="number" min="1" value={f.bib_start} onChange={set('bib_start')} />
         <Field id="r-waiver" label={t('waiver')} type="textarea" value={f.waiver || ''} onChange={set('waiver')} full />

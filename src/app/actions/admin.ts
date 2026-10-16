@@ -70,7 +70,7 @@ function raceInput(f: Record<string, unknown>): RaceInput | null {
   return {
     name, brand: str(f.brand, 40) || 'Reisin', status, race_date, location: str(f.location, 160) || null,
     team_price: Math.max(0, int(f.team_price)), runner_fee: Math.max(0, int(f.runner_fee)),
-    team_size: Math.max(1, int(f.team_size, 1)), capacity_teams: Math.max(1, int(f.capacity_teams, 1)),
+    team_size: Math.max(1, int(f.team_size, 1)), capacity_teams: Math.max(0, int(f.capacity_teams, 0)),
     categories: str(f.categories, 300), bib_start: Math.max(1, int(f.bib_start, 1)), waiver: str(f.waiver, 8000) || null,
     team_sizes: str(f.team_sizes, 40).split(',').map((x) => parseInt(x, 10)).filter((n) => n > 0).join(','),
     hold_slots: Math.max(0, int(f.hold_slots)),
