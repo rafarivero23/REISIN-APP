@@ -12,6 +12,8 @@ import { RaceGate } from '@/components/racepage';
 import { Back, loadOpenRace, Closed } from '../../shared';
 import { PhotoHero, PhotoGallery } from '@/components/PhotoHero';
 import { defaultCover } from '@/lib/photos';
+import { sponsorsOf, sponsorMono } from '@/lib/sponsors';
+import { SponsorStrip } from '@/components/Sponsors';
 import { brandKey, fmtDate } from '@/lib/format';
 
 export default async function RaceChoice({ params }: { params: { raceId: string } }) {
@@ -22,7 +24,9 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
   if ('closed' in res) return <Closed name={res.closed} />;
   const r = res.race;
   const page = parsePage(raw.page);
-  const showBoard = raw.board_public && (await checkpointsOf(raw.id)).length > 0;
+  const [cps, sponsors, mono] = await Promise.all([checkpointsOf(raw.id), sponsorsOf(raw.id), sponsorMono(raw.id)]);
+  const showBoard = raw.board_public && cps.length > 0;
+  const sponsorStrip = <SponsorStrip sponsors={sponsors} mono={mono} title={t('sp_title')} />;
   const hero = (
     <PhotoHero photo={page.cover || defaultCover(r.brand)} size="lg" top={<Back href="/" />}>
       <span className={'brand-chip ' + brandKey(r.brand)}>{r.brand}</span>
@@ -36,6 +40,7 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
       <>
         {hero}
         <RaceGate raceId={r.id} />
+        {sponsorStrip}
       </>
     );
   }
@@ -96,6 +101,7 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
         </div>
       )}
       <PhotoGallery photos={page.photos} title={t('pg_gallery')} />
+      {sponsorStrip}
     </>
   );
 }

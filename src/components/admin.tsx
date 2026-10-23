@@ -10,6 +10,8 @@ import { raceStats, teamSlots, isHold, regComplete } from '@/lib/stats';
 import { parseGroups, groupFor, categoryOf, categoryLabel, fmtHalf, type StartGroup } from '@/lib/groups';
 import { LogoInput } from './LogoInput';
 import { PageEditor } from './racepage';
+import { SponsorEditor } from './sponsors-admin';
+import type { Sponsor } from '@/lib/sponsors';
 import { CaptainsPanel } from './captains';
 import { SolosPanel } from './solos';
 import { TimingPanel } from './timing-admin';
@@ -174,7 +176,7 @@ type Modal = { type: 'race' } | { type: 'teamForm'; id?: string } | { type: 'tea
 
 export type AAgent = { id: string; name: string; email: string; phone: string | null; gender: string | null; half_avg_min: number | null; city: string | null;
   message: string | null; paid_claim: boolean; status: string; team_id: string | null; notes: string | null; created_at: string };
-export function RaceDetail({ race, teams, solos = [], runners, payments, agents, checkpoints = [], photos = [] }: { race: ARace; teams: ATeam[]; solos?: ATeam[]; runners: ARunner[]; payments: APayment[]; agents: AAgent[]; checkpoints?: { id: string; num: number; name: string; km: number | null }[]; photos?: { id: string; w: number; h: number }[] }) {
+export function RaceDetail({ race, teams, solos = [], runners, payments, agents, checkpoints = [], photos = [], sponsors = [], sponsorMono = false }: { sponsors?: Sponsor[]; sponsorMono?: boolean; race: ARace; teams: ATeam[]; solos?: ATeam[]; runners: ARunner[]; payments: APayment[]; agents: AAgent[]; checkpoints?: { id: string; num: number; name: string; km: number | null }[]; photos?: { id: string; w: number; h: number }[] }) {
   const { t, lang } = useT();
   const router = useRouter();
   const q = useSearchParams();
@@ -248,6 +250,7 @@ export function RaceDetail({ race, teams, solos = [], runners, payments, agents,
       {tab === 'timing' && <TimingPanel race={race} teams={teams} solos={solos} checkpoints={checkpoints} />}
       {tab === 'page' && <SettleEditor race={race} />}
       {tab === 'page' && <PageEditor race={race} initial={{ slug: race.slug || '', access_code: race.access_code || '', page: parsePage(race.page) }} uploads={photos} />}
+      {tab === 'page' && <div style={{ marginTop: 16 }}><SponsorEditor raceId={race.id} sponsors={sponsors} mono={sponsorMono} /></div>}
       {tab === 'agents' && <AgentsAdmin agents={agents} teamName={(id) => teamById(id)?.name || '—'} />}
 
       {modal?.type === 'race' && <RaceForm race={race} onClose={() => setModal(null)} />}

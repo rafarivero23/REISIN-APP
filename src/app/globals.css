@@ -392,3 +392,17 @@ h1,h2,h3,.choice b,.choice a b,.race-card h3,.section-t{font-family:var(--f-titl
 .ck-time{white-space:nowrap}
 .ph-del{all:unset;cursor:pointer;position:absolute;top:6px;right:6px;width:26px;height:26px;border-radius:999px;background:rgba(0,0,0,.6);color:#fff;display:grid;place-items:center;font-size:13px}
 .ph-del:focus-visible{outline:2px solid #fff}
+
+/* sponsor logos: white band in both themes, logos sized by equal area */
+.sponsors{--sp-k:1;margin-top:28px;background:#fff;color:#141820;border-radius:14px;padding:22px 20px 26px;display:flex;flex-direction:column;align-items:center;gap:18px;border:1px solid var(--line)}
+.sponsors .label{color:#5b6370}
+.sponsors ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;align-items:center;gap:26px 44px}
+.sponsors li{display:flex;align-items:center;justify-content:center}
+.sponsors img{display:block;max-width:100%;transition:filter .2s ease,opacity .2s ease}
+.sponsors.mono img{filter:grayscale(1) contrast(1.1);opacity:.8}
+.sponsors.mono a:hover img{filter:none;opacity:1}
+@media (max-width:640px){.sponsors{--sp-k:.72}.sponsors ul{gap:20px 28px}}
+.sp-edit{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.sp-card{background:var(--surface-2);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.sp-card .sp-logo{background:#fff;border-radius:8px;height:96px;display:flex;align-items:center;justify-content:center;padding:8px}
+.sp-card .sp-logo img{max-width:100%;max-height:100%}

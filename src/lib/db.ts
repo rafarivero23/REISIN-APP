@@ -300,5 +300,20 @@ CREATE TABLE IF NOT EXISTS agent_invites (
   created_at TEXT NOT NULL,
   UNIQUE (agent_id, team_id)
 );
+
+-- Sponsor logos shown at the bottom of the race page. img = trimmed PNG.
+CREATE TABLE IF NOT EXISTS race_sponsors (
+  id TEXT PRIMARY KEY,
+  race_id TEXT NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  name TEXT NOT NULL DEFAULT '',
+  url TEXT,
+  img BYTEA NOT NULL,
+  w INTEGER NOT NULL,
+  h INTEGER NOT NULL,
+  sort INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_race_sponsors_race ON race_sponsors(race_id);
+ALTER TABLE races ADD COLUMN IF NOT EXISTS sponsor_mono BOOLEAN NOT NULL DEFAULT false;
 `);
 }
