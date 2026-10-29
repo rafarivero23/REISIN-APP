@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getRace, getTeam, isListedTeam, type Team } from '@/lib/repo';
-import { many, run } from '@/lib/db';
+import { many, one, run } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth-guard';
 import { setTimingAccess, timingAccess } from '@/lib/team-session';
 import { saveCheckpoints, setCheckin, deleteCheckin, checkpointsOf, START } from '@/lib/timing';
@@ -88,6 +88,16 @@ export async function saveTiming(raceId: string, input: { timing_code: string; b
   revalidatePath('/admin', 'layout');
   refresh(raceId);
   return {};
+}
+
+// Wipes every start and checkpoint time of the race (for tests / a fresh start).
+export async function clearCheckins(raceId: string): Promise<{ count: number }> {
+  await guard();
+  const n = await one<{ n: string }>('SELECT COUNT(*) AS n FROM checkins WHERE race_id = ?', [raceId]);
+  await run('DELETE FROM checkins WHERE race_id = ?', [raceId]);
+  revalidatePath('/admin', 'layout');
+  refresh(raceId);
+  return { count: Number(n?.n || 0) };
 }
 
 // Numbers every team (and Solo) without one: teams first, alphabetically.

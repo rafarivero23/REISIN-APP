@@ -3,7 +3,7 @@ import { useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useT } from './I18n';
 import { useToast, useCopy } from './ui';
-import { saveTiming, assignTeamNumbers, setTeamNumber } from '@/app/actions/timing';
+import { saveTiming, assignTeamNumbers, setTeamNumber, clearCheckins } from '@/app/actions/timing';
 import type { ARace, ATeam } from './admin';
 
 type CP = { id?: string; num: number | string; name: string; km: number | string | null };
@@ -92,6 +92,17 @@ export function TimingPanel({ race, teams, solos, checkpoints }: { race: ARace; 
             </tr>
           ))}</tbody>
         </table></div>
+      </div>
+
+      <div className="card row" style={{ justifyContent: 'space-between', gap: 12 }}>
+        <div style={{ minWidth: 0, flex: '1 1 260px' }}><h3 style={{ textTransform: 'uppercase' }}>{t('tm_clear')}</h3><p className="muted" style={{ fontSize: 14, marginTop: 4 }}>{t('tm_clearSub')}</p></div>
+        <button type="button" className="btn btn-danger" onClick={async () => {
+          const w = t('tm_clearWord');
+          if ((prompt(t('tm_clearConfirm').replace('{w}', w)) || '').trim().toUpperCase() !== w) return;
+          const r = await clearCheckins(race.id);
+          toast(t('tm_cleared').replace('{n}', String(r.count)));
+          start(() => router.refresh());
+        }}>{t('tm_clear')}</button>
       </div>
     </div>
   );
