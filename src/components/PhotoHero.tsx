@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { getPhoto, photoSrc } from '@/lib/photos';
+import { HandFrame } from './HandFrame';
 
 // Full-width photo band with a dark gradient so white text stays readable.
 export function PhotoHero({ photo, children, size = 'md', top }: { photo: string; children: ReactNode; size?: 'md' | 'lg'; top?: ReactNode }) {
@@ -25,7 +26,7 @@ export function PhotoGallery({ photos, title }: { photos: string[]; title: strin
   if (!list.length) return null;
   return (
     <section className="stack" style={{ gap: 12 }}>
-      <h2 style={{ fontSize: 28 }}>{title}</h2>
+      <h2 style={{ fontSize: 28 }}><span className="hb"><HandFrame seed={40} />{title}</span></h2>
       <div className="gallery">
         {list.map((p) => (
           <a key={p.id} href={photoSrc(p.id)} target="_blank" rel="noreferrer" className={p.wide ? 'wide' : ''}>

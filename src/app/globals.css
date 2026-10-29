@@ -406,3 +406,118 @@ h1,h2,h3,.choice b,.choice a b,.race-card h3,.section-t{font-family:var(--f-titl
 .sp-card{background:var(--surface-2);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:8px}
 .sp-card .sp-logo{background:#fff;border-radius:8px;height:96px;display:flex;align-items:center;justify-content:center;padding:8px}
 .sp-card .sp-logo img{max-width:100%;max-height:100%}
+
+/* ---------- hand-drawn frames (only visible under .bx) ---------- */
+.hb{position:relative}
+.hb>.hb-f,.hb>.hb-t{display:none}
+.lb-livebox{display:inline-flex;align-items:center;gap:8px}
+
+/* ---------- leaderboard cards on phones (all races) ---------- */
+.lb-cards{display:none;list-style:none;margin:0;padding:0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.lb-cards li{display:grid;grid-template-columns:40px minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px 12px;border-top:1px solid var(--line)}
+.lb-cards li:first-child{border-top:0}
+.lb-cards li.lb-first{background:color-mix(in srgb,var(--bib) 14%,var(--surface))}
+.lb-cards .lb-posn{font-size:22px;text-align:center}
+.lb-cards .lb-name{font-size:16px}
+.lb-c-meta{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;font-size:12px;margin-top:3px}
+.lb-c-meta .chip{font-size:11px;padding:1px 7px}
+.lb-bar{display:flex;gap:3px;margin-top:7px}
+.lb-bar i{flex:0 1 22px;height:4px;border-radius:1px;background:var(--line)}
+.lb-bar i.on{background:var(--ink)}
+.lb-c-time{text-align:right;display:flex;flex-direction:column;gap:2px;white-space:nowrap}
+.lb-c-time b{font-size:15px}
+.lb-c-time span{font-size:11px}
+@media (max-width:640px){.lb-table{display:none}.lb-cards{display:block}}
+
+/* ---------- Baja Crossing theme (race manual 2025) ----------
+   Dark charcoal + film grain, B&W photos, BajaCrossing titles in
+   hand-drawn boxes, wide sans body (Archivo Expanded ≈ Termina), ✱ bullets. */
+@font-face{font-family:"Archivo";src:url(/fonts/Archivo-wdth.woff2) format("woff2");font-weight:100 900;font-stretch:62% 125%;font-display:swap}
+.portal:has(.bx){
+  --bg:#1d1e1f;--surface:#262728;--surface-2:#303132;--ink:#f2f2f0;--muted:#a3a3a0;--line:rgba(255,255,255,.16);
+  --accent:#f2f2f0;--accent-ink:#141414;--accent-soft:rgba(255,255,255,.08);--bx-orange:#f26a2e;--bx-yellow:#ffe52e;--bib:#ffe52e;
+  background:radial-gradient(120% 50% at 50% 0%,#333435 0%,#1d1e1f 60%) fixed,#1d1e1f;color:var(--ink);
+  font-family:"Archivo",var(--f-body);font-stretch:125%;font-weight:500;color-scheme:dark;position:relative}
+.portal:has(.bx)::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opacity:.16;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.portal:has(.bx) .p-top{background:transparent!important;position:relative;z-index:3}
+.portal:has(.bx) .p-main{font-size:14px;line-height:1.45}
+.bx .hb>.hb-f{display:block;position:absolute;inset:0;width:100%;height:100%;overflow:visible;pointer-events:none}
+.bx .hb>.hb-t{display:block;position:absolute;width:18px;height:12px;overflow:visible;pointer-events:none}
+.bx .hb>.hb-tl{left:5px;top:5px}.bx .hb>.hb-br{right:5px;bottom:5px}
+.bx .hb path{fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+.bx .hb>.hb-t path{stroke-width:1.6}
+.bx h1,.bx h2,.bx h3{font-family:var(--f-title);font-weight:400}
+.bx h2>.hb{display:inline-block;padding:.45em .9em .35em;line-height:1}
+/* hero */
+.bx .hero{margin-top:-84px;background:#1d1e1f}
+.bx .hero img{filter:grayscale(1) contrast(1.15) brightness(.85)}
+.bx .hero::after{background:linear-gradient(180deg,rgba(29,30,31,.6) 0%,rgba(29,30,31,0) 28%,rgba(29,30,31,.1) 55%,#1d1e1f 100%)}
+.bx .hero-in{padding-top:84px}
+.bx .hero h1{text-shadow:0 2px 30px rgba(0,0,0,.5)}
+.bx .hero p,.bx .bx-sub{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#e6e6e3}
+.bx .hero .brand-chip{background:none;backdrop-filter:none;padding:0;color:var(--bx-orange);letter-spacing:.14em}
+/* buttons & links */
+.bx .btn{background:transparent;border:0;border-radius:0;color:var(--ink);font-weight:600;font-size:12px;padding:.85em 1.2em .75em}
+.bx .btn.hb{padding:.95em 1.4em .85em}
+.bx .btn-primary{background:transparent;color:var(--ink)}
+.bx .rp-live{color:var(--bx-yellow);font-family:var(--f-title);font-size:20px;font-weight:400;text-transform:uppercase}
+.bx .choice{gap:16px}
+.bx .choice a{background:transparent;border:0;border-radius:0;padding:22px 22px 18px}
+.bx .choice a:hover{box-shadow:none;background:rgba(255,255,255,.04)}
+.bx .choice a b{font-size:24px}
+.bx .choice a span{font-size:12px}
+.bx .choice a.ch-main{color:var(--bx-orange)}
+.bx .choice a.ch-main span{color:var(--muted)}
+.bx .choice a.ch-main span.num{color:var(--bx-orange)!important}
+/* content */
+.bx .rp-intro{font-size:14px}
+.bx .rp-grid{gap:34px 22px}
+.bx .rp-grid .card{background:transparent;border:0;padding:0}
+.bx .rp-grid h2{font-size:26px;margin-bottom:18px}
+.bx .rp-day li{border-top:0;grid-template-columns:70px 1fr;padding:5px 0;font-size:13px}
+.bx .rp-day .label{font-family:var(--f-title);font-size:19px;letter-spacing:.02em;color:var(--ink);text-transform:uppercase}
+.bx .rp-day .label::before{content:"✱ ";font-family:var(--f-body)}
+.bx .rp-time{color:var(--ink);font-weight:600}
+.bx .rich ul{list-style:none;padding-left:0}
+.bx .rich li{position:relative;padding-left:22px;margin:6px 0}
+.bx .rich li::before{content:"✱";position:absolute;left:0;top:-.05em;font-size:1.05em}
+.bx .rich a{color:var(--ink)}
+.bx .gallery img{filter:grayscale(1) contrast(1.1)}
+.bx .gallery a{border-radius:2px;background:#2a2b2c}
+.bx .card{background:var(--surface);border-color:var(--line)}
+.bx input,.bx select,.bx textarea{background:#1f2021;color:var(--ink);border-color:var(--line)}
+/* sponsors: white silhouettes on the dark page */
+.bx .sponsors{background:transparent;border:0;color:var(--ink)}
+.bx .sponsors .label{color:var(--ink);font-family:var(--f-title);font-size:20px;letter-spacing:.02em}
+.bx .sponsors .label .hb{display:inline-block;padding:.45em .9em .35em}
+.bx .sponsors img,.bx .sponsors.mono img{filter:brightness(0) invert(1);opacity:.85}
+.bx .sponsors a:hover img{opacity:1;filter:brightness(0) invert(1)}
+/* leaderboard */
+.bx .lb-livebox{color:var(--bx-yellow);font-family:var(--f-title);font-weight:400;font-size:20px;text-transform:uppercase;padding:.45em 1em .35em}
+.bx .seg{background:transparent;border:0;padding:0;gap:2px}
+.bx .seg button{font-family:var(--f-title);font-weight:400;font-size:16px;text-transform:uppercase;border-radius:0;padding:.4em .7em .3em;color:var(--muted)}
+.bx .seg button[aria-selected="true"]{background:#f2f2f0;color:#141414;clip-path:polygon(2% 6%,98% 0,100% 94%,0 100%)}
+.bx .lb-filters select,.bx .lb-filters .search{border-radius:4px;background:transparent;font-size:12px}
+.bx .tbl-wrap{background:transparent;border:0;border-radius:0}
+.bx .lb-table th{font-size:10px;letter-spacing:.14em;color:var(--muted);border-bottom:1.5px solid var(--line);background:transparent}
+.bx .lb-table td{border-bottom:1px dashed rgba(255,255,255,.12);border-top:0;padding-top:14px;padding-bottom:14px}
+.bx .lb-sticky{background:var(--bg)}
+.bx .lb-team{box-shadow:none}
+.bx .lb-posn{font-family:var(--f-title);font-weight:400;font-size:30px}
+.bx .lb-name{font-family:var(--f-title);font-weight:400;font-size:20px;text-transform:uppercase;letter-spacing:.02em}
+.bx .lb-noLogo{background:#f2f2f0;color:#141414;border-radius:0;font-family:"Archivo";font-stretch:125%;font-weight:700;clip-path:polygon(4% 0,100% 6%,96% 100%,0 94%)}
+.bx .lb-logo{border-radius:0}
+.bx .lb-first td,.bx .lb-first td.lb-sticky,.bx .lb-cards li.lb-first{background:#2b2a22}
+.bx .lb-first .lb-posn{color:var(--bx-yellow)}
+.bx .lb-best{color:var(--bx-yellow)}
+.bx .lb-focus{background:rgba(255,255,255,.03)}
+.bx .chip.plain{background:transparent;border:1.5px solid currentColor;border-radius:3px;font-size:11px}
+.bx .cat-varonil{color:#9fb4ff!important;background:transparent!important}.bx .cat-mixto{color:#7fd3a0!important;background:transparent!important}.bx .cat-femenil{color:#ff8a65!important;background:transparent!important}
+.bx .lb-cards{background:transparent;border:0;border-radius:0}
+.bx .lb-cards li{border-top:1px dashed rgba(255,255,255,.14)}
+.bx .lb-cards .lb-posn{font-size:28px}
+.bx .lb-cards .lb-name{font-size:18px}
+.bx .lb-bar i.on{background:#f2f2f0}.bx .lb-first .lb-bar i.on{background:var(--bx-yellow)}
+.bx .note{background:var(--surface);color:var(--muted)}
+.bx .choice a.hb,.bx .btn.hb{position:relative}

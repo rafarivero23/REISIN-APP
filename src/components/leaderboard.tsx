@@ -5,6 +5,7 @@ import { useT } from './I18n';
 import { fmtElapsed, rankTeams, type Board, type BoardTeam } from '@/lib/timing-shared';
 
 import { categoryLabel } from '@/lib/groups';
+import { HandFrame } from './HandFrame';
 const BRANCHES = ['all', 'varonil', 'mixto', 'femenil'] as const;
 
 export function Leaderboard({ board }: { board: Board }) {
@@ -48,7 +49,7 @@ export function Leaderboard({ board }: { board: Board }) {
     <div className="stack">
       <div className="row" style={{ justifyContent: 'space-between' }}>
         <div className="row" style={{ gap: 8 }}>
-          <span className="live-dot" aria-hidden /> <b>{t('lb_live')}</b>
+          <b className="hb lb-livebox"><HandFrame seed={7} /><span className="live-dot" aria-hidden /> {t('lb_live')}</b>
           <span className="muted" style={{ fontSize: 13 }}>{t('lb_updated').replace('{s}', String(ago))} · {started}/{board.teams.length} {t('lb_onCourse')}</span>
         </div>
         <button type="button" className="btn btn-sm" onClick={() => router.refresh()}>↻ {t('lb_refresh')}</button>
@@ -90,7 +91,7 @@ export function Leaderboard({ board }: { board: Board }) {
           <tbody>
             {shown.map((x) => (
               <tr key={x.id} className={x.pos === 1 ? 'lb-first' : undefined}>
-                <td className="lb-sticky lb-pos num"><b>{x.pos ?? '–'}</b></td>
+                <td className="lb-sticky lb-pos num"><b className="lb-posn">{x.pos ?? '–'}</b></td>
                 <td className="lb-sticky lb-team">
                   <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
                     {x.logo ? <img src={x.logo} alt="" className="lb-logo" /> : <span className="lb-logo lb-noLogo" aria-hidden>{x.no ?? ''}</span>}
@@ -114,6 +115,33 @@ export function Leaderboard({ board }: { board: Board }) {
         </table>
         {!shown.length && <div className="empty">{t('noTeams')}</div>}
       </div>
+      {/* phones: one card per team instead of the wide table */}
+      <ul className="lb-cards">
+        {shown.map((x) => {
+          const reached = cp === 'all' ? x.last : x.clock?.[cp] ? (cps.find((c) => c.id === cp)?.num ?? 0) : -1;
+          const cpAt = cp === 'all' ? cps.find((c) => c.num === x.last) : cps.find((c) => c.id === cp);
+          const ms = cp === 'all' ? (x.last > 0 ? x.lastMs : null) : x.times[cp] ?? null;
+          const clock = cpAt ? x.clock?.[cpAt.id] : undefined;
+          return (
+            <li key={x.id} className={x.pos === 1 ? 'lb-first' : undefined}>
+              <b className="lb-posn">{x.pos ?? '–'}</b>
+              <div className="lb-c-main">
+                <b className="lb-name">{x.name}</b>
+                <div className="lb-c-meta">
+                  <span className={'chip plain cat-' + (x.category || 'none')}>{categoryLabel(x.div, x.category, t)}</span>
+                  <span className="muted">{x.no != null ? `#${x.no}` : ''}{x.group ? `${x.no != null ? ' · ' : ''}${t('group')} ${x.group}` : ''}</span>
+                </div>
+                {cps.length > 0 && <div className="lb-bar" aria-hidden>{cps.map((c) => <i key={c.id} className={reached >= c.num ? 'on' : ''} />)}</div>}
+              </div>
+              <div className="lb-c-time">
+                <b className="num">{ms != null ? fmtElapsed(ms) : clock ? `${clockOf(clock)} ⏱` : '—'}</b>
+                <span className="muted">{cp === 'all' ? lastLabel(x) : cpAt ? `PC ${cpAt.num}` : ''}</span>
+              </div>
+            </li>
+          );
+        })}
+        {!shown.length && <li className="empty">{t('noTeams')}</li>}
+      </ul>
       <p className="muted" style={{ fontSize: 12 }}>{t('lb_legend')}</p>
     </div>
   );

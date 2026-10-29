@@ -8,6 +8,10 @@ import { getT } from '@/lib/lang';
 import { CheckinApp, TimingGate } from '@/components/checkin';
 import { Leaderboard } from '@/components/leaderboard';
 import { RaceHeader } from './shared';
+import { PhotoHero } from '@/components/PhotoHero';
+import { brandKey, fmtDate } from '@/lib/format';
+import { parsePage } from '@/lib/racepage';
+import { defaultCover } from '@/lib/photos';
 
 // The race the short URLs (/leaderboard, /checkpoint/…) point to: the open
 // race with checkpoints closest to today, else the latest one with checkpoints.
@@ -24,6 +28,19 @@ export async function LeaderboardView({ race }: { race: Race }) {
     return (<><RaceHeader race={race} lang={lang} /><div className="card empty">{t('lb_hidden')}</div></>);
   }
   const board = await buildBoard(race);
+  if (brandKey(race.brand) === 'baja') {
+    // Race-manual look: B&W photo header, dark grain, hand-drawn boxes.
+    const km = (await checkpointsOf(race.id)).reduce((m, c) => Math.max(m, c.km ?? 0), 0);
+    return (
+      <div className="bx" style={{ display: 'contents' }}>
+        <PhotoHero photo={parsePage(race.page).cover || defaultCover(race.brand)} size="md">
+          <h1>{race.name}</h1>
+          <p className="bx-sub">Leaderboard · {fmtDate(race.race_date, lang)}{race.location ? ' · ' + race.location : ''}{km ? ` · ${km} km` : ''}</p>
+        </PhotoHero>
+        <div className="lb-wide stack"><Leaderboard board={board} /></div>
+      </div>
+    );
+  }
   return (
     <div className="lb-wide stack">
       <RaceHeader race={race} lang={lang} />

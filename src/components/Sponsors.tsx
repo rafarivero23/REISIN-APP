@@ -1,4 +1,5 @@
 import type { Sponsor } from '@/lib/sponsors';
+import { HandFrame } from './HandFrame';
 
 // Every logo gets the same visual area (not the same width or height), so a
 // square crest and a long wordmark read as equally big. Caps keep extremes tidy.
@@ -15,7 +16,7 @@ export function SponsorStrip({ sponsors, mono, title }: { sponsors: Sponsor[]; m
   if (!sponsors.length) return null;
   return (
     <section className={'sponsors' + (mono ? ' mono' : '')} aria-label={title}>
-      <div className="label">{title}</div>
+      <div className="label"><span className="hb"><HandFrame seed={50} />{title}</span></div>
       <ul>
         {sponsors.map((s) => {
           const b = logoBox(s.w, s.h);
