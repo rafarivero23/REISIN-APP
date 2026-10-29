@@ -8,7 +8,7 @@ import { categoryLabel } from '@/lib/groups';
 const BRANCHES = ['all', 'varonil', 'mixto', 'femenil'] as const;
 
 export function Leaderboard({ board }: { board: Board }) {
-  const { t } = useT();
+  const { t, lang } = useT();
   const router = useRouter();
   const [cat, setCat] = useState<(typeof BRANCHES)[number]>('all');
   const [div, setDiv] = useState<string>('all');
@@ -26,18 +26,19 @@ export function Leaderboard({ board }: { board: Board }) {
   }, [board.updated]);
 
   const cps = board.checkpoints;
+  const clockOf = (iso?: string) => (iso ? new Date(iso).toLocaleTimeString(lang === 'en' ? 'en-US' : 'es-MX', { hour: '2-digit', minute: '2-digit' }) : '');
   const present = new Set(board.teams.filter((x) => div === 'all' || x.div === div).map((x) => x.category || ''));
   const divs = Array.from(new Set(board.teams.map((x) => x.div).filter(Boolean))).sort((a, b) => (a === 'solo' ? 1 : b === 'solo' ? -1 : Number(a) - Number(b)));
   const rows = useMemo(() => {
     let list = board.teams.filter((x) => (cat === 'all' || x.category === cat) && (div === 'all' || x.div === div));
     if (cp !== 'all') {
       const cpNum = cps.find((c) => c.id === cp)?.num ?? 0;
-      list = rankTeams(list.map((x) => ({ ...x, last: x.times[cp] != null ? cpNum : -1, lastMs: x.times[cp] ?? null })));
+      list = rankTeams(list.map((x) => ({ ...x, last: x.clock?.[cp] ? cpNum : -1, lastMs: x.times[cp] ?? null, lastAt: x.clock?.[cp] ? Date.parse(x.clock[cp]) : null })));
     }
     return list;
   }, [board.teams, cat, div, cp, cps]);
   // Positions are computed on the filtered ranking, then the search narrows the view.
-  const ranked = rows.map((x, i) => ({ ...x, pos: (cp === 'all' ? x.last >= 0 : x.times[cp] != null) ? i + 1 : null }));
+  const ranked = rows.map((x, i) => ({ ...x, pos: (cp === 'all' ? x.last >= 0 : !!x.clock?.[cp]) ? i + 1 : null }));
   const shown = ranked.filter((x) => !q || `${x.no ?? ''} ${x.name}`.toLowerCase().includes(q.toLowerCase()));
   const best = (id: string) => Math.min(...rows.map((x) => x.times[id]).filter((v): v is number => v != null));
   const lastLabel = (x: BoardTeam) => (x.last < 0 ? t('lb_notStarted') : x.last === 0 ? t('lb_started') : cps.find((c) => c.num === x.last)?.name || `PC ${x.last}`);
@@ -70,6 +71,7 @@ export function Leaderboard({ board }: { board: Board }) {
         <input className="search" type="search" placeholder={t('lb_search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('lb_search')} />
       </div>
       {!cps.length && <div className="note">{t('lb_noCps')}</div>}
+      {board.teams.some((x) => !x.start && Object.keys(x.clock || {}).length) && <div className="note" style={{ fontSize: 13 }}>{t('lb_noStartNote')}</div>}
       <div className="tbl-wrap lb-table">
         <table>
           <thead>
@@ -99,10 +101,12 @@ export function Leaderboard({ board }: { board: Board }) {
                   </div>
                 </td>
                 <td><span className={'chip plain cat-' + (x.category || 'none')} style={{ whiteSpace: 'nowrap' }}>{categoryLabel(x.div, x.category, t)}</span></td>
-                {cp === 'all' && <td style={{ whiteSpace: 'nowrap' }}>{lastLabel(x)}{x.last > 0 && <div className="muted num" style={{ fontSize: 12 }}>{fmtElapsed(x.lastMs)}</div>}</td>}
+                {cp === 'all' && <td style={{ whiteSpace: 'nowrap' }}>{lastLabel(x)}{x.last > 0 && <div className="muted num" style={{ fontSize: 12 }}>{x.lastMs != null ? fmtElapsed(x.lastMs) : <span title={t('lb_noStartHint')}>{clockOf(x.clock?.[cps.find((c) => c.num === x.last)?.id || ''])} · {t('lb_noStart')}</span>}</div>}</td>}
                 {cps.map((c) => {
-                  const v = x.times[c.id];
-                  return <td key={c.id} className={'num' + (cp === c.id ? ' lb-focus' : '') + (v != null && v === best(c.id) ? ' lb-best' : '')} style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtElapsed(v)}</td>;
+                  const v = x.times[c.id], at = x.clock?.[c.id];
+                  return <td key={c.id} className={'num' + (cp === c.id ? ' lb-focus' : '') + (v != null && v === best(c.id) ? ' lb-best' : '')} style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                    {v != null ? fmtElapsed(v) : at ? <span className="muted" title={t('lb_noStartHint')}>{clockOf(at)} ⏱</span> : '—'}
+                  </td>;
                 })}
               </tr>
             ))}

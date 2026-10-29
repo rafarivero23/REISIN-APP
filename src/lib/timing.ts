@@ -50,22 +50,23 @@ export async function buildBoard(race: Race): Promise<Board> {
   const list: BoardTeam[] = teams.filter(isListedTeam).map((t) => {
     const mine = byTeam.get(t.id) || [];
     const start = mine.find((c) => c.checkpoint_id === START)?.at || null;
-    const times: Record<string, number> = {};
-    let last = start ? 0 : -1, lastMs: number | null = start ? 0 : null;
-    if (start) for (const c of mine) {
+    const times: Record<string, number> = {}, clock: Record<string, string> = {};
+    let last = start ? 0 : -1, lastMs: number | null = start ? 0 : null, lastAt: number | null = null;
+    for (const c of mine) {
       if (c.checkpoint_id === START || !numOf.has(c.checkpoint_id)) continue;
-      const ms = Date.parse(c.at) - Date.parse(start);
-      if (!(ms >= 0)) continue;
-      times[c.checkpoint_id] = ms;
-      const n = numOf.get(c.checkpoint_id)!;
-      if (n > last || (n === last && ms < (lastMs ?? Infinity))) { last = n; lastMs = ms; }
+      clock[c.checkpoint_id] = c.at;
+      const n = numOf.get(c.checkpoint_id)!, at = Date.parse(c.at);
+      const ms = start ? at - Date.parse(start) : NaN;
+      if (ms >= 0) times[c.checkpoint_id] = ms;
+      const elapsed = ms >= 0 ? ms : null;
+      if (n > last || (n === last && (elapsed ?? Infinity) < (lastMs ?? Infinity))) { last = n; lastMs = elapsed; lastAt = at; }
     }
     const g = t.is_solo ? null : groupFor(t.half_avg_min, groups);
     return {
       id: t.id, no: t.team_no, name: t.name, logo: t.logo ? `/api/logo/${t.id}?v=${t.logo.length}` : null,
       category: categoryOf(runners.filter((r) => r.team_id === t.id).map((r) => r.gender), t.is_solo),
       div: divisionOf(t.team_size || race.team_size, t.is_solo),
-      group: g?.label || null, groupColor: g?.color || null, start, times, last, lastMs,
+      group: g?.label || null, groupColor: g?.color || null, start, times, clock, last, lastMs, lastAt,
     };
   });
   return { checkpoints: cps, teams: rankTeams(list), updated: now() };

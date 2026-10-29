@@ -189,6 +189,7 @@ export function CheckinApp({ raceId, raceName, staff, teams, checkpoints, checki
         </div>
         <button type="button" className="btn btn-ghost btn-sm" style={{ alignSelf: 'flex-start' }} onClick={setNow}>⟲ {t('tm_now')}</button>
         {already && <p className="note" style={{ color: 'var(--ink)' }}>{t('tm_replace').replace('{t}', stamp(already))}</p>}
+        {pick && cp !== START && !startOf(pick.id) && <p className="note" style={{ color: 'var(--ink)' }}>{t('tm_noStartWarn')}</p>}
         <button type="submit" className="btn btn-primary btn-lg ck-go" disabled={!pick || !day || !hour}>{t('tm_save')}</button>
       </form>
 
