@@ -135,6 +135,12 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono }: {
             {strava && <a className="mono sv-ul" href={strava.url} target="_blank" rel="noopener noreferrer">{t('sv_strava')} ↗</a>}
           </div>
           <div className="sv-route-art" aria-hidden><img src={`${B}/pyramid.png`} alt="" /><img className="sv-boxes" src={`${B}/boxes.png`} alt="" /></div>
+          <figure className="sv-route-map">
+            <span className="mono sv-rm-tl">{t('sv_route')} / Trazo</span>
+            {page.stats[0] && <span className="mono sv-rm-tr">{`${page.stats[0].value} ${page.stats[0].unit}`.trim()}</span>}
+            <img src={`${B}/route-map.png`} alt={race.location || t('sv_route')} loading="lazy" />
+            {race.location && <span className="mono sv-rm-bl">{race.location}</span>}
+          </figure>
         </section>
       )}
 
