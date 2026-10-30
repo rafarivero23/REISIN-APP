@@ -867,3 +867,7 @@ a.sv-acc:hover .sv-cta{background:#fff;color:#050505}
 .bxl .sv-logo{animation:svIn 1.2s cubic-bezier(.2,.8,.2,1) both,bxDissolve 1.6s ease-in 5s forwards}
 @keyframes bxDissolve{0%{opacity:1;filter:drop-shadow(0 6px 40px rgba(0,0,0,.6)) blur(0)}60%{opacity:.5;filter:blur(6px)}100%{opacity:0;filter:blur(18px);transform:translate(-50%,-50%) scale(1.06)}}
 @media (prefers-reduced-motion:reduce){.bxl .sv-logo{animation:none}}
+/* Baja footer: logo is tall, size it by height so it matches the SAV footer weight */
+.bxl .sv-foot-logo{width:auto;height:clamp(110px,12vw,160px);max-width:none}
+.bxl .sv-foot-rings{width:150px;top:50%;transform:translate(-50%,-50%)}
+@media (max-width:760px){.bxl .sv-foot-logo{height:110px}}
