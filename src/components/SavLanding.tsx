@@ -7,6 +7,7 @@ import { money, fmtDate } from '@/lib/format';
 import { RichText } from './RichText';
 import { SponsorStrip } from './Sponsors';
 import { ReisinGlitch } from './ReisinGlitch';
+import { SAV_ELEV } from '@/lib/savRoute';
 
 // Sal a Valle look (SAV27 brand kit): black, thin lines, mono labels,
 // one red accent, brand elements from the SAV .ai files in /public/brand/sav.
@@ -15,6 +16,31 @@ type T = (k: string) => string;
 
 const B = '/brand/sav';
 const pad = (n: number) => String(n).padStart(2, '0');
+const r10 = (n: number) => Math.round(n / 10) * 10;
+const elev = { max: r10(Math.max(...SAV_ELEV.map((p) => p[1]))), min: r10(Math.min(...SAV_ELEV.map((p) => p[1]))) };
+
+// Elevation profile drawn from SAV_ELEV: 1000 x 140 viewBox, km ticks every 20.
+function ElevProfile({ t }: { t: T }) {
+  const W = 1000, H = 140, top = 14, lo = 1600, hi = 3000;
+  const km = SAV_ELEV[SAV_ELEV.length - 1][0];
+  const X = (k: number) => (k / km) * W, Y = (m: number) => top + (1 - (m - lo) / (hi - lo)) * (H - top);
+  const line = SAV_ELEV.map(([k, m], i) => `${i ? 'L' : 'M'}${X(k).toFixed(1)},${Y(m).toFixed(1)}`).join('');
+  const peak = SAV_ELEV.reduce((a, b) => (b[1] > a[1] ? b : a));
+  return (
+    <div className="sv-elev">
+      <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-label={t('sv_elev')}>
+        {[2000, 2500].map((m) => <line key={m} x1="0" x2={W} y1={Y(m)} y2={Y(m)} className="g" />)}
+        <path d={`${line}L${W},${H}L0,${H}Z`} className="a" />
+        <path d={line} className="l" vectorEffect="non-scaling-stroke" />
+        <line x1={X(peak[0])} x2={X(peak[0])} y1={Y(peak[1])} y2={H} className="p" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <span className="mono sv-elev-pk" style={{ left: `${(peak[0] / km) * 100}%` }}>{r10(peak[1]).toLocaleString('en-US')} m</span>
+      <span className="mono sv-elev-y" style={{ top: `${(Y(2500) / H) * 100}%` }}>2,500</span>
+      <span className="mono sv-elev-y" style={{ top: `${(Y(2000) / H) * 100}%` }}>2,000</span>
+      <div className="sv-elev-x mono">{[0, 20, 40, 60, 80, 100, 120].map((k) => <span key={k} style={{ left: `${(k / km) * 100}%` }}>{k}{k === 120 ? ' km' : ''}</span>)}</div>
+    </div>
+  );
+}
 
 export function SavHero({ race, page, lang }: { race: R; page: PageData; lang: 'es' | 'en' }) {
   const cover = getPhoto(page.cover);
@@ -136,17 +162,21 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono }: {
 
       {(routeSec || strava) && (
         <section className="sv-route sv-bleed">
-          <div>
-            <span className="mono">{t('sv_route')}{race.location ? ` / ${race.location}` : ''}</span>
-            {routeSec && <div className="sv-route-txt"><RichText text={routeSec.body} /></div>}
-            {strava && <a className="mono sv-ul" href={strava.url} target="_blank" rel="noopener noreferrer">{t('sv_strava')} ↗</a>}
+          <div className="sv-route-head">
+            <div>
+              <span className="mono">{t('sv_route')}{race.location ? ` / ${race.location}` : ''}</span>
+              {routeSec && <div className="sv-route-txt"><RichText text={routeSec.body} /></div>}
+              {strava && <a className="mono sv-ul" href={strava.url} target="_blank" rel="noopener noreferrer">{t('sv_strava')} ↗</a>}
+            </div>
+            <dl className="sv-route-stats">
+              {page.stats[0] && <div><dt className="mono">{page.stats[0].label}</dt><dd>{page.stats[0].value}<small>{page.stats[0].unit}</small></dd></div>}
+              <div><dt className="mono">{t('sv_elevMax')}</dt><dd>{elev.max.toLocaleString('en-US')}<small>m</small></dd></div>
+              <div><dt className="mono">{t('sv_elevMin')}</dt><dd>{elev.min.toLocaleString('en-US')}<small>m</small></dd></div>
+            </dl>
           </div>
-          <div className="sv-route-art" aria-hidden><img src={`${B}/pyramid.png`} alt="" /><img className="sv-boxes" src={`${B}/boxes.png`} alt="" /></div>
           <figure className="sv-route-map">
-            <span className="mono sv-rm-tl">{t('sv_route')} / Trazo</span>
-            {page.stats[0] && <span className="mono sv-rm-tr">{`${page.stats[0].value} ${page.stats[0].unit}`.trim()}</span>}
             <img src={`${B}/route-map.png`} alt={race.location || t('sv_route')} loading="lazy" />
-            {race.location && <span className="mono sv-rm-bl">{race.location}</span>}
+            <ElevProfile t={t} />
           </figure>
         </section>
       )}
