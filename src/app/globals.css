@@ -702,3 +702,4 @@ a.sv-acc small{color:#f2f2f2}
 .sv-cta{display:inline-block;margin-top:18px;background:var(--sv-red);color:#fff;font-family:"JetBrains Mono",monospace;font-size:12px;letter-spacing:.12em;text-transform:uppercase;padding:10px 14px;position:relative}
 a.sv-acc:hover .sv-cta{background:#fff;color:#050505}
 .sv-cta{white-space:nowrap}@media (max-width:760px){.sv-cta{font-size:10.5px;letter-spacing:.06em;padding:10px 10px}}
+.sv-data b.sv-acc-t{font-size:clamp(30px,2.8vw,42px);font-weight:300;letter-spacing:-.02em;line-height:1.05}@media (max-width:760px){.sv-data b.sv-acc-t{font-size:26px}}

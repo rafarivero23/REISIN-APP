@@ -76,9 +76,9 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono }: {
         {!full && (
           <Link href={`/r/${race.id}/buy`} className="sv-acc">
             <img className="sv-el" src={`${B}/braille-red.png`} alt="" aria-hidden />
-            <span className="mono">{race.teams_left <= 20 ? t('sv_last') : t('sv_avail')}</span>
-            <b>{race.teams_left}<small>{t('sv_availUnit')}</small></b>
-            <span className="sv-cta">{t('sv_cta')} →</span>
+            <span className="mono">{t('sv_signup')}</span>
+            <b className="sv-acc-t">{t('sv_avail')}</b>
+            <span className="sv-cta">Join mission →</span>
           </Link>
         )}
       </section>
