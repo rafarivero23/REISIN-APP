@@ -167,6 +167,7 @@ export function PageEditor({ race, initial, uploads = [] }: { race: { id: string
           </div>
         </div>
         <Field id="pg-intro" label={t('pg_intro')} type="textarea" value={p.intro} onChange={(v) => setPage((x) => ({ ...x, intro: v }))} />
+        <Field id="pg-video" label={t('pg_video')} value={p.video} onChange={(v) => setPage((x) => ({ ...x, video: v }))} placeholder="https://vimeo.com/…" hint={t('pg_videoHint')} />
 
         <div className="stack" style={{ gap: 8 }}>
           <div className="label">{t('pg_links')}</div>
@@ -178,6 +179,22 @@ export function PageEditor({ race, initial, uploads = [] }: { race: { id: string
             </div>
           ))}
           <button type="button" className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setPage((x) => ({ ...x, links: [...x.links, { label: '', url: '' }] }))}>+ {t('pg_addLink')}</button>
+        </div>
+
+        <div className="stack" style={{ gap: 8 }}>
+          <div><div className="label">{t('pg_stats')}</div><p className="muted" style={{ fontSize: 13, marginTop: 2 }}>{t('pg_statsSub')}</p></div>
+          {p.stats.map((x, i) => {
+            const set = (k: 'value' | 'unit' | 'label') => (e: React.ChangeEvent<HTMLInputElement>) => setPage((pp) => ({ ...pp, stats: pp.stats.map((y, j) => (j === i ? { ...y, [k]: e.target.value } : y)) }));
+            return (
+              <div key={i} className="row" style={{ flexWrap: 'nowrap' }}>
+                <input aria-label={t('pg_statValue')} placeholder="120" value={x.value} onChange={set('value')} style={{ ...inp, width: 90 }} />
+                <input aria-label={t('pg_statUnit')} placeholder="km" value={x.unit} onChange={set('unit')} style={{ ...inp, width: 150 }} />
+                <input aria-label={t('pg_statLabel')} placeholder={t('pg_statLabel')} value={x.label} onChange={set('label')} style={{ ...inp, flex: 1 }} />
+                <button type="button" className="btn btn-ghost btn-sm" aria-label={t('del')} onClick={() => setPage((pp) => ({ ...pp, stats: pp.stats.filter((_, j) => j !== i) }))}>✕</button>
+              </div>
+            );
+          })}
+          {p.stats.length < 6 && <button type="button" className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setPage((x) => ({ ...x, stats: [...x.stats, { value: '', unit: '', label: '' }] }))}>+ {t('pg_addStat')}</button>}
         </div>
 
         <div className="stack" style={{ gap: 8 }}>

@@ -3,9 +3,10 @@ export type PageLink = { label: string; url: string };
 export type PageAgendaItem = { day: string; time: string; title: string; note: string };
 export type PageSection = { title: string; body: string };
 export type PageFaq = { q: string; a: string };
-export type PageData = { intro: string; links: PageLink[]; agenda: PageAgendaItem[]; sections: PageSection[]; cover: string; photos: string[]; faq: PageFaq[] };
+export type PageStat = { value: string; unit: string; label: string };
+export type PageData = { intro: string; links: PageLink[]; agenda: PageAgendaItem[]; sections: PageSection[]; cover: string; photos: string[]; faq: PageFaq[]; stats: PageStat[]; video: string };
 
-export const emptyPage = (): PageData => ({ intro: '', links: [], agenda: [], sections: [], cover: '', photos: [], faq: [] });
+export const emptyPage = (): PageData => ({ intro: '', links: [], agenda: [], sections: [], cover: '', photos: [], faq: [], stats: [], video: '' });
 
 import { isPhoto } from './photos';
 
@@ -29,9 +30,20 @@ export function cleanPage(p: any): PageData {
     agenda: arr(p?.agenda).slice(0, 40).map((a: any) => ({ day: s(a?.day, 40).trim(), time: s(a?.time, 20).trim(), title: s(a?.title, 140).trim(), note: s(a?.note, 300).trim() })).filter((a) => a.title),
     cover: isPhoto(p?.cover) ? p.cover : '',
     photos: Array.from(new Set(arr(p?.photos).filter(isPhoto))).slice(0, 24),
+    video: videoEmbed(s(p?.video, 300).trim()) ? s(p?.video, 300).trim() : '',
+    stats: arr(p?.stats).slice(0, 6).map((x: any) => ({ value: s(x?.value, 12).trim(), unit: s(x?.unit, 30).trim(), label: s(x?.label, 40).trim() })).filter((x) => x.value),
     faq: arr(p?.faq).slice(0, 40).map((x: any) => ({ q: s(x?.q, 200).trim(), a: s(x?.a, 3000).trim() })).filter((x) => x.q),
     sections: arr(p?.sections).slice(0, 20).map((x: any) => ({ title: s(x?.title, 100).trim(), body: s(x?.body, 6000).trim() })).filter((x) => x.title || x.body),
   };
+}
+
+// Background video for the hero: Vimeo or YouTube link → muted looping embed URL.
+export function videoEmbed(u: string): string | null {
+  const v = /vimeo\.com\/(?:video\/)?(\d+)/.exec(u || '');
+  if (v) return `https://player.vimeo.com/video/${v[1]}?background=1&autoplay=1&loop=1&muted=1&dnt=1`;
+  const y = /(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{11})/.exec(u || '');
+  if (y) return `https://www.youtube-nocookie.com/embed/${y[1]}?autoplay=1&mute=1&loop=1&playlist=${y[1]}&controls=0&playsinline=1&modestbranding=1`;
+  return null;
 }
 
 // Only http(s) and mailto links; "bajaxing.mx/faq" becomes https://…
@@ -52,6 +64,8 @@ export function cleanSlug(v: unknown): string {
 // Starting point copied from bajaxing.mx/registered — staff edit from here.
 export const BAJA_TEMPLATE: PageData = {
   faq: [],
+  stats: [],
+  video: '',
   cover: 'aerial-duo',
   photos: ['golden-runner', 'handoff', 'beach-duo', 'car-13', 'sunset-road', 'canyon-crowd', 'coast-runner', 'shades', 'desert-runner', 'road-crew', 'crowd-rocks'],
   intro: 'Bienvenido a Baja Crossing, el relevo de La Paz a Los Cabos. Aquí está todo lo que tu equipo necesita antes de la carrera.',
@@ -105,6 +119,12 @@ export const SAV_TEMPLATE: Omit<PageData, 'cover' | 'photos'> = {
     { label: 'reisin.mx/sav', url: 'https://reisin.mx/sav/' },
     { label: 'Instagram', url: 'https://www.instagram.com/reisin_reisin' },
   ],
+  video: 'https://vimeo.com/1107471888',
+  stats: [
+    { value: '120', unit: 'km', label: 'Distancia' },
+    { value: '5', unit: '+1 camioneta', label: 'Formato' },
+    { value: '1–5', unit: 'km por relevo', label: 'Relevos' },
+  ],
   agenda: [
     { day: 'Viernes 19 de febrero', time: '12:00 pm', title: 'Check-in en Fiesta Americana Ixtapan de la Sal', note: 'Llega a partir de las 12:00 pm y no después de las 5:30 pm.' },
     { day: 'Viernes 19 de febrero', time: '6:00 pm', title: 'Runners meeting', note: 'Instrucciones de carrera y dudas. Obligatoria para todo el equipo.' },
@@ -114,6 +134,10 @@ export const SAV_TEMPLATE: Omit<PageData, 'cover' | 'photos'> = {
     { day: 'Sábado 20 de febrero', time: '11:00 am', title: 'SAV Fest en Valle de Bravo', note: 'Fiesta de llegada con música, comida y chelas Reina.' },
   ],
   sections: [
+    {
+      title: 'La ruta',
+      body: 'De Ixtapan de la Sal a Valle de Bravo: montañas pobladas de pinos, carreteras calientes y volcanes helados. Relevos de 1 a 5 km; cada corredor corre entre 20 y 25 km, según la estrategia de su equipo.',
+    },
     {
       title: 'Incluye',
       body: [

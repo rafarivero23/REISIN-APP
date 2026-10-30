@@ -1,0 +1,184 @@
+import Link from 'next/link';
+import type { ReactNode } from 'react';
+import { videoEmbed, type PageData } from '@/lib/racepage';
+import type { Sponsor } from '@/lib/sponsors';
+import { getPhoto, photoSrc } from '@/lib/photos';
+import { money, fmtDate } from '@/lib/format';
+import { RichText } from './RichText';
+import { SponsorStrip } from './Sponsors';
+import { ReisinGlitch } from './ReisinGlitch';
+
+// Sal a Valle look (SAV27 brand kit): black, thin lines, mono labels,
+// one red accent, brand elements from the SAV .ai files in /public/brand/sav.
+type R = { id: string; slug: string | null; name: string; race_date: string | null; location: string | null; team_price: number; solo_price: number; teams_left: number };
+type T = (k: string) => string;
+
+const B = '/brand/sav';
+const pad = (n: number) => String(n).padStart(2, '0');
+
+export function SavHero({ race, page, lang }: { race: R; page: PageData; lang: 'es' | 'en' }) {
+  const cover = getPhoto(page.cover);
+  return (
+    <section className="sv-hero sv-bleed">
+      <div className="sv-intro-r" aria-hidden><ReisinGlitch /><span className="mono">Reisin presenta</span></div>
+      {cover && <img className="sv-hero-bg" src={photoSrc(cover.id)} alt="" style={{ objectPosition: cover.pos }} />}
+      {videoEmbed(page.video) && <iframe className="sv-hero-vid" src={videoEmbed(page.video)!} title="" aria-hidden tabIndex={-1} allow="autoplay; fullscreen; picture-in-picture" loading="eager" />}
+      <div className="sv-grid" aria-hidden />
+      <img className="sv-el sv-pyr" src={`${B}/pyramid.png`} alt="" aria-hidden />
+      <img className="sv-el sv-rings" src={`${B}/rings.png`} alt="" aria-hidden />
+      <img className="sv-el sv-plus" src={`${B}/plus-red.png`} alt="" aria-hidden />
+      <h1 className="sv-logo"><img src={`${B}/logo-27.png`} alt={race.name} /></h1>
+      <div className="sv-c sv-tl mono">Edición<b>SAV27</b></div>
+      <div className="sv-c sv-tr mono">{lang === 'en' ? 'Date' : 'Fecha'}<b>{fmtDate(race.race_date, lang)}</b></div>
+      {race.location && <div className="sv-c sv-bl mono">{lang === 'en' ? 'Route' : 'Ruta'}<b>{race.location}</b></div>}
+      <div className="sv-hud mono"><i />Field signal · SAV27</div>
+      <div className="sv-org mono">A race by <ReisinGlitch /></div>
+    </section>
+  );
+}
+
+export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono }: {
+  race: R; page: PageData; t: T; lang: 'es' | 'en'; showBoard: boolean; sponsors: Sponsor[]; mono: boolean;
+}) {
+  const strava = page.links.find((l) => /strava/i.test(l.url));
+  const routeSec = page.sections.find((s) => /ruta|route/i.test(s.title));
+  const otherSecs = page.sections.filter((s) => s !== routeSec);
+  const photos = page.photos.map(getPhoto).filter((p): p is NonNullable<typeof p> => !!p);
+  const thumb = (i: number) => (photos.length ? photoSrc(photos[i % photos.length].id, true) : null);
+  const ticker = ['Not your average race', ...page.stats.map((s) => `${s.value} ${s.unit}`.trim()), race.location, fmtDate(race.race_date, lang), t('sv_by')].filter(Boolean) as string[];
+  const full = race.teams_left <= 0;
+  const rows: { k: string; title: string; sub: string; href: string; price?: string; hot?: boolean; off?: boolean; img: string | null }[] = [
+    { k: 'A / ' + t('team'), title: t('p_buy'), sub: full ? t('p_fullRace') : t('p_buySub'), href: `/r/${race.id}/buy`, price: full ? t('sv_sold') : money(race.team_price, lang), hot: !full, off: full, img: thumb(0) },
+    ...(race.solo_price > 0 ? [{ k: 'B / Solo', title: 'Solo runner', sub: t('so_cardBuy').replace('{p}', money(race.solo_price, lang)), href: `/r/${race.id}/solo`, price: money(race.solo_price, lang), img: thumb(1) }] : []),
+    { k: 'C / ' + t('captain'), title: t('p_captain'), sub: t('p_captainSub'), href: `/r/${race.id}/captain`, img: thumb(2) },
+    { k: 'D / ' + t('runner_s'), title: t('p_join'), sub: t('p_joinSub'), href: `/r/${race.id}/join`, img: thumb(3) },
+    { k: 'E / Agente libre', title: t('fa_title'), sub: t('fa_cardSub'), href: `/r/${race.id}/agents`, img: thumb(4) },
+    ...(race.solo_price > 0 ? [] : [{ k: 'B / Solo', title: t('so_card'), sub: t('so_cardSub'), href: `/r/${race.id}/solo`, img: thumb(1) }]),
+  ];
+  const days: { day: string; items: PageData['agenda'] }[] = [];
+  for (const a of page.agenda) {
+    const last = days[days.length - 1];
+    if (last && last.day === a.day) last.items.push(a); else days.push({ day: a.day, items: [a] });
+  }
+  const flat = page.agenda;
+  const Head = ({ title, aside, icon }: { title: string; aside?: ReactNode; icon?: string }) => (
+    <div className="sv-sh"><h2>{title}{icon && <img src={`${B}/${icon}`} alt="" aria-hidden />}</h2>{aside && <span className="mono">{aside}</span>}</div>
+  );
+
+  return (
+    <>
+      <div className="sv-ticker sv-bleed mono" aria-hidden><div>{[...ticker, ...ticker].map((x, i) => <span key={i}>✚ {x}</span>)}</div></div>
+
+      <section className="sv-data sv-bleed">
+        {page.stats.map((s, i) => (
+          <div key={i}><span className="mono">{pad(i + 1)} / {s.label}</span><b>{s.value}<small>{s.unit}</small></b></div>
+        ))}
+        {!full && (
+          <div className="sv-acc">
+            <img className="sv-el" src={`${B}/braille-red.png`} alt="" aria-hidden />
+            <span className="mono">{pad(page.stats.length + 1)} / {race.teams_left <= 20 ? t('sv_last') : t('sv_left')}</span>
+            <b>{race.teams_left}<small>{t('sv_leftUnit')}</small></b>
+          </div>
+        )}
+      </section>
+
+      {page.intro && <div className="sv-intro sv-bleed"><RichText text={page.intro} /></div>}
+
+      {(showBoard || page.links.length > 0) && (
+        <div className="sv-links sv-bleed">
+          {showBoard && <Link href={`/r/${race.slug || race.id}/leaderboard`} className="mono sv-live"><i />{t('lb_title')}</Link>}
+          {page.links.map((l, i) => <a key={i} className="mono" href={l.url} target={l.url.startsWith('mailto:') ? undefined : '_blank'} rel="noopener noreferrer">{l.label} ↗</a>)}
+        </div>
+      )}
+
+      <Head title={t('sv_signup')} aside={t('sv_pick')} icon="head.png" />
+      <section className="sv-acts sv-bleed">
+        {rows.map((x) => (
+          <Link key={x.href + x.k} href={x.href} className={'sv-row' + (x.hot ? ' hot' : '')} aria-disabled={x.off || undefined}>
+            <span className="mono">{x.k}</span>
+            <h3>{x.title}</h3>
+            <p>{x.sub}</p>
+            {x.price ? <span className="sv-price">{x.price}</span> : x.img ? <span className="sv-thumb" style={{ backgroundImage: `url(${x.img})` }} /> : <span />}
+            <span className="sv-go" aria-hidden>→</span>
+          </Link>
+        ))}
+      </section>
+
+      {flat.length > 0 && (
+        <>
+          <Head title={t('pg_agenda')} aside={days.map((d) => d.day).join(' · ')} />
+          <section className="sv-tl sv-bleed">
+            <ol>
+              {flat.map((a, i) => {
+                const firstOfDay = i === 0 || flat[i - 1].day !== a.day;
+                return (
+                  <li key={i} className={i === flat.length - 1 ? 'end' : ''}>
+                    <span className="mono sv-day">{firstOfDay ? a.day : ' '}</span>
+                    <span className="sv-dot" aria-hidden />
+                    <span className="mono">{a.time}</span>
+                    <b>{a.title}</b>
+                    {a.note && <p><RichText text={a.note} /></p>}
+                  </li>
+                );
+              })}
+            </ol>
+          </section>
+        </>
+      )}
+
+      {(routeSec || strava) && (
+        <section className="sv-route sv-bleed">
+          <div>
+            <span className="mono">{t('sv_route')}{race.location ? ` / ${race.location}` : ''}</span>
+            {routeSec && <div className="sv-route-txt"><RichText text={routeSec.body} /></div>}
+            {strava && <a className="mono sv-ul" href={strava.url} target="_blank" rel="noopener noreferrer">{t('sv_strava')} ↗</a>}
+          </div>
+          <div className="sv-route-art" aria-hidden><img src={`${B}/pyramid.png`} alt="" /><img className="sv-boxes" src={`${B}/boxes.png`} alt="" /></div>
+        </section>
+      )}
+
+      {photos.length > 0 && (
+        <>
+          <Head title={t('sv_photos')} aside={`${photos.length}`} />
+          <section className="sv-gal sv-bleed">
+            {photos.slice(0, 7).map((p, i) => (
+              <a key={p.id} href={photoSrc(p.id)} target="_blank" rel="noreferrer" style={{ backgroundImage: `url(${photoSrc(p.id, i > 0)})` }}>
+                {i === 0 && <img className="sv-el sv-frames" src={`${B}/frames.png`} alt="" aria-hidden />}
+                <span className="mono">{pad(i + 1)}</span>
+              </a>
+            ))}
+          </section>
+        </>
+      )}
+
+      {otherSecs.map((s, i) => (
+        <div key={i}>
+          <Head title={s.title} aside={pad(i + 1)} icon={i === 0 ? 'plus-red.png' : undefined} />
+          <section className="sv-sec sv-bleed"><RichText text={s.body} /></section>
+        </div>
+      ))}
+
+      {page.faq.length > 0 && (
+        <>
+          <Head title="FAQ" aside={`${page.faq.length}`} />
+          <section className="sv-faq sv-bleed">
+            {page.faq.map((f, i) => (
+              <details key={i}>
+                <summary><span className="mono">{pad(i + 1)}</span><span>{f.q}</span><i aria-hidden>+</i></summary>
+                <div className="sv-faq-a"><RichText text={f.a} /></div>
+              </details>
+            ))}
+          </section>
+        </>
+      )}
+
+      <SponsorStrip sponsors={sponsors} mono={mono} title={t('sp_title')} />
+
+      <footer className="sv-foot sv-bleed">
+        <img className="sv-el sv-foot-rings" src={`${B}/rings.png`} alt="" aria-hidden />
+        <img className="sv-foot-logo" src={`${B}/logo-27.png`} alt="SAV27" />
+        <div className="sv-foot-by"><ReisinGlitch /><span className="mono">{t('sv_by')}</span></div>
+      </footer>
+    </>
+  );
+}

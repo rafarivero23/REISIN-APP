@@ -16,6 +16,7 @@ import { sponsorsOf, sponsorMono } from '@/lib/sponsors';
 import { SponsorStrip } from '@/components/Sponsors';
 import { brandKey, fmtDate } from '@/lib/format';
 import { HandFrame } from '@/components/HandFrame';
+import { SavHero, SavLanding } from '@/components/SavLanding';
 
 export default async function RaceChoice({ params }: { params: { raceId: string } }) {
   const { t, lang } = getT();
@@ -37,8 +38,21 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
       <p>{fmtDate(r.race_date, lang)}{r.location ? ' · ' + r.location : ''}</p>
     </PhotoHero>
   );
+  // Sal a Valle: its own full-width landing (SAV27 brand kit).
+  const sv = brandKey(r.brand) === 'sav';
+  const svRace = { id: r.id, slug: raw.slug, name: r.name, race_date: r.race_date, location: r.location, team_price: r.team_price, solo_price: raw.solo_price, teams_left: r.teams_left };
+  const locked = !!raw.access_code && !(await hasRaceAccess(raw.id, raw.access_code)) && !(await getCurrentUser());
+  if (sv) {
+    return (
+      <div className="sv" style={{ display: 'contents' }}>
+        <SavHero race={svRace} page={page} lang={lang} />
+        {locked ? <div className="sv-gate"><RaceGate raceId={r.id} /></div>
+          : <SavLanding race={svRace} page={page} t={t} lang={lang} showBoard={showBoard} sponsors={sponsors} mono={mono} />}
+      </div>
+    );
+  }
   // Password-protected page: staff always get in (to preview).
-  if (raw.access_code && !(await hasRaceAccess(raw.id, raw.access_code)) && !(await getCurrentUser())) {
+  if (locked) {
     return (
       <div className={theme} style={{ display: 'contents' }}>
         {hero}
