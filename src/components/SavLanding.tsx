@@ -9,6 +9,7 @@ import { SponsorStrip } from './Sponsors';
 import { ReisinGlitch } from './ReisinGlitch';
 import { SAV_ELEV } from '@/lib/savRoute';
 import { SavGallery } from './SavGallery';
+import { BxRoute } from './BxRoute';
 
 // Sal a Valle look (SAV27 brand kit): black, thin lines, mono labels,
 // one red accent, brand elements from the SAV .ai files in /public/brand/sav.
@@ -188,7 +189,16 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono, kit
         </>
       )}
 
-      {(routeSec || strava) && (
+      {kit.key === 'bx' ? (
+        <>
+          <Head title={t('sv_route')} aside={race.location || undefined} icon={icon()} />
+          <BxRoute km={page.stats.find((x) => /km/i.test(x.unit))?.value} l={{
+            route: `${t('sv_route')}${race.location ? ` / ${race.location}` : ''}`, strava: strava?.url, stravaLabel: t('sv_strava'),
+            text: routeSec ? <RichText text={routeSec.body} /> : undefined,
+            dist: t('sv_dist'), max: t('sv_elevMax'), cps: t('sv_cps'), start: 'La Paz', finish: 'San José del Cabo', elev: t('sv_elevHint'),
+          }} />
+        </>
+      ) : (routeSec || strava) && (
         <section className="sv-route sv-bleed">
           <div className="sv-route-head">
             <div>

@@ -871,3 +871,43 @@ a.sv-acc:hover .sv-cta{background:#fff;color:#050505}
 .bxl .sv-foot-logo{width:auto;height:clamp(110px,12vw,160px);max-width:none}
 .bxl .sv-foot-rings{width:150px;top:50%;transform:translate(-50%,-50%)}
 @media (max-width:760px){.bxl .sv-foot-logo{height:110px}}
+/* Baja route (grey map traced from Strava + scrubbable elevation) */
+.bxr{display:grid;grid-template-columns:1.25fr 1fr;border-bottom:1px solid var(--line)}
+.bxr-map{border-right:1px solid var(--line);background:#161718;overflow:hidden}
+.bxr-map svg{display:block;width:100%;height:auto}
+.bxr .land{fill:#2a2b2d;stroke:rgba(255,255,255,.28);stroke-width:.8}
+.bxr .sea{fill:rgba(255,255,255,.22);font:600 9px "Archivo",sans-serif;letter-spacing:.32em}
+.bxr .rt-glow{fill:none;stroke:rgba(255,255,255,.12);stroke-width:9;stroke-linecap:round;stroke-linejoin:round}
+.bxr .rt{fill:none;stroke:#f2f2f0;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1;transition:stroke-dashoffset 2.8s cubic-bezier(.6,.1,.2,1)}
+.bxr.on .rt{stroke-dashoffset:0}
+.bxr .cp{opacity:0;transition:opacity .4s}.bxr.on .cp{opacity:1}
+.bxr .cp circle{fill:#1b1c1d;stroke:#cfcfcc;stroke-width:1.6}
+.bxr text{fill:#bdbdba;font:600 9.5px "Archivo",sans-serif;letter-spacing:.14em;text-transform:uppercase}
+.bxr .pin text{fill:#f2f2f0;font-family:"Baja Crossing",sans-serif;font-size:15px;letter-spacing:.04em;font-weight:400}
+.bxr .pin circle,.bxr .pin rect{fill:#f2f2f0}
+.bxr .pulse{fill:none!important;stroke:#f2f2f0;stroke-width:1.4;transform-box:fill-box;transform-origin:center;animation:bxPulse 2s ease-out infinite}
+@keyframes bxPulse{from{transform:scale(1);opacity:.9}to{transform:scale(3.4);opacity:0}}
+.bxr .end rect{fill:url(#bxr-dots);stroke:#f2f2f0;stroke-width:2}
+.bxr .here circle{fill:#f2f2f0}.bxr .here .ring{fill:rgba(242,242,240,.15);stroke:#f2f2f0;stroke-width:1}
+.bxr .nrose path{fill:#9a9a97}.bxr .nrose text{font-size:9px}
+.bxr-side{padding:40px 32px 32px;display:flex;flex-direction:column;gap:22px;min-width:0}
+.bxr-stats{display:grid;grid-template-columns:repeat(3,auto);justify-content:start;gap:0;margin:0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.bxr-stats>div{padding:16px 26px 16px 0;margin-right:26px;border-right:1px solid var(--line)}
+.bxr-stats>div:last-child{border-right:0}
+.bxr-stats dd{margin:8px 0 0;font-family:var(--f-title);font-size:44px;line-height:1;white-space:nowrap}
+.bxr-stats small{font-family:"Archivo",sans-serif;font-size:14px;color:var(--muted);margin-left:4px;text-transform:none}
+.bxr-elev{position:relative;padding:28px 0 22px;cursor:crosshair;touch-action:pan-y}
+.bxr-read{position:absolute;top:0;left:0;color:#cfcfcc!important}
+.bxr-read b{color:#f2f2f0;font-weight:800}
+.bxr-elev svg{display:block;width:100%;height:150px}
+.bxr-elev .a{fill:rgba(255,255,255,.1)}.bxr-elev .l{fill:none;stroke:#e6e6e3;stroke-width:1.3}
+.bxr-elev .g{stroke:rgba(255,255,255,.07);stroke-dasharray:3 5}
+.bxr-elev .c{stroke:rgba(255,255,255,.25);stroke-dasharray:2 3}
+.bxr-elev .h{stroke:#f2f2f0;stroke-width:1}
+.bxr-x{position:absolute;left:0;right:0;bottom:0;height:12px}
+.bxr-x span{position:absolute;top:0;font-size:9.5px}
+@media (max-width:900px){.bxr{grid-template-columns:1fr}.bxr-map{border-right:0;border-bottom:1px solid var(--line)}.bxr-side{padding:28px 18px}.bxr-stats dd{font-size:32px}.bxr-stats>div{padding-right:16px;margin-right:16px}}
+@media (prefers-reduced-motion:reduce){.bxr .rt{transition:none;stroke-dashoffset:0}.bxr .cp{opacity:1}.bxr .pulse{animation:none}}
+.bxr-side{justify-content:center}
+@media (min-width:901px){.bxr-elev svg{height:200px}}
+@media (max-width:900px){.bxr-stats{grid-template-columns:repeat(3,1fr)}.bxr-stats dt{font-size:9px}}
