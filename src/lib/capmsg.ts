@@ -47,7 +47,8 @@ export function captainMessage(
   const due = settleDue(team, race);
   if (due > 0) {
     body += '\n\n' + tr('capMsgSettle')
-      .replace('{paid}', team.amount && team.payment_status === 'paid' ? ' ' + tr('capMsgOf') + ' ' + money(team.amount, lang) : '')
+      // team.amount is the race price, not what the deposit was, so no amount here.
+      .replace('{paid}', '')
       .replace('{amount}', money(due, lang))
       .replace('{deadline}', race.settle_deadline ? ' ' + tr('capMsgDeadline').replace('{date}', dayMonth(race.settle_deadline, lang)) : '');
   }
