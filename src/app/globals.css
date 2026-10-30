@@ -310,8 +310,10 @@ a.btn-primary{color:var(--accent-ink)}
 
 /* Baja Crossing title font (one weight; missing glyphs like $ : / fall back to Barlow) */
 @font-face{font-family:"Baja Crossing";src:url(/fonts/BajaCrossing.woff2) format("woff2");font-weight:400;font-style:normal;font-display:swap;size-adjust:118%}
-:root{--f-title:"Baja Crossing","Barlow Condensed","Arial Narrow",system-ui,sans-serif}
-h1,h2,h3,.choice b,.choice a b,.race-card h3,.section-t{font-family:var(--f-title);font-weight:400;font-synthesis:none;letter-spacing:.02em;text-transform:uppercase}
+:root{--f-title:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;--f-title-w:800}
+/* The BajaCrossing font belongs to Baja Crossing only (.bx theme and Baja race cards). */
+.portal:has(.bx),.bx,.race-card.baja{--f-title:"Baja Crossing","Barlow Condensed","Arial Narrow",system-ui,sans-serif;--f-title-w:400}
+h1,h2,h3,.choice b,.choice a b,.race-card h3,.section-t{font-family:var(--f-title);font-weight:var(--f-title-w);font-synthesis:none;letter-spacing:.02em;text-transform:uppercase}
 .hero h1{line-height:.95}
 
 /* password show/hide */
