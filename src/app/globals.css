@@ -863,3 +863,7 @@ a.sv-acc:hover .sv-cta{background:#fff;color:#050505}
 .bxl .sv-foot-logo{max-width:min(420px,70vw)}
 .bxl .sv-foot-rings{opacity:.08!important}
 @media (max-width:760px){.bxl .sv-plus{width:40px;bottom:auto;top:190px}.bxl .sv-rings{top:150px}}
+/* Baja hero: only the Baja Crossing logo; it dissolves after 5s to leave the video/photo */
+.bxl .sv-logo{animation:svIn 1.2s cubic-bezier(.2,.8,.2,1) both,bxDissolve 1.6s ease-in 5s forwards}
+@keyframes bxDissolve{0%{opacity:1;filter:drop-shadow(0 6px 40px rgba(0,0,0,.6)) blur(0)}60%{opacity:.5;filter:blur(6px)}100%{opacity:0;filter:blur(18px);transform:translate(-50%,-50%) scale(1.06)}}
+@media (prefers-reduced-motion:reduce){.bxl .sv-logo{animation:none}}

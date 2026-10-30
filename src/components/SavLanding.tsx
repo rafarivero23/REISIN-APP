@@ -30,7 +30,7 @@ export const SAV_KIT: Kit = {
 };
 export const BX_KIT: Kit = {
   key: 'bx', base: '/brand/bx', logo: 'logo.png', ed: 'BX', hud: 'Desert signal', tagline: 'Cruce peligroso', tick: '✱',
-  hero: [{ src: 'bolts.png', cls: 'sv-pyr' }, { src: 'patch.png', cls: 'sv-rings' }, { src: 'cactus.png', cls: 'sv-plus' }],
+  hero: [{ src: 'patch.png', cls: 'sv-rings' }, { src: 'cactus.png', cls: 'sv-plus' }],
   acc: 'roadrunner.png', icons: ['meta.png', 'km-muerto.png', 'last-taco.png', 'oasis.png', 'rest.png', 'cruce.png'], galFrame: 'bc.png', foot: 'bolts2.png',
   ctaTeam: 'Join the crew', ctaSolo: 'Solo race',
 };
