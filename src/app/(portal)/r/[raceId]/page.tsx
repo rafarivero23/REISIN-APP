@@ -103,6 +103,19 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
           ))}
         </div>
       )}
+      {page.faq.length > 0 && (
+        <section className="rp-faq stack" style={{ gap: 12 }}>
+          <h2 style={{ fontSize: 28 }}><span className="hb"><HandFrame seed={45} />{t('pg_faq')}</span></h2>
+          <div className="card rp-faq-list">
+            {page.faq.map((f, i) => (
+              <details key={i}>
+                <summary>{f.q}</summary>
+                <div className="rp-faq-a"><RichText text={f.a} /></div>
+              </details>
+            ))}
+          </div>
+        </section>
+      )}
       <PhotoGallery photos={page.photos} title={t('pg_gallery')} />
       {sponsorStrip}
     </div>

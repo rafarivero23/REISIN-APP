@@ -5,7 +5,7 @@ import { useT } from './I18n';
 import { Field, useToast, useCopy } from './ui';
 import { RichText } from './RichText';
 import { unlockRace, saveRacePage } from '@/app/actions/racepage';
-import { BAJA_TEMPLATE, cleanSlug, type PageData } from '@/lib/racepage';
+import { BAJA_TEMPLATE, SAV_TEMPLATE, cleanSlug, type PageData } from '@/lib/racepage';
 import { PHOTOS, photoSrc, defaultCover, type Photo } from '@/lib/photos';
 import { uploadRacePhoto, deleteRacePhoto } from '@/app/actions/photos';
 
@@ -127,6 +127,9 @@ export function PageEditor({ race, initial, uploads = [] }: { race: { id: string
           {/baja/i.test(race.brand + race.name) && (
             <button type="button" className="btn btn-sm" onClick={() => { if (!p.sections.length || confirm(t('pg_templateConfirm'))) setPage(() => BAJA_TEMPLATE); }}>{t('pg_template')}</button>
           )}
+          {/(sal a valle|\bsav\b)/i.test(race.brand + ' ' + race.name) && (
+            <button type="button" className="btn btn-sm" onClick={() => { if (!(p.sections.length || p.faq.length || p.agenda.length) || confirm(t('pg_templateConfirm'))) setPage((x) => ({ ...SAV_TEMPLATE, cover: x.cover, photos: x.photos })); }}>{t('pg_templateSav')}</button>
+          )}
         </div>
         <PhotoUploader raceId={race.id} uploads={uploads} onAdded={(ids) => setPage((x) => ({ ...x, photos: [...ids, ...x.photos] }))}
           onRemoved={(id) => setPage((x) => ({ ...x, photos: x.photos.filter((y) => y !== id), cover: x.cover === id ? '' : x.cover }))} />
@@ -217,6 +220,23 @@ export function PageEditor({ race, initial, uploads = [] }: { race: { id: string
           ))}
           <button type="button" className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setPage((x) => ({ ...x, sections: [...x.sections, { title: '', body: '' }] }))}>+ {t('pg_addSection')}</button>
           <p className="muted" style={{ fontSize: 12 }}>{t('pg_formatHelp')}</p>
+        </div>
+
+        <div className="stack" style={{ gap: 10 }}>
+          <div className="label">{t('pg_faq')} · {p.faq.length}</div>
+          {p.faq.map((f, i) => (
+            <div key={i} className="card stack" style={{ padding: 14, gap: 8, background: 'var(--surface-2)' }}>
+              <div className="row" style={{ flexWrap: 'nowrap' }}>
+                <input aria-label={t('pg_faqQ')} placeholder={t('pg_faqQ')} value={f.q} style={{ ...inp, flex: 1, fontWeight: 600 }} onChange={(e) => setPage((pp) => ({ ...pp, faq: pp.faq.map((y, j) => (j === i ? { ...y, q: e.target.value } : y)) }))} />
+                <button type="button" className="btn btn-ghost btn-sm" aria-label="↑" onClick={() => setPage((pp) => ({ ...pp, faq: move(pp.faq, i, -1) }))}>↑</button>
+                <button type="button" className="btn btn-ghost btn-sm" aria-label="↓" onClick={() => setPage((pp) => ({ ...pp, faq: move(pp.faq, i, 1) }))}>↓</button>
+                <button type="button" className="btn btn-ghost btn-sm" aria-label={t('del')} onClick={() => setPage((pp) => ({ ...pp, faq: pp.faq.filter((_, j) => j !== i) }))}>✕</button>
+              </div>
+              <textarea aria-label={t('pg_faqA')} placeholder={t('pg_faqA')} value={f.a} rows={Math.min(10, Math.max(3, f.a.split('\n').length + 1))} style={{ ...inp, width: '100%', resize: 'vertical' }}
+                onChange={(e) => setPage((pp) => ({ ...pp, faq: pp.faq.map((y, j) => (j === i ? { ...y, a: e.target.value } : y)) }))} />
+            </div>
+          ))}
+          <button type="button" className="btn btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setPage((x) => ({ ...x, faq: [...x.faq, { q: '', a: '' }] }))}>+ {t('pg_addFaq')}</button>
         </div>
       </div>
 

@@ -2,9 +2,10 @@
 export type PageLink = { label: string; url: string };
 export type PageAgendaItem = { day: string; time: string; title: string; note: string };
 export type PageSection = { title: string; body: string };
-export type PageData = { intro: string; links: PageLink[]; agenda: PageAgendaItem[]; sections: PageSection[]; cover: string; photos: string[] };
+export type PageFaq = { q: string; a: string };
+export type PageData = { intro: string; links: PageLink[]; agenda: PageAgendaItem[]; sections: PageSection[]; cover: string; photos: string[]; faq: PageFaq[] };
 
-export const emptyPage = (): PageData => ({ intro: '', links: [], agenda: [], sections: [], cover: '', photos: [] });
+export const emptyPage = (): PageData => ({ intro: '', links: [], agenda: [], sections: [], cover: '', photos: [], faq: [] });
 
 import { isPhoto } from './photos';
 
@@ -28,6 +29,7 @@ export function cleanPage(p: any): PageData {
     agenda: arr(p?.agenda).slice(0, 40).map((a: any) => ({ day: s(a?.day, 40).trim(), time: s(a?.time, 20).trim(), title: s(a?.title, 140).trim(), note: s(a?.note, 300).trim() })).filter((a) => a.title),
     cover: isPhoto(p?.cover) ? p.cover : '',
     photos: Array.from(new Set(arr(p?.photos).filter(isPhoto))).slice(0, 24),
+    faq: arr(p?.faq).slice(0, 40).map((x: any) => ({ q: s(x?.q, 200).trim(), a: s(x?.a, 3000).trim() })).filter((x) => x.q),
     sections: arr(p?.sections).slice(0, 20).map((x: any) => ({ title: s(x?.title, 100).trim(), body: s(x?.body, 6000).trim() })).filter((x) => x.title || x.body),
   };
 }
@@ -49,6 +51,7 @@ export function cleanSlug(v: unknown): string {
 
 // Starting point copied from bajaxing.mx/registered — staff edit from here.
 export const BAJA_TEMPLATE: PageData = {
+  faq: [],
   cover: 'aerial-duo',
   photos: ['golden-runner', 'handoff', 'beach-duo', 'car-13', 'sunset-road', 'canyon-crowd', 'coast-runner', 'shades', 'desert-runner', 'road-crew', 'crowd-rocks'],
   intro: 'Bienvenido a Baja Crossing, el relevo de La Paz a Los Cabos. Aquí está todo lo que tu equipo necesita antes de la carrera.',
@@ -90,5 +93,71 @@ export const BAJA_TEMPLATE: PageData = {
       ].join('\n'),
     },
     { title: 'Hoteles en Los Cabos', body: 'Por confirmar.' },
+  ],
+};
+
+// Starting point copied from reisin.mx/sav (Sal a Valle 2027), cleaned up so
+// it matches what captains were told (liquidación before Dec 1).
+export const SAV_TEMPLATE: Omit<PageData, 'cover' | 'photos'> = {
+  intro: 'Bienvenidos a SAV27, la novena edición de Sal a Valle, presentada por Nike Running: 120 km en relevos de Ixtapan de la Sal a Valle de Bravo, cruzando montañas pobladas de pinos, carreteras calientes y volcanes helados.\n\nEn esta página registras a tu equipo y a tus corredores, haces cambios y pagas la liquidación de tu equipo. La iremos actualizando con toda la información.',
+  links: [
+    { label: 'Ruta en Strava', url: 'https://www.strava.com/routes/3443436604377812702' },
+    { label: 'reisin.mx/sav', url: 'https://reisin.mx/sav/' },
+    { label: 'Instagram', url: 'https://www.instagram.com/reisin_reisin' },
+  ],
+  agenda: [
+    { day: 'Viernes 19 de febrero', time: '12:00 pm', title: 'Check-in en Fiesta Americana Ixtapan de la Sal', note: 'Llega a partir de las 12:00 pm y no después de las 5:30 pm.' },
+    { day: 'Viernes 19 de febrero', time: '6:00 pm', title: 'Runners meeting', note: 'Instrucciones de carrera y dudas. Obligatoria para todo el equipo.' },
+    { day: 'Viernes 19 de febrero', time: '7:00 pm', title: 'Cena de competidores', note: 'Incluida para los 5 corredores del equipo.' },
+    { day: 'Sábado 20 de febrero', time: '3:00 am', title: 'Salida Solo Runners', note: '120 km · tiempo límite 19 horas.' },
+    { day: 'Sábado 20 de febrero', time: '5:00 am', title: 'Salida equipos', note: 'Antes de arrancar: coffee break y snacks para desayunar.' },
+    { day: 'Sábado 20 de febrero', time: '11:00 am', title: 'SAV Fest en Valle de Bravo', note: 'Fiesta de llegada con música, comida y chelas Reina.' },
+  ],
+  sections: [
+    {
+      title: 'Incluye',
+      body: [
+        '- Inscripción para 5 corredores.',
+        '- Hospedaje en el Hotel Fiesta Americana Ixtapan de la Sal la noche del viernes 19: 2 habitaciones con dos camas queen por equipo.',
+        '- Race kit, mapas detallados de la ruta, bandera, viniles para la camioneta y muchas sorpresas más (not your average race pack).',
+        '- Cena de bienvenida para los 5 corredores en Ixtapan de la Sal.',
+        '- Fiesta de llegada en Valle de Bravo con comida y chelas Reina.',
+      ].join('\n'),
+    },
+    {
+      title: 'Responsabilidad del equipo',
+      body: [
+        '- Juntar 5 corredores capaces de cruzar de Ixtapan de la Sal a Valle de Bravo.',
+        '- Diseñar un logo de equipo y subirlo en tu panel de capitán.',
+        '- Camioneta de máximo 6 m de largo y 2 m de ancho.',
+        '- Llevar sus comidas, snacks, hidratación y kit de primeros auxilios.',
+        '- Usar ropa reflejante, poner un letrero de **"Cuidado: corredores"**, pintar la camioneta, armar una buena playlist y no olvidar el papel de baño.',
+      ].join('\n'),
+    },
+    {
+      title: 'Seguridad',
+      body: 'El Gobierno del Estado de México proporcionará seguridad federal y estatal durante la ruta y controlará carreteras y tráfico. Habrá checkpoints con staff de SAV cada 30 km y cuatro estaciones de primeros auxilios. Unos días antes de la carrera te mandamos el teléfono de emergencia.',
+    },
+    {
+      title: 'Pagos',
+      body: [
+        '- El apartado del equipo no es reembolsable, pero sí transferible.',
+        '- La liquidación del equipo se paga desde tu panel de capitán antes del **1 de diciembre**.',
+      ].join('\n'),
+    },
+  ],
+  faq: [
+    { q: '¿Tenemos hospedaje incluido?', a: 'Sí, en Ixtapan de la Sal la noche del viernes 19: 2 habitaciones con dos camas queen por equipo. No hay hospedaje incluido en Valle de Bravo.' },
+    { q: '¿Habrá algún servicio para dejar nuestras maletas?', a: 'Sí, habrá bag check: una maleta por corredor. La dejas en Ixtapan de la Sal y la recoges al llegar a Valle de Bravo.' },
+    { q: '¿Habrá puntos de hidratación y comida?', a: 'No habrá estaciones de hidratación en la ruta; cada equipo lleva la comida y snacks que va a consumir durante la carrera.\n\nEl viernes en la noche hay cena de competidores y el sábado, antes de arrancar, una barra de coffee break y snacks para desayunar.' },
+    { q: '¿A qué hora tenemos que llegar el viernes a Ixtapan de la Sal?', a: 'A partir de las 12:00 pm. Te recomendamos no llegar después de las 5:30 pm: a las 6:00 pm es la plática con instrucciones y dudas antes de la carrera.' },
+    { q: '¿Qué equipo y ropa tenemos que llevar?', a: 'Durante la carrera hay cambios de clima drásticos, así que lleva ropa para calor y para frío. No necesitas tenis de trail.\n\nBásicos:\n- Ropa reflejante\n- Bloqueador solar\n- Guantes\n- Gorra\n- Repelente\n- Lentes de sol' },
+    { q: '¿Cuál es la distancia total y cuántos km corre cada integrante?', a: 'Son 120 km en total. Cada corredor corre entre 20 y 25 km en relevos de 1 a 5 km, según la estrategia de su equipo. Revisa la [ruta en Strava](https://www.strava.com/routes/3443436604377812702).' },
+    { q: '¿Es obligatorio seguir el manual de ruta?', a: 'Es obligatorio seguir la ruta marcada. Cómo y dónde hacen los relevos lo decide cada equipo.' },
+    { q: '¿Habrá seguridad y primeros auxilios?', a: 'Sí. La carrera cuenta con el apoyo de la Secretaría de Seguridad del Estado. Habrá checkpoints con staff de SAV cada 30 km y cuatro estaciones de primeros auxilios (vienen en el manual de ruta). Unos días antes te mandamos el teléfono de emergencia.' },
+    { q: '¿La camioneta acompaña al corredor toda la carrera?', a: 'En cerca del 80% de la ruta la camioneta puede ir detrás del corredor. En el manual de ruta vienen las indicaciones de cada tramo para el corredor y para la camioneta.' },
+    { q: '¿Tenemos que llevar un conductor?', a: 'Pueden llevar un conductor extra, pero te recomendamos que los 5 corredores se turnen el volante: van más cómodos y es parte de la experiencia.' },
+    { q: '¿Podemos tener porras y acompañantes?', a: 'Las porras solo pueden estar en el km 100 o en la meta en Valle de Bravo. No se permiten porras en la ruta ni acompañantes en las camionetas (salvo el conductor extra, si llevan uno).' },
+    { q: '¿Podemos invitar a familiares y amigos al evento de llegada?', a: 'Sí. En Valle de Bravo habrá un evento de llegada con música, comida y bebidas para los corredores. Tus invitados pueden entrar con un costo adicional por persona.' },
   ],
 };
