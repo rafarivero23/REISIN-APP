@@ -73,7 +73,7 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
         <Link href={`/r/${r.id}/captain`} className="hb"><HandFrame seed={2} /><b>{t('p_captain')}</b><span>{t('p_captainSub')}</span></Link>
         <Link href={`/r/${r.id}/join`} className="hb"><HandFrame seed={3} /><b>{t('p_join')}</b><span>{t('p_joinSub')}</span></Link>
         <Link href={`/r/${r.id}/agents`} className="hb"><HandFrame seed={4} /><b>{t('fa_title')}</b><span>{t('fa_cardSub')}</span></Link>
-        <Link href={`/r/${r.id}/solo`} className="hb"><HandFrame seed={5} /><b>{t('so_card')}</b><span>{t('so_cardSub')}</span></Link>
+        <Link href={`/r/${r.id}/solo`} className="hb"><HandFrame seed={5} /><b>{t('so_card')}</b><span>{raw.solo_price > 0 ? t('so_cardBuy').replace('{p}', money(raw.solo_price, lang)) : t('so_cardSub')}</span></Link>
       </div>
       {(days.length > 0 || page.sections.length > 0) && (
         <div className="rp-grid">

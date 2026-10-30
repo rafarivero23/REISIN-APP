@@ -9,7 +9,7 @@ import { money, splitCats, brandPrefix, SIZES } from '@/lib/format';
 import { fmtHalf } from '@/lib/groups';
 import { LogoInput } from './LogoInput';
 import {
-  buyTeam, confirmTeam, captainLogin, captainLogout, setTeamPassword, captainPayRunner, captainPaySlots, confirmSlots, setTeamDetails, joinTeam, registerRunner,
+  buyTeam, buySolo, confirmTeam, captainLogin, captainLogout, setTeamPassword, captainPayRunner, captainPaySlots, confirmSlots, setTeamDetails, joinTeam, registerRunner,
   confirmRunner, retryRunnerPayment, captainRunnerDetails, captainUpdateRunner, captainRemoveRunner, captainStartRegister, captainUpdateContact, soloAcceptWaiver, captainWaiverLink, captainPaySettle, confirmSettle,
 } from '@/app/actions/portal';
 
@@ -87,11 +87,11 @@ export function TeamCreated() {
   const copy = useCopy();
   const q = useSearchParams();
   const teamId = q.get('team') || '', sessionId = q.get('session_id') || undefined;
-  const [s, setS] = useState<{ loading?: boolean; error?: string; code?: string }>({ loading: true });
+  const [s, setS] = useState<{ loading?: boolean; error?: string; code?: string; solo?: boolean }>({ loading: true });
   const [pw, setPw] = useState('');
   const [err, setErr] = useState<string | null>(null);
   useEffect(() => {
-    confirmTeam({ teamId, sessionId }).then((r) => setS('error' in r ? { error: r.error } : { code: r.claimCode }));
+    confirmTeam({ teamId, sessionId }).then((r) => setS('error' in r ? { error: r.error } : { code: r.claimCode, solo: r.solo }));
   }, [teamId, sessionId]);
   if (s.loading) return <p className="muted">{t('p_confirming')}</p>;
   if (s.error) return <div className="banner">{t(s.error)}</div>;
@@ -113,6 +113,12 @@ export function TeamCreated() {
         </div>
         <p className="muted" style={{ fontSize: 14, marginTop: 6 }}>{t('p_codeKeep')}</p>
       </div>
+      {s.solo ? (
+        <div className="stack" style={{ gap: 10 }}>
+          <p className="muted">{t('so_boughtNext')}</p>
+          <div><button className="btn btn-primary btn-lg" type="button" onClick={() => router.push('/captain')}>{t('so_boughtGo')} →</button></div>
+        </div>
+      ) : (
       <form className="stack" style={{ gap: 12 }} onSubmit={save}>
         <h2>{t('p_setPass')}</h2>
         <p className="muted">{t('p_setPassSub')}</p>
@@ -120,6 +126,60 @@ export function TeamCreated() {
         <Err k={err} />
         <div><button className="btn btn-primary btn-lg" type="submit">{t('p_saveContinue')}</button></div>
       </form>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- buy a Solo Runner spot ---------------- */
+export function SoloBuyForm({ raceId, raceName, price, left }: { raceId: string; raceName: string; price: number; left: number | null }) {
+  const { t, lang } = useT();
+  const router = useRouter();
+  const [f, setF] = useState({ name: '', email: '', phone: '' });
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [sim, setSim] = useState<{ teamId: string; payToken: string } | null>(null);
+  const set = (k: keyof typeof f) => (v: string) => setF((x) => ({ ...x, [k]: v }));
+  const full = left != null && left <= 0;
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErr(null);
+    if (!f.name || !f.email || !f.phone) return setErr('required');
+    setBusy(true);
+    const r = await buySolo({ raceId, ...f });
+    if ('error' in r) { setErr(r.error); setBusy(false); return; }
+    if ('url' in r) { window.location.href = r.url; return; }
+    setSim({ teamId: r.teamId, payToken: r.payToken });
+    setBusy(false);
+  };
+  return (
+    <div className="card">
+      <h2 style={{ marginBottom: 6 }}>{t('so_buyTitle')}</h2>
+      <p className="muted" style={{ fontSize: 14, marginBottom: 16 }}>{t('so_buySub')}</p>
+      <form className="form" onSubmit={submit}>
+        <Field id="sb-name" label={t('so_fullName')} value={f.name} onChange={set('name')} req full autoComplete="name" />
+        <Field id="sb-email" label={t('email')} type="email" value={f.email} onChange={set('email')} req autoComplete="email" />
+        <Field id="sb-phone" label={t('phone')} type="tel" value={f.phone} onChange={set('phone')} req autoComplete="tel" />
+        <Err k={err} />
+        <div className="full row" style={{ justifyContent: 'space-between' }}>
+          <div>
+            <b className="num" style={{ fontFamily: 'var(--f-display)', fontSize: 28 }}>{money(price, lang)}</b>
+            {left != null && <div className="muted" style={{ fontSize: 13 }}>{full ? t('so_full') : t('so_left').replace('{n}', String(left))}</div>}
+          </div>
+          <button className="btn btn-primary btn-lg" type="submit" disabled={busy || full}>
+            {busy ? <><span className="spin" /> {t('p_redirect')}</> : `${t('p_continuePay')} →`}
+          </button>
+        </div>
+      </form>
+      {sim && (
+        <TestCheckout amount={price} concept={`Solo Runner · ${f.name} · ${raceName}`} email={f.email}
+          onClose={() => setSim(null)}
+          onPay={async () => {
+            const r = await confirmTeam({ teamId: sim.teamId, payToken: sim.payToken });
+            if ('error' in r) throw new Error(t(r.error));
+            router.push(`/team-created?team=${sim.teamId}`);
+          }} />
+      )}
     </div>
   );
 }

@@ -28,7 +28,7 @@ export type ARace = {
   id: string; name: string; brand: string; status: string; race_date: string | null; location: string | null;
   team_price: number; runner_fee: number; team_size: number; capacity_teams: number; categories: string;
   bib_start: number; waiver: string | null; team_sizes: string; hold_slots: number; start_groups: string;
-  slug: string | null; access_code: string | null; page: string | null; timing_code: string | null; board_public: boolean; settle_amounts: string | null; settle_deadline: string | null;
+  slug: string | null; access_code: string | null; page: string | null; timing_code: string | null; board_public: boolean; settle_amounts: string | null; settle_deadline: string | null; solo_price: number; solo_capacity: number | null;
 };
 export type APayment = {
   id: string; team_id: string | null; runner_id: string | null; kind: string; source: string; external_id: string | null; quantity: number;
@@ -155,6 +155,8 @@ export function RaceForm({ race, onClose }: { race?: ARace; onClose: () => void 
         <Field id="r-size" label={t('teamSizeMax')} type="number" min="1" value={f.team_size} onChange={set('team_size')} />
         <Field id="r-sizes" label={t('teamSizes')} value={f.team_sizes || ''} onChange={set('team_sizes')} hint={t('teamSizesHint')} placeholder="4,5,6" />
         <Field id="r-hold" label={t('holdSlots')} type="number" min="0" value={f.hold_slots ?? 0} onChange={set('hold_slots')} hint={t('holdSlotsHint')} />
+        <Field id="r-solo" label={`${t('soloPrice')} (MXN)`} type="number" min="0" step="50" value={f.solo_price ?? 0} onChange={set('solo_price')} hint={t('soloPriceHint')} />
+        <Field id="r-solocap" label={t('soloCap')} type="number" min="0" value={f.solo_capacity ?? ''} onChange={set('solo_capacity')} hint={t('soloCapHint')} />
         <Field id="r-cap" label={t('capacity')} type="number" min="0" value={f.capacity_teams} onChange={set('capacity_teams')} hint={t('capacityHint')} />
         <Field id="r-cats" label={t('categories')} value={f.categories || ''} onChange={set('categories')} hint={t('categoriesHint')} />
         <Field id="r-bib" label={t('bibStart')} type="number" min="1" value={f.bib_start} onChange={set('bib_start')} />

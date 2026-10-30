@@ -7,7 +7,7 @@ export const toARace = (r: Race): ARace => ({
   id: r.id, name: r.name, brand: r.brand, status: r.status, race_date: r.race_date, location: r.location, team_price: r.team_price,
   runner_fee: r.runner_fee, team_size: r.team_size, capacity_teams: r.capacity_teams, categories: r.categories, bib_start: r.bib_start, waiver: r.waiver,
   team_sizes: r.team_sizes, hold_slots: r.hold_slots, start_groups: r.start_groups,
-  slug: r.slug, access_code: r.access_code, page: r.page, timing_code: r.timing_code, board_public: r.board_public, settle_amounts: r.settle_amounts, settle_deadline: r.settle_deadline,
+  slug: r.slug, access_code: r.access_code, page: r.page, timing_code: r.timing_code, board_public: r.board_public, settle_amounts: r.settle_amounts, settle_deadline: r.settle_deadline, solo_price: r.solo_price, solo_capacity: r.solo_capacity,
 });
 export const toATeams = (teams: Team[]): ATeam[] => toATeamsAll(teams.filter((x) => isListedTeam(x) && !x.is_solo));
 const toATeamsAll = (teams: Team[]): ATeam[] =>

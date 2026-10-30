@@ -83,6 +83,8 @@ export async function saveRace(id: string | null, f: Record<string, unknown>): P
   if (!input) return { error: 'required' };
   if (id) await updateRace(id, input);
   else id = await createRace(input);
+  const cap = String(f.solo_capacity ?? '').trim();
+  await run('UPDATE races SET solo_price = ?, solo_capacity = ? WHERE id = ?', [Math.max(0, int(f.solo_price)), cap === '' ? null : Math.max(0, int(cap)), id]);
   refresh();
   return { id };
 }

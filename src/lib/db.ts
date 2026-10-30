@@ -316,5 +316,8 @@ CREATE TABLE IF NOT EXISTS race_sponsors (
 CREATE INDEX IF NOT EXISTS idx_race_sponsors_race ON race_sponsors(race_id);
 ALTER TABLE races ADD COLUMN IF NOT EXISTS sponsor_mono BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE races ADD COLUMN IF NOT EXISTS settle_deadline TEXT;
+-- Solo Runner sales from the race page: price (0 = not for sale) and optional cap.
+ALTER TABLE races ADD COLUMN IF NOT EXISTS solo_price INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE races ADD COLUMN IF NOT EXISTS solo_capacity INTEGER;
 `);
 }

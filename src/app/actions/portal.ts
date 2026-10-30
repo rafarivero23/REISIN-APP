@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs';
 import {
   getRace, getTeam, getRunner, updateRunner, deleteRunner, setRunnerWaiver, liveTeamCount, countRunners, createTeam, updateTeam, createRunner, recordPayment,
   findTeamByCode, feeForNewRunner, isHoldRace, paidSlots, sizeOptions, captainSizeOptions, settleAmount, teamSizeOf, type Race, type RunnerInput,
+  liveSoloCount,
 } from '@/lib/repo';
 import { newClaimCode, now } from '@/lib/ids';
 import { stripe } from '@/lib/stripe';
@@ -124,9 +125,28 @@ export async function buyTeam(input: { raceId: string; name: string; category: s
   return { teamId, amount: race.team_price, ...co };
 }
 
+/* ---------------- buy a Solo Runner spot ---------------- */
+export async function buySolo(input: { raceId: string; name: string; email: string; phone: string }):
+  Promise<Err | ({ teamId: string; amount: number } & Checkout)> {
+  const race = await openRace(input.raceId);
+  if ('error' in race) return race;
+  if (!(race.solo_price > 0)) return { error: 'so_notForSale' };
+  const name = clean(input.name, 120), email = clean(input.email, 160).toLowerCase(), phone = clean(input.phone, 40);
+  if (!name || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || !phone) return { error: 'required' };
+  if (race.solo_capacity != null && (await liveSoloCount(race.id)) >= race.solo_capacity) return { error: 'so_full' };
+  const teamId = await createTeam({
+    race_id: race.id, name, category: null, captain_name: name, captain_email: email, captain_phone: phone,
+    amount: race.solo_price, payment_status: 'pending', payment_method: null, paid_at: null,
+    claim_code: newClaimCode(race.brand), team_size: 1, notes: null, is_solo: true,
+  });
+  const co = await checkout('team', teamId, race.solo_price, 1, `${race.name} — Solo Runner ${name}`, email,
+    `/team-created?team=${teamId}`, `/r/${race.id}/solo`);
+  return { teamId, amount: race.solo_price, ...co };
+}
+
 // Called after payment (Stripe redirect or test checkout). Sets the captain
 // cookie and returns the captain code — only to the browser that paid.
-export async function confirmTeam(input: { teamId: string; sessionId?: string; payToken?: string }): Promise<Err | { claimCode: string; teamName: string }> {
+export async function confirmTeam(input: { teamId: string; sessionId?: string; payToken?: string }): Promise<Err | { claimCode: string; teamName: string; solo: boolean }> {
   const team = await getTeam(input.teamId);
   if (!team) return { error: 'not_found' };
   if (team.payment_status !== 'paid') {
@@ -139,7 +159,7 @@ export async function confirmTeam(input: { teamId: string; sessionId?: string; p
     if (!already && !proof) return { error: 'p_captainSub' };
   }
   await setCaptain(team.id);
-  return { claimCode: team.claim_code, teamName: team.name };
+  return { claimCode: team.claim_code, teamName: team.name, solo: !!team.is_solo };
 }
 
 /* ---------------- captain ---------------- */
