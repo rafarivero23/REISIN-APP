@@ -789,3 +789,77 @@ a.sv-acc:hover .sv-cta{background:#fff;color:#050505}
 @media (max-width:760px){.sv-gal-it:not(:first-child){grid-column:span var(--sm,1)}.sv-lb-img{max-height:calc(100svh - 230px)}}
 .sv-lb-nav{font-family:system-ui,sans-serif;font-size:26px;line-height:1}
 @media (max-width:760px){.sv-gal-zoom{display:none}}
+
+/* ---------- Baja Crossing landing (.sv structure + race-manual look) ----------
+   Charcoal + film grain, BajaCrossing titles, Archivo Expanded labels,
+   brand palette yellow #EED314 / orange #F16A21 / pink #ED3B94. */
+.portal:has(.bxl){--bg:#1b1c1d;--surface:#232425;--surface-2:#2b2c2d;--ink:#f2f2f0;--muted:#a3a3a0;--line:rgba(255,255,255,.14);
+  --sv-red:#EED314;--bx-y:#EED314;--bx-o:#F16A21;--bx-p:#ED3B94;--bx-grad:linear-gradient(90deg,#EED314,#F16A21 50%,#ED3B94);
+  --f-title:"Baja Crossing","Barlow Condensed",system-ui,sans-serif;--f-title-w:400;
+  background:radial-gradient(120% 60% at 50% 0%,#2c2d2e 0%,#1b1c1d 55%) fixed,#1b1c1d;font-family:"Archivo",var(--f-body);font-stretch:112%}
+.portal:has(.bxl)::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:60;opacity:.14;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+.bxl .mono{font-family:"Archivo",sans-serif;font-stretch:125%;font-weight:600;font-size:10.5px;letter-spacing:.16em}
+.bxl h1,.bxl h2,.bxl h3,.bxl .sv-data b,.bxl .sv-route-stats dd,.bxl .sv-tl li b{font-family:var(--f-title);font-weight:400;text-transform:uppercase;letter-spacing:.01em}
+/* hero */
+.bxl .sv-hero{background:#111}
+.bxl .sv-hero-bg,.bxl .sv-hero-vid{filter:grayscale(1) contrast(1.2) brightness(.55)}
+.bxl .sv-hero:before{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(180deg,rgba(27,28,29,.5),transparent 30%,transparent 60%,#1b1c1d)}
+.bxl .sv-hero>*:not(.sv-intro-r):not(.sv-hero-bg):not(.sv-hero-vid){z-index:2}
+.bxl .sv-intro-r{background:#1b1c1d}
+.bxl .sv-grid{opacity:.25}
+.bxl .sv-logo{width:min(56vw,640px);filter:drop-shadow(0 6px 40px rgba(0,0,0,.6))}
+.bxl .sv-pyr{width:min(70vw,900px);bottom:auto;top:50%;transform:translate(-50%,-50%) rotate(-4deg);opacity:.08}
+.bxl .sv-rings{width:min(170px,24vw);top:150px;opacity:.85;animation:bxWob 6s ease-in-out infinite}
+@keyframes bxWob{50%{transform:rotate(-6deg)}}
+.bxl .sv-plus{width:64px;bottom:96px;opacity:.85}
+.bxl .sv-c b{font-family:var(--f-title);font-size:20px;letter-spacing:.03em;font-weight:400}
+.bxl .sv-hud{border-color:var(--bx-y);color:var(--bx-y)!important}
+.bxl .sv-intro-r .mono{color:#f2f2f0}
+/* ticker: brand gradient */
+.bxl .sv-ticker{background:var(--bx-grad)}
+.bxl .sv-ticker span{color:#141414!important;font-weight:800}
+/* data + CTAs */
+.bxl .sv-data b{font-size:clamp(54px,6.4vw,92px);line-height:.9}
+.bxl .sv-data small{font-family:"Archivo",sans-serif;text-transform:none;font-size:16px}
+.bxl a.sv-acc{background:linear-gradient(180deg,rgba(238,211,20,.07),transparent)}
+.bxl a.sv-acc:hover{background:rgba(238,211,20,.12)}
+.bxl a.sv-acc .mono{color:var(--bx-o)!important}
+.bxl .sv-data b.sv-acc-t{font-size:clamp(32px,3.2vw,48px);background:var(--bx-grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.bxl .sv-acc .sv-el{width:200px;right:-20px;top:auto;bottom:-10px;opacity:.12}
+.bxl .sv-cta{background:var(--bx-y);color:#141414;font-family:"Archivo",sans-serif;font-stretch:125%;font-weight:800;clip-path:polygon(1% 4%,99% 0,100% 94%,0 100%)}
+.bxl a.sv-acc:hover .sv-cta{background:var(--bx-p);color:#fff}
+/* section heads with sticker icons */
+.bxl .sv-sh h2{font-size:clamp(40px,5.4vw,72px)}
+.bxl .sv-sh h2 img{height:1.05em;opacity:.9;transform:rotate(-6deg)}
+.bxl .sv-sh:nth-of-type(even) h2 img{transform:rotate(5deg)}
+/* inscripción rows */
+.bxl .sv-row h3{font-size:clamp(26px,2.8vw,40px)}
+.bxl .sv-row.hot{background:var(--bx-y);color:#141414}
+.bxl .sv-row.hot .sv-go{background:#141414;color:var(--bx-y)}
+.bxl .sv-row:hover{background:#242526}
+.bxl .sv-row.hot:hover{background:#f4dc3a}
+.bxl .sv-thumb{filter:grayscale(1) contrast(1.1)}
+/* timeline */
+.bxl .sv-tl ol:before{background:var(--bx-grad);height:2px}
+.bxl .sv-dot{background:#1b1c1d}
+.bxl .sv-tl li.end .sv-dot{background:var(--bx-p);border-color:var(--bx-p)}
+.bxl .sv-tl li b{font-size:22px}
+/* route */
+.bxl .sv-route-stats dd{font-size:46px}
+.bxl .sv-elev .l{stroke:var(--bx-y)}.bxl .sv-elev .a{fill:rgba(238,211,20,.08)}.bxl .sv-elev .p{stroke:var(--bx-p)}
+/* gallery + viewer */
+.bxl .sv-gal{background:#1b1c1d}
+.bxl .sv-gal-it>img:first-child{filter:grayscale(1) contrast(1.15)}
+.bxl .sv-gal-it:hover>img:first-child{filter:none}
+.bxl .sv-gal-it .sv-frames{height:38%;opacity:.9;transform:rotate(-8deg)}
+.bxl .sv-gal-zoom{color:#141414}
+.bxl .sv-lb{background:#1b1c1d}
+.bxl .sv-lb-bar b{font-family:var(--f-title);font-size:22px}
+.bxl .sv-lb-nav:hover{color:#141414}
+.bxl .sv-lb-prog i{background:var(--bx-grad)}
+/* faq + footer */
+.bxl .sv-faq summary span:nth-child(2){font-family:var(--f-title);text-transform:uppercase;font-size:clamp(18px,1.8vw,24px);letter-spacing:.02em}
+.bxl .sv-foot-logo{max-width:min(420px,70vw)}
+.bxl .sv-foot-rings{opacity:.08!important}
+@media (max-width:760px){.bxl .sv-plus{width:40px;bottom:auto;top:190px}.bxl .sv-rings{top:150px}}
