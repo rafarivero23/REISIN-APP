@@ -74,11 +74,12 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono }: {
           <div key={i}><span className="mono">{pad(i + 1)} / {s.label}</span><b>{s.value}<small>{s.unit}</small></b></div>
         ))}
         {!full && (
-          <div className="sv-acc">
+          <Link href={`/r/${race.id}/buy`} className="sv-acc">
             <img className="sv-el" src={`${B}/braille-red.png`} alt="" aria-hidden />
-            <span className="mono">{pad(page.stats.length + 1)} / {race.teams_left <= 20 ? t('sv_last') : t('sv_left')}</span>
-            <b>{race.teams_left}<small>{t('sv_leftUnit')}</small></b>
-          </div>
+            <span className="mono">{race.teams_left <= 20 ? t('sv_last') : t('sv_avail')}</span>
+            <b>{race.teams_left}<small>{t('sv_availUnit')}</small></b>
+            <span className="sv-cta">{t('sv_cta')} →</span>
+          </Link>
         )}
       </section>
 
