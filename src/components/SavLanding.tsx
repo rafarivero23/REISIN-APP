@@ -27,7 +27,7 @@ export function SavHero({ race, page, lang }: { race: R; page: PageData; lang: '
       <img className="sv-el sv-pyr" src={`${B}/pyramid.png`} alt="" aria-hidden />
       <img className="sv-el sv-rings" src={`${B}/rings.png`} alt="" aria-hidden />
       <img className="sv-el sv-plus" src={`${B}/plus-red.png`} alt="" aria-hidden />
-      <h1 className="sv-logo"><img src={`${B}/logo-27.png`} alt={race.name} /></h1>
+      <h1 className="sv-logo"><img src={`${B}/logo-27.svg`} alt={race.name} /></h1>
       <div className="sv-c sv-tl mono">Edición<b>SAV27</b></div>
       <div className="sv-c sv-tr mono">{lang === 'en' ? 'Date' : 'Fecha'}<b>{fmtDate(race.race_date, lang)}</b></div>
       {race.location && <div className="sv-c sv-bl mono">{lang === 'en' ? 'Route' : 'Ruta'}<b>{race.location}</b></div>}
@@ -177,7 +177,7 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono }: {
 
       <footer className="sv-foot sv-bleed">
         <img className="sv-el sv-foot-rings" src={`${B}/rings.png`} alt="" aria-hidden />
-        <img className="sv-foot-logo" src={`${B}/logo-27.png`} alt="SAV27" />
+        <img className="sv-foot-logo" src={`${B}/logo-27.svg`} alt="SAV27" />
         <div className="sv-foot-by"><ReisinGlitch /><span className="mono">{t('sv_by')}</span></div>
       </footer>
     </>
