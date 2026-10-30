@@ -97,6 +97,9 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono, kit
   const photos = page.photos.map(getPhoto).filter((p): p is NonNullable<typeof p> => !!p);
   const thumb = (i: number) => (photos.length ? photoSrc(photos[i % photos.length].id, true) : null);
   const ticker = [kit.tagline, ...page.stats.map((s) => `${s.value} ${s.unit}`.trim()), race.location, fmtDate(race.race_date, lang), t('sv_by')].filter(Boolean) as string[];
+  // Repeat the items so one half of the ticker is always wider than the screen (no empty tail).
+  const tick: string[] = [];
+  while (tick.length < 16 && ticker.length) tick.push(...ticker);
   const full = race.teams_left <= 0;
   const rows: { k: string; title: string; sub: string; href: string; price?: string; hot?: boolean; off?: boolean; img: string | null }[] = [
     { k: 'A / ' + t('team'), title: t('p_buy'), sub: full ? t('p_fullRace') : t('p_buySub'), href: `/r/${race.id}/buy`, price: full ? t('sv_sold') : money(race.team_price, lang), hot: !full, off: full, img: thumb(0) },
@@ -118,7 +121,7 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono, kit
 
   return (
     <>
-      <div className="sv-ticker sv-bleed mono" aria-hidden><div>{[...ticker, ...ticker].map((x, i) => <span key={i}>{kit.tick} {x}</span>)}</div></div>
+      <div className="sv-ticker sv-bleed mono" aria-hidden><div style={{ animationDuration: `${tick.length * 5}s` }}>{[...tick, ...tick].map((x, i) => <span key={i}>{kit.tick} {x}</span>)}</div></div>
 
       <section className="sv-data sv-bleed">
         {page.stats.map((s, i) => (
