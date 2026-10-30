@@ -6,7 +6,7 @@ export type Race = {
   race_date: string | null; location: string | null; team_price: number; runner_fee: number;
   team_size: number; capacity_teams: number; categories: string; bib_start: number;
   waiver: string | null; created_at: string; team_sizes: string; hold_slots: number; start_groups: string;
-  slug: string | null; access_code: string | null; page: string | null; timing_code: string | null; board_public: boolean; settle_amounts: string | null;
+  slug: string | null; access_code: string | null; page: string | null; timing_code: string | null; board_public: boolean; settle_amounts: string | null; settle_deadline: string | null;
 };
 export type Team = {
   id: string; race_id: string; name: string; category: string | null; captain_name: string;
@@ -53,7 +53,7 @@ export async function listOpenRaces() {
   return races.map((r) => ({ ...r, teams_left: Math.max(0, r.capacity_teams - Number(r.live)) }));
 }
 
-export type RaceInput = Omit<Race, 'id' | 'created_at' | 'start_groups' | 'slug' | 'access_code' | 'page' | 'timing_code' | 'board_public' | 'settle_amounts'>;
+export type RaceInput = Omit<Race, 'id' | 'created_at' | 'start_groups' | 'slug' | 'access_code' | 'page' | 'timing_code' | 'board_public' | 'settle_amounts' | 'settle_deadline'>;
 export async function createRace(input: RaceInput) {
   const id = newId();
   await run(

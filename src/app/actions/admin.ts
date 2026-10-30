@@ -254,11 +254,12 @@ export async function staffWaiverLink(runnerId: string): Promise<{ path: string 
 }
 
 /* ---------------- settlement ---------------- */
-export async function saveSettleAmounts(raceId: string, amounts: Record<string, string | number>): Promise<Result> {
+export async function saveSettleAmounts(raceId: string, amounts: Record<string, string | number>, deadline?: string): Promise<Result> {
   await guard();
   const clean: Record<string, number> = {};
   for (const [k, v] of Object.entries(amounts || {})) { const n = Math.round(Number(v)); if (/^\d+$/.test(k) && n > 0) clean[k] = n; }
-  await run('UPDATE races SET settle_amounts = ? WHERE id = ?', [Object.keys(clean).length ? JSON.stringify(clean) : null, raceId]);
+  const dl = /^\d{4}-\d{2}-\d{2}$/.test(String(deadline || '')) ? String(deadline) : null;
+  await run('UPDATE races SET settle_amounts = ?, settle_deadline = ? WHERE id = ?', [Object.keys(clean).length ? JSON.stringify(clean) : null, dl, raceId]);
   refresh();
   return {};
 }

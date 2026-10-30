@@ -315,5 +315,6 @@ CREATE TABLE IF NOT EXISTS race_sponsors (
 );
 CREATE INDEX IF NOT EXISTS idx_race_sponsors_race ON race_sponsors(race_id);
 ALTER TABLE races ADD COLUMN IF NOT EXISTS sponsor_mono BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE races ADD COLUMN IF NOT EXISTS settle_deadline TEXT;
 `);
 }

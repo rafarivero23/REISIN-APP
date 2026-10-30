@@ -28,7 +28,7 @@ export type ARace = {
   id: string; name: string; brand: string; status: string; race_date: string | null; location: string | null;
   team_price: number; runner_fee: number; team_size: number; capacity_teams: number; categories: string;
   bib_start: number; waiver: string | null; team_sizes: string; hold_slots: number; start_groups: string;
-  slug: string | null; access_code: string | null; page: string | null; timing_code: string | null; board_public: boolean; settle_amounts: string | null;
+  slug: string | null; access_code: string | null; page: string | null; timing_code: string | null; board_public: boolean; settle_amounts: string | null; settle_deadline: string | null;
 };
 export type APayment = {
   id: string; team_id: string | null; runner_id: string | null; kind: string; source: string; external_id: string | null; quantity: number;
@@ -728,10 +728,11 @@ function SettleEditor({ race }: { race: ARace }) {
   const sizes = sizeList(race).filter((n) => n > 1);
   const init = (() => { try { return JSON.parse(race.settle_amounts || '{}') as Record<string, number>; } catch { return {}; } })();
   const [f, setF] = useState<Record<string, string>>(Object.fromEntries(sizes.map((n) => [String(n), init[String(n)] ? String(init[String(n)]) : ''])));
+  const [dl, setDl] = useState(race.settle_deadline || '');
   const auto = (n: number) => Math.max(0, n - (isHold(race) ? race.hold_slots : 0)) * (race.runner_fee || 0);
   return (
     <div className="card stack" style={{ marginBottom: 16 }}>
-      <div><h3>{t('st_admin')}</h3><p className="muted" style={{ fontSize: 14, marginTop: 4, maxWidth: '75ch' }}>{t('st_adminSub')}</p></div>
+      <div><h3>{t('st_admin')}</h3><p className="muted" style={{ fontSize: 14, marginTop: 4, maxWidth: '75ch' }}>{t('st_adminSub')} {t('st_deadlineHint')}</p></div>
       <div className="row" style={{ gap: 12, alignItems: 'flex-end' }}>
         {sizes.map((n) => (
           <div className="field" key={n} style={{ minWidth: 150 }}>
@@ -740,7 +741,11 @@ function SettleEditor({ race }: { race: ARace }) {
               onChange={(e) => setF((x) => ({ ...x, [String(n)]: e.target.value }))} />
           </div>
         ))}
-        <button type="button" className="btn btn-primary" onClick={() => act(() => saveSettleAmounts(race.id, f))}>{t('save')}</button>
+        <div className="field" style={{ minWidth: 170 }}>
+          <label htmlFor="st-dl">{t('st_deadline')}</label>
+          <input id="st-dl" type="date" value={dl} onChange={(e) => setDl(e.target.value)} />
+        </div>
+        <button type="button" className="btn btn-primary" onClick={() => act(() => saveSettleAmounts(race.id, f, dl))}>{t('save')}</button>
       </div>
     </div>
   );

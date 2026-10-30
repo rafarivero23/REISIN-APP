@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useT } from './I18n';
+import { dayMonth } from '@/lib/capmsg';
 import { Field, PayChip, Bib, TestCheckout, useToast, useCopy } from './ui';
 import { money, splitCats, brandPrefix, SIZES } from '@/lib/format';
 import { fmtHalf } from '@/lib/groups';
@@ -238,7 +239,7 @@ export function CaptainDash({ team, race, runners, slots, settle }: {
   team: { name: string; category: string | null; payment_status: string; claim_code: string; has_password: boolean; half_avg_min: number | null; logo: string | null;
     captain_name: string; captain_email: string; captain_phone: string | null };
   race: { id: string; name: string; team_size: number; runner_fee: number; sizes: number[] }; runners: DashRunner[];
-  slots: { hold: boolean; size: number; paid: number }; settle?: { amount: number; settled: boolean };
+  slots: { hold: boolean; size: number; paid: number }; settle?: { amount: number; settled: boolean; deadline?: string | null };
 }) {
   const { t, lang } = useT();
   const router = useRouter();
@@ -332,6 +333,7 @@ export function CaptainDash({ team, race, runners, slots, settle }: {
             <div className="label">{t('st_title')}</div>
             <b className="num" style={{ fontFamily: 'var(--f-display)', fontSize: 30 }}>{money(settle.amount, lang)}</b>
             <div className="muted" style={{ fontSize: 13 }}>{t('st_sub').replace('{n}', String(slots.size))}</div>
+            {settle.deadline && <div style={{ fontSize: 13, fontWeight: 600, marginTop: 2 }}>{t('st_deadline')}: {dayMonth(settle.deadline, lang)}</div>}
           </div>
           <button type="button" className="btn btn-primary btn-lg" onClick={paySettle}>{t('st_pay')}</button>
         </div>
