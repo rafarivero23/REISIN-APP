@@ -81,6 +81,13 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono }: {
             <span className="sv-cta">Join mission →</span>
           </Link>
         )}
+        {race.solo_price > 0 && (
+          <Link href={`/r/${race.id}/solo`} className="sv-acc">
+            <span className="mono">Solo runner</span>
+            <b className="sv-acc-t">{t('sv_soloAvail')}</b>
+            <span className="sv-cta">Solo race →</span>
+          </Link>
+        )}
       </section>
 
       {page.intro && <div className="sv-intro sv-bleed"><RichText text={page.intro} /></div>}

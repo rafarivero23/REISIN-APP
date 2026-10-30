@@ -709,3 +709,4 @@ a.sv-acc:hover .sv-cta{background:#fff;color:#050505}
 .sv-rm-tl{top:24px;left:32px}.sv-rm-tr{top:24px;right:32px;color:var(--sv-red)!important}.sv-rm-bl{bottom:22px;left:32px}
 @media (max-width:760px){.sv-route-map{padding:52px 12px 48px;background-size:40px 40px}.sv-rm-tl,.sv-rm-bl{left:18px}.sv-rm-tr{right:18px}}
 @media (max-width:760px){.sv-route-art{display:none}}
+@media (max-width:760px){.sv-data>:last-child:nth-child(odd){grid-column:1/-1;border-right:0}}
