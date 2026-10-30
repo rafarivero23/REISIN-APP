@@ -8,6 +8,7 @@ import { RichText } from './RichText';
 import { SponsorStrip } from './Sponsors';
 import { ReisinGlitch } from './ReisinGlitch';
 import { SAV_ELEV } from '@/lib/savRoute';
+import { SavGallery } from './SavGallery';
 
 // Sal a Valle look (SAV27 brand kit): black, thin lines, mono labels,
 // one red accent, brand elements from the SAV .ai files in /public/brand/sav.
@@ -184,14 +185,7 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono }: {
       {photos.length > 0 && (
         <>
           <Head title={t('sv_photos')} aside={`${photos.length}`} />
-          <section className="sv-gal sv-bleed">
-            {photos.slice(0, 7).map((p, i) => (
-              <a key={p.id} href={photoSrc(p.id)} target="_blank" rel="noreferrer" style={{ backgroundImage: `url(${photoSrc(p.id, i > 0)})` }}>
-                {i === 0 && <img className="sv-el sv-frames" src={`${B}/frames.png`} alt="" aria-hidden />}
-                <span className="mono">{pad(i + 1)}</span>
-              </a>
-            ))}
-          </section>
+          <SavGallery photos={photos.map((p) => ({ id: p.id, full: photoSrc(p.id), thumb: photoSrc(p.id, true) }))} frames={`${B}/frames.png`} moreLabel={t('sv_galMore')} lessLabel={t('sv_galLess')} />
         </>
       )}
 
