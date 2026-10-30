@@ -10,6 +10,7 @@ import {
   createRace, updateRace, deleteRace, getRace, getTeam, getRunner, createTeam, updateTeam, deleteTeam, updateRunner, deleteRunner,
   recordPayment, assignPayment, deletePayment, getPayment, findUserByEmail, createUser, deleteUser, getUserById, updateUserPassword,
   sizeOptions, captainSizeOptions, setPaymentResolution, setRunnerWaiver, settleAmount, setCodeSent, setRaceGroups, setPaymentNotes, setRunnerNotes, type RaceInput, type RunnerInput,
+  paymentsOfRace,
 } from '@/lib/repo';
 import { importCsvText, rematch, importSolos } from '@/lib/importers';
 import { parseHalf } from '@/lib/groups';
@@ -308,6 +309,20 @@ export async function saveRunnerNotes(id: string, notes: string): Promise<Result
 // in with the code, names the team and picks its size.
 export async function teamFromPayment(paymentId: string): Promise<Result> {
   await guard();
+  const r = await makeTeamFromPayment(paymentId);
+  refresh();
+  return r;
+}
+// Every apartado still without a team becomes a team (one click instead of N).
+export async function teamsFromAllPayments(raceId: string): Promise<{ count: number }> {
+  await guard();
+  const list = (await paymentsOfRace(raceId)).filter((p) => !p.team_id && !p.resolution && p.kind === 'team');
+  let count = 0;
+  for (const p of list) if ((await makeTeamFromPayment(p.id)).id) count++;
+  refresh();
+  return { count };
+}
+async function makeTeamFromPayment(paymentId: string): Promise<Result> {
   const p = await getPayment(paymentId);
   if (!p || p.team_id) return { error: 'not_found' };
   const race = await getRace(p.race_id);
@@ -322,7 +337,6 @@ export async function teamFromPayment(paymentId: string): Promise<Result> {
     claim_code: newClaimCode(race.brand), team_size: sizes[sizes.length - 1], notes: `Creado desde el pago${order}. Falta que el capitán ponga nombre y tamaño.`,
   });
   await assignPayment(p.id, id);
-  refresh();
   return { id };
 }
 

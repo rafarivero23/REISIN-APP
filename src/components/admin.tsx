@@ -20,7 +20,7 @@ import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
-  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, resolvePayment, setWaiverStaff, staffWaiverLink, saveSettleAmounts, teamMarkSettled, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
+  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, teamsFromAllPayments, resolvePayment, setWaiverStaff, staffWaiverLink, saveSettleAmounts, teamMarkSettled, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
 /* Shapes passed from server components (no password hashes). */
@@ -513,7 +513,14 @@ function Payments({ race, teams, solos = [], payments, stats, openTeam }: { race
         <div className="card stack">
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <div><h3 style={{ textTransform: 'uppercase' }}>{t('unassignedTitle')}</h3><p className="muted" style={{ fontSize: 14, marginTop: 4 }}>{t('unassignedSub')}</p></div>
-            <button type="button" className="btn btn-sm" disabled={busy} onClick={async () => { setBusy(true); const r = await rematchPayments(race.id); setBusy(false); toast(`${t('stillUnassigned')}: ${r.left}`); }}>{t('rematch')}</button>
+            <span className="row" style={{ gap: 6 }}>
+              {un.some((p) => p.kind === 'team') && <button type="button" className="btn btn-sm btn-primary" disabled={busy} onClick={async () => {
+                const n = un.filter((p) => p.kind === 'team').length;
+                if (!confirm(t('fromPayAllConfirm').replace('{n}', String(n)))) return;
+                setBusy(true); const r = await teamsFromAllPayments(race.id); setBusy(false); toast(t('fromPayAllDone').replace('{n}', String(r.count)));
+              }}>{t('fromPayAll').replace('{n}', String(un.filter((p) => p.kind === 'team').length))}</button>}
+              <button type="button" className="btn btn-sm" disabled={busy} onClick={async () => { setBusy(true); const r = await rematchPayments(race.id); setBusy(false); toast(`${t('stillUnassigned')}: ${r.left}`); }}>{t('rematch')}</button>
+            </span>
           </div>
           <div className="tbl-wrap"><table>
             <thead><tr><th>{t('date')}</th><th>{t('payer')}</th><th>{t('concept')}</th><th style={{ textAlign: 'right' }}>{t('amount')}</th><th>{t('team')}</th><th>{t('notes')}</th></tr></thead>
