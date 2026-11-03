@@ -116,6 +116,18 @@ export async function assignTeamNumbers(raceId: string, from = 1): Promise<{ cou
   refresh(raceId);
   return { count };
 }
+// Renumbers every confirmed team 1..N (alphabetical or by registration), Solos continue after.
+export async function renumberTeams(raceId: string, order: 'alpha' | 'created'): Promise<{ count: number }> {
+  await guard();
+  const all = (await many<Team>('SELECT * FROM teams WHERE race_id = ?', [raceId])).filter(isListedTeam);
+  const by = (a: Team, b: Team) => (order === 'created' ? a.created_at.localeCompare(b.created_at) : a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+  const list = [...all.filter((t) => !t.is_solo).sort(by), ...all.filter((t) => t.is_solo).sort(by)];
+  await run('UPDATE teams SET team_no = NULL WHERE race_id = ?', [raceId]);
+  for (const [i, t] of list.entries()) await run('UPDATE teams SET team_no = ? WHERE id = ?', [i + 1, t.id]);
+  revalidatePath('/admin', 'layout');
+  refresh(raceId);
+  return { count: list.length };
+}
 export async function setTeamNumber(teamId: string, no: string): Promise<{ error?: string }> {
   await guard();
   const team = await getTeam(teamId);

@@ -5,6 +5,7 @@ type StoreProps = { settings: { on: boolean; pickup: boolean; shipFee: number | 
 import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { renumberTeams } from '@/app/actions/timing';
 import { useT } from './I18n';
 import { Drawer, Field, PayChip, Bib, DeleteButton, useToast, useCopy } from './ui';
 import { RunnerFields, type RunnerForm } from './portal';
@@ -232,9 +233,13 @@ export function RaceDetail({ race, teams, solos = [], runners, payments, agents,
         <>
           <div className="toolbar">
             <input className="search" type="search" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} aria-label={t('search')} />
-            <button type="button" className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'teamForm' })}>+ {t('addTeam')}</button>
+            <div className="row" style={{ gap: 8 }}>
+              <NumberTeams raceId={race.id} total={teams.length} missing={teams.filter((x) => x.team_no == null).length} />
+              <a className="btn btn-sm" href={`/api/admin/races/${race.id}/teams`}>{t('tn_export')}</a>
+              <button type="button" className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'teamForm' })}>+ {t('addTeam')}</button>
+            </div>
           </div>
-          <TeamsTable race={race} teams={teams.filter((x) => !search || `${x.name} ${x.captain_name} ${x.captain_email} ${x.claim_code}`.toLowerCase().includes(search.toLowerCase()))}
+          <TeamsTable race={race} teams={[...teams].sort((a, b) => (a.team_no ?? 1e9) - (b.team_no ?? 1e9) || a.name.localeCompare(b.name)).filter((x) => !search || `#${x.team_no ?? ''} ${x.name} ${x.captain_name} ${x.captain_email} ${x.claim_code}`.toLowerCase().includes(search.toLowerCase()))}
             count={(id) => runnersOfTeam(id).length} open={(id) => setModal({ type: 'team', id })} info={info} />
         </>
       )}
@@ -403,12 +408,13 @@ function TeamsTable({ race, teams, count, open, info }: { race: ARace; teams: AT
     <div className="tbl-wrap">
       {teams.length ? (
         <table>
-          <thead><tr><th>{t('team')}</th><th>{t('captain')}</th><th>{t('categories')}</th><th>{t('group')}</th><th>{t('members')}</th>{hold && <th>{t('paidSlots')}</th>}<th style={{ textAlign: 'right' }}>{t('balance')}</th><th>{t('regType')}</th><th>{t('logo')}</th><th>{t('teamPassword')}</th><th>{hold ? t('holdLabel') : t('payment')}</th><th>{t('notes')}</th></tr></thead>
+          <thead><tr><th style={{ width: 52 }}>#</th><th>{t('team')}</th><th>{t('captain')}</th><th>{t('categories')}</th><th>{t('group')}</th><th>{t('members')}</th>{hold && <th>{t('paidSlots')}</th>}<th style={{ textAlign: 'right' }}>{t('balance')}</th><th>{t('regType')}</th><th>{t('logo')}</th><th>{t('teamPassword')}</th><th>{hold ? t('holdLabel') : t('payment')}</th><th>{t('notes')}</th></tr></thead>
           <tbody>
             {teams.map((x) => {
               const sl = teamSlots(x, race), n = count(x.id), inf = info(x), lg = logoSrc(x);
               return (
                 <tr key={x.id} className="click" onClick={() => open(x.id)}>
+                  <td className="num"><b className="team-no">{x.team_no ?? '—'}</b></td>
                   <td><div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>{lg && <img src={lg} alt="" style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 4 }} />}<b>{x.name}</b></div></td>
                   <td>{x.captain_name}<div className="muted" style={{ fontSize: 12 }}>{x.captain_email}</div></td>
                   <td><CatChip c={inf.cat} div={inf.div} /></td>
@@ -427,6 +433,37 @@ function TeamsTable({ race, teams, count, open, info }: { race: ARace; teams: AT
           </tbody>
         </table>
       ) : <div className="empty">{t('noTeams')}</div>}
+    </div>
+  );
+}
+
+// Numbers the confirmed teams 1..N (alphabetical or registration order); Solos continue after.
+function NumberTeams({ raceId, total, missing }: { raceId: string; total: number; missing: number }) {
+  const { t } = useT();
+  const router = useRouter();
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const go = async (order: 'alpha' | 'created') => {
+    if (!confirm(t('tn_confirm').replace('{n}', String(total)))) return;
+    setBusy(true);
+    const r = await renumberTeams(raceId, order);
+    setBusy(false); setOpen(false);
+    toast(t('tn_done').replace('{n}', String(r.count))); router.refresh();
+  };
+  return (
+    <div className="tn-wrap">
+      <button type="button" className="btn btn-sm" onClick={() => setOpen(!open)} aria-expanded={open}>
+        # {t('tn_btn')}{missing > 0 && missing < total ? ` · ${missing} ${t('tn_missing')}` : ''}
+      </button>
+      {open && (
+        <div className="tn-pop card">
+          <b>{t('tn_title').replace('{n}', String(total))}</b>
+          <p className="muted" style={{ fontSize: 13, margin: '4px 0 10px' }}>{t('tn_sub')}</p>
+          <button type="button" className="btn btn-sm" disabled={busy} onClick={() => go('alpha')}>A→Z · {t('tn_alpha')}</button>
+          <button type="button" className="btn btn-sm" disabled={busy} onClick={() => go('created')}>{t('tn_created')}</button>
+        </div>
+      )}
     </div>
   );
 }
