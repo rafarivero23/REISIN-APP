@@ -97,7 +97,7 @@ export function Leaderboard({ board }: { board: Board }) {
                     {x.logo ? <img src={x.logo} alt="" className="lb-logo" /> : <span className="lb-logo lb-noLogo" aria-hidden>{x.no ?? ''}</span>}
                     <div style={{ minWidth: 0 }}>
                       <b className="lb-name">{x.name}</b>
-                      <div className="muted" style={{ fontSize: 12 }}>{x.no != null ? `#${x.no}` : ''}{x.group ? <> · <span style={{ color: x.groupColor || undefined }}>{t('group')} {x.group}</span></> : ''}</div>
+                      <div className="muted" style={{ fontSize: 12 }}>{x.no != null ? (x.no.startsWith("S") ? x.no : `#${x.no}`) : ''}{x.group ? <> · <span style={{ color: x.groupColor || undefined }}>{t('group')} {x.group}</span></> : ''}</div>
                     </div>
                   </div>
                 </td>
@@ -129,7 +129,7 @@ export function Leaderboard({ board }: { board: Board }) {
                 <b className="lb-name">{x.name}</b>
                 <div className="lb-c-meta">
                   <span className={'chip plain cat-' + (x.category || 'none')}>{categoryLabel(x.div, x.category, t)}</span>
-                  <span className="muted">{x.no != null ? `#${x.no}` : ''}{x.group ? `${x.no != null ? ' · ' : ''}${t('group')} ${x.group}` : ''}</span>
+                  <span className="muted">{x.no != null ? (x.no.startsWith("S") ? x.no : `#${x.no}`) : ''}{x.group ? `${x.no != null ? ' · ' : ''}${t('group')} ${x.group}` : ''}</span>
                 </div>
                 {cps.length > 0 && <div className="lb-bar" aria-hidden>{cps.map((c) => <i key={c.id} className={reached >= c.num ? 'on' : ''} />)}</div>}
               </div>

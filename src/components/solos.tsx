@@ -33,7 +33,7 @@ export function SolosPanel({ race, solos, runners, openRunner, NoteCell }: {
   const [log, setLog] = useState<string | null>(null);
   const file = useRef<HTMLInputElement>(null);
   const runnerOf = (id: string) => runners.find((r) => r.team_id === id);
-  const shown = [...solos].sort((a, b) => a.name.localeCompare(b.name))
+  const shown = [...solos].sort((a, b) => (a.team_no ?? 1e9) - (b.team_no ?? 1e9) || a.name.localeCompare(b.name))
     .filter((s) => !q || `${s.name} ${s.captain_email} ${s.claim_code}`.toLowerCase().includes(q.toLowerCase()));
   const reg = solos.filter((s) => runnerOf(s.id)).length;
   const sent = solos.filter((s) => s.code_sent_at).length;
@@ -85,7 +85,7 @@ export function SolosPanel({ race, solos, runners, openRunner, NoteCell }: {
       <div className="tbl-wrap">
         {shown.length ? (
           <table>
-            <thead><tr><th>{t('bib')}</th><th>{t('name')}</th><th>{t('so_code')}</th><th>{t('status')}</th><th>{t('cap_sent')}</th><th>{t('notes')}</th><th /></tr></thead>
+            <thead><tr><th>#</th><th>{t('bib')}</th><th>{t('name')}</th><th>{t('so_code')}</th><th>{t('status')}</th><th>{t('cap_sent')}</th><th>{t('notes')}</th><th /></tr></thead>
             <tbody>
               {shown.map((s) => {
                 const r = runnerOf(s.id);
@@ -93,6 +93,7 @@ export function SolosPanel({ race, solos, runners, openRunner, NoteCell }: {
                 const mail = mailLink(s.captain_email, e.subject, e.body), wa = waLink(s.captain_phone, w.body);
                 return (
                   <tr key={s.id} className={r ? 'click' : undefined} onClick={r ? () => openRunner(r.id) : undefined}>
+                    <td className="num"><b>{s.team_no != null ? `S${s.team_no}` : '—'}</b></td>
                     <td><Bib n={r?.bib} /></td>
                     <td><b>{s.name}</b><div className="muted" style={{ fontSize: 12 }}>{s.captain_email}{s.captain_phone ? ' · ' + s.captain_phone : ''}</div></td>
                     <td><span className="code">{s.claim_code}</span></td>

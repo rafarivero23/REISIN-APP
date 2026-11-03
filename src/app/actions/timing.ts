@@ -104,26 +104,32 @@ export async function clearCheckins(raceId: string): Promise<{ count: number }> 
 export async function assignTeamNumbers(raceId: string, from = 1): Promise<{ count: number }> {
   await guard();
   const teams = (await many<Team>('SELECT * FROM teams WHERE race_id = ?', [raceId])).filter(isListedTeam);
-  const used = new Set(teams.map((t) => t.team_no).filter((n): n is number => n != null));
-  let n = Math.max(1, Math.round(from) || 1), count = 0;
-  const todo = teams.filter((t) => t.team_no == null).sort((a, b) => Number(a.is_solo) - Number(b.is_solo) || a.name.localeCompare(b.name));
-  for (const t of todo) {
-    while (used.has(n)) n++;
-    await run('UPDATE teams SET team_no = ? WHERE id = ?', [n, t.id]);
-    used.add(n); count++;
+  let count = 0;
+  // Teams and Solos are separate series (Solos show as S1, S2…).
+  for (const solo of [false, true]) {
+    const kind = teams.filter((t) => t.is_solo === solo);
+    const used = new Set(kind.map((t) => t.team_no).filter((n): n is number => n != null));
+    let n = solo ? 1 : Math.max(1, Math.round(from) || 1);
+    for (const t of kind.filter((x) => x.team_no == null).sort((a, b) => a.name.localeCompare(b.name))) {
+      while (used.has(n)) n++;
+      await run('UPDATE teams SET team_no = ? WHERE id = ?', [n, t.id]);
+      used.add(n); count++;
+    }
   }
   revalidatePath('/admin', 'layout');
   refresh(raceId);
   return { count };
 }
-// Renumbers every confirmed team 1..N (alphabetical or by registration), Solos continue after.
+// Renumbers every confirmed team 1..N and every Solo S1..SM (alphabetical or by registration).
 export async function renumberTeams(raceId: string, order: 'alpha' | 'created'): Promise<{ count: number }> {
   await guard();
   const all = (await many<Team>('SELECT * FROM teams WHERE race_id = ?', [raceId])).filter(isListedTeam);
   const by = (a: Team, b: Team) => (order === 'created' ? a.created_at.localeCompare(b.created_at) : a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
-  const list = [...all.filter((t) => !t.is_solo).sort(by), ...all.filter((t) => t.is_solo).sort(by)];
+  const teams = all.filter((t) => !t.is_solo).sort(by), solos = all.filter((t) => t.is_solo).sort(by);
   await run('UPDATE teams SET team_no = NULL WHERE race_id = ?', [raceId]);
-  for (const [i, t] of list.entries()) await run('UPDATE teams SET team_no = ? WHERE id = ?', [i + 1, t.id]);
+  for (const [i, t] of teams.entries()) await run('UPDATE teams SET team_no = ? WHERE id = ?', [i + 1, t.id]);
+  for (const [i, t] of solos.entries()) await run('UPDATE teams SET team_no = ? WHERE id = ?', [i + 1, t.id]);
+  const list = [...teams, ...solos];
   revalidatePath('/admin', 'layout');
   refresh(raceId);
   return { count: list.length };
@@ -132,10 +138,10 @@ export async function setTeamNumber(teamId: string, no: string): Promise<{ error
   await guard();
   const team = await getTeam(teamId);
   if (!team) return { error: 'not_found' };
-  const n = no === '' ? null : Math.round(Number(no));
+  const n = no === '' ? null : Math.round(Number(String(no).replace(/^s/i, '')));
   if (n != null && !(n > 0)) return { error: 'required' };
   if (n != null) {
-    const dup = await many('SELECT 1 FROM teams WHERE race_id = ? AND team_no = ? AND id <> ?', [team.race_id, n, team.id]);
+    const dup = await many('SELECT 1 FROM teams WHERE race_id = ? AND team_no = ? AND is_solo = ? AND id <> ?', [team.race_id, n, team.is_solo, team.id]);
     if (dup.length) return { error: 'tm_noTaken' };
   }
   await run('UPDATE teams SET team_no = ? WHERE id = ?', [n, team.id]);

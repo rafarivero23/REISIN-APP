@@ -6,7 +6,7 @@ import { Field, useToast } from './ui';
 import { timingLogin, recordCheckin, removeCheckin, startWave } from '@/app/actions/timing';
 import { START, fmtElapsed } from '@/lib/timing-shared';
 
-type T = { id: string; no: number | null; name: string; solo: boolean; group: string | null };
+type T = { id: string; no: string | null; name: string; solo: boolean; group: string | null };
 type CP = { id: string; num: number; name: string; km: number | null };
 type CI = { team_id: string; checkpoint_id: string; at: string; by: string | null };
 // Pending writes survive no-signal spots: kept in localStorage and retried.
@@ -129,8 +129,8 @@ export function CheckinApp({ raceId, raceName, staff, teams, checkpoints, checki
 
   const cpObj = checkpoints.find((c) => c.id === cp);
   const qq = q.trim().toLowerCase();
-  const matches = !qq ? [] : teams.filter((x) => (/^\d+$/.test(qq) ? String(x.no ?? '').startsWith(qq) : x.name.toLowerCase().includes(qq)))
-    .sort((a, b) => Number(String(b.no ?? '') === qq) - Number(String(a.no ?? '') === qq)).slice(0, 6);
+  const matches = !qq ? [] : teams.filter((x) => (/^s?\d+$/i.test(qq) ? (x.no ?? '').toLowerCase().startsWith(qq.toLowerCase()) : x.name.toLowerCase().includes(qq)))
+    .sort((a, b) => Number((b.no ?? '').toLowerCase() === qq.toLowerCase()) - Number((a.no ?? '').toLowerCase() === qq.toLowerCase())).slice(0, 6);
   const done = teams.filter((x) => times.has(`${x.id}|${cp}`));
   const todo = teams.filter((x) => !times.has(`${x.id}|${cp}`));
   const log = done.map((x) => ({ x, at: times.get(`${x.id}|${cp}`)! })).sort((a, b) => b.at.localeCompare(a.at));
@@ -235,7 +235,7 @@ export function CheckinApp({ raceId, raceName, staff, teams, checkpoints, checki
         <details className="card"><summary style={{ cursor: 'pointer' }}><b>{t('tm_missing')} · {todo.length}</b></summary>
           <div className="list" style={{ marginTop: 8 }}>
             {todo.map((x) => <button key={x.id} type="button" className="it" style={{ all: 'unset', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: '1px solid var(--line)' }}
-              onClick={() => { setPick(x); window.scrollTo({ top: 0, behavior: 'smooth' }); }}><span>#{x.no ?? '–'} {x.name}</span><span className="muted">＋</span></button>)}
+              onClick={() => { setPick(x); window.scrollTo({ top: 0, behavior: 'smooth' }); }}><span>{x.no?.startsWith("S") ? "" : "#"}{x.no ?? "–"} {x.name}</span><span className="muted">＋</span></button>)}
           </div>
         </details>
       )}

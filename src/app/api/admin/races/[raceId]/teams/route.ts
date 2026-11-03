@@ -51,12 +51,12 @@ export async function GET(_req: Request, { params }: { params: { raceId: string 
   const soloRows: unknown[][] = [['No.', 'Nombre', 'Correo', 'Teléfono', 'Código', 'Registro', 'Exoneración', 'Estado', 'Pago', 'Notas']];
   for (const t of solos) {
     const s = status(t), r = s.list[0];
-    soloRows.push([t.team_no ?? '', r ? fullName(r) : t.captain_name, r?.email || t.captain_email, r?.phone || t.captain_phone || '', t.claim_code, r ? 'Sí' : 'No', r?.waiver_accepted_at ? `Sí · ${d(r.waiver_accepted_at)}` : 'No',
+    soloRows.push([t.team_no != null ? `S${t.team_no}` : '', r ? fullName(r) : t.captain_name, r?.email || t.captain_email, r?.phone || t.captain_phone || '', t.claim_code, r ? 'Sí' : 'No', r?.waiver_accepted_at ? `Sí · ${d(r.waiver_accepted_at)}` : 'No',
       s.complete ? 'Completo' : 'Incompleto', s.pay, t.notes || '']);
   }
   const runnerRows: unknown[][] = [['No. equipo', 'Equipo', 'Número', 'Nombre', 'Apellidos', 'Correo', 'Teléfono', 'Género', 'Talla', 'Fecha de nacimiento', 'Contacto de emergencia', 'Teléfono de emergencia', 'Exoneración', 'Fecha exoneración', 'Pago corredor', 'Registrado']];
   for (const t of [...teams, ...solos]) for (const r of rs(t.id))
-    runnerRows.push([t.team_no ?? '', t.is_solo ? 'SOLO' : t.name, r.bib ?? '', r.first_name, r.last_name, r.email, r.phone || '', r.gender || '', r.shirt_size || '', r.birth_date || '', r.emergency_name || '', r.emergency_phone || '',
+    runnerRows.push([t.team_no != null ? (t.is_solo ? `S${t.team_no}` : t.team_no) : '', t.is_solo ? 'SOLO' : t.name, r.bib ?? '', r.first_name, r.last_name, r.email, r.phone || '', r.gender || '', r.shirt_size || '', r.birth_date || '', r.emergency_name || '', r.emergency_phone || '',
       r.waiver_accepted_at ? 'Firmada' : 'PENDIENTE', d(r.waiver_accepted_at), r.payment_status === 'paid' ? 'Pagado' : 'Pendiente', d(r.created_at)]);
   const summary: unknown[][] = [[race.name], [`Exportado ${new Date().toLocaleString('es-MX', { timeZone: 'America/Mexico_City' })}`], [],
     ['Equipos confirmados', teams.length], ['Equipos completos (corredores + exoneraciones)', stats.complete], ['Equipos incompletos', stats.incomplete],

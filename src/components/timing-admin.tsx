@@ -22,7 +22,7 @@ export function TimingPanel({ race, teams, solos, checkpoints }: { race: ARace; 
   const [err, setErr] = useState<string | null>(null);
   const dirty = JSON.stringify(f) !== JSON.stringify(init);
   const base = `${origin}/r/${race.slug || race.id}`;
-  const all = [...teams, ...solos].sort((a, b) => (a.team_no ?? 1e9) - (b.team_no ?? 1e9) || a.name.localeCompare(b.name));
+  const all = [...[...teams].sort((a, b) => (a.team_no ?? 1e9) - (b.team_no ?? 1e9) || a.name.localeCompare(b.name)), ...[...solos].sort((a, b) => (a.team_no ?? 1e9) - (b.team_no ?? 1e9) || a.name.localeCompare(b.name))];
   const missing = all.filter((x) => x.team_no == null).length;
   const setCp = (i: number, k: keyof CP, v: string) => setF((x) => ({ ...x, checkpoints: x.checkpoints.map((c, j) => (j === i ? { ...c, [k]: v } : c)) }));
   const inp = { padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--surface)', font: 'inherit', fontSize: 14, minWidth: 0 } as const;
@@ -119,7 +119,7 @@ function NumberCell({ team, onSaved }: { team: ATeam; onSaved: () => void }) {
     if (r.error) { toast(t(r.error)); setV(team.team_no == null ? '' : String(team.team_no)); return; }
     onSaved();
   };
-  return <input aria-label={`# ${team.name}`} type="number" min={1} value={v} onChange={(e) => setV(e.target.value)} onBlur={save}
+  return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>{team.is_solo && <b>S</b>}<input aria-label={`# ${team.name}`} type="number" min={1} value={v} onChange={(e) => setV(e.target.value)} onBlur={save}
     onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
-    style={{ width: 80, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)', font: 'inherit' }} />;
+    style={{ width: 80, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)', font: 'inherit' }} /></span>;
 }

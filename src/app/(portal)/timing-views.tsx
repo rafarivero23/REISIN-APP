@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth-guard';
 import { timingAccess } from '@/lib/team-session';
 import { buildBoard, checkpointsOf, checkinsOf, START } from '@/lib/timing';
 import { parseGroups, groupFor } from '@/lib/groups';
+import { noLabel, noSort } from '@/lib/timing-shared';
 import { getT } from '@/lib/lang';
 import { CheckinApp, TimingGate } from '@/components/checkin';
 import { Leaderboard } from '@/components/leaderboard';
@@ -60,8 +61,8 @@ export async function CheckinView({ race }: { race: Race }) {
   }
   const groups = parseGroups(race.start_groups);
   const [cps, cis, teams] = await Promise.all([checkpointsOf(race.id), checkinsOf(race.id), many<Team>('SELECT * FROM teams WHERE race_id = ?', [race.id])]);
-  const list = teams.filter(isListedTeam).map((x) => ({ id: x.id, no: x.team_no, name: x.name, solo: x.is_solo, group: x.is_solo ? null : groupFor(x.half_avg_min, groups)?.label || null }))
-    .sort((a, b) => (a.no ?? 1e9) - (b.no ?? 1e9) || a.name.localeCompare(b.name));
+  const list = teams.filter(isListedTeam).map((x) => ({ id: x.id, no: noLabel(x.team_no, x.is_solo), name: x.name, solo: x.is_solo, group: x.is_solo ? null : groupFor(x.half_avg_min, groups)?.label || null }))
+    .sort((a, b) => noSort(a.no) - noSort(b.no) || a.name.localeCompare(b.name));
   return (
     <div className="lb-wide">
       <CheckinApp raceId={race.id} raceName={race.name} staff={access.name} teams={list}

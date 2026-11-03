@@ -3,7 +3,7 @@ import { many, one, run } from './db';
 import { newId, now } from './ids';
 import { isListedTeam, type Race, type Team } from './repo';
 import { categoryOf, divisionOf, groupFor, parseGroups } from './groups';
-import { START, rankTeams, type Checkpoint, type Checkin, type BoardTeam, type Board } from './timing-shared';
+import { START, rankTeams, noLabel, type Checkpoint, type Checkin, type BoardTeam, type Board } from './timing-shared';
 export * from './timing-shared';
 
 export const checkpointsOf = async (raceId: string) =>
@@ -63,7 +63,7 @@ export async function buildBoard(race: Race): Promise<Board> {
     }
     const g = t.is_solo ? null : groupFor(t.half_avg_min, groups);
     return {
-      id: t.id, no: t.team_no, name: t.name, logo: t.logo ? `/api/logo/${t.id}?v=${t.logo.length}` : null,
+      id: t.id, no: noLabel(t.team_no, t.is_solo), name: t.name, logo: t.logo ? `/api/logo/${t.id}?v=${t.logo.length}` : null,
       category: categoryOf(runners.filter((r) => r.team_id === t.id).map((r) => r.gender), t.is_solo),
       div: divisionOf(t.team_size || race.team_size, t.is_solo),
       group: g?.label || null, groupColor: g?.color || null, start, times, clock, last, lastMs, lastAt,

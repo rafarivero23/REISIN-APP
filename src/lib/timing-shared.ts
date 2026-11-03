@@ -4,7 +4,7 @@ export type Checkin = { id: string; team_id: string; checkpoint_id: string; at: 
 export const START = 'start'; // checkpoint_id used for the start line
 
 export type BoardTeam = {
-  id: string; no: number | null; name: string; logo: string | null; category: string | null; div: string; group: string | null; groupColor: string | null;
+  id: string; no: string | null; name: string; logo: string | null; category: string | null; div: string; group: string | null; groupColor: string | null;
   start: string | null; times: Record<string, number>; // checkpoint id → elapsed ms since start
   clock: Record<string, string>; // checkpoint id → pass time (ISO), even without a start
   last: number; lastMs: number | null; // furthest checkpoint num reached (0 = started, -1 = not started)
@@ -19,7 +19,7 @@ export type Board = { checkpoints: Checkpoint[]; teams: BoardTeam[]; updated: st
 export function rankTeams<T extends Pick<BoardTeam, 'last' | 'lastMs' | 'lastAt' | 'no' | 'name'>>(list: T[]): T[] {
   return [...list].sort((a, b) =>
     b.last - a.last || (a.lastMs ?? Infinity) - (b.lastMs ?? Infinity) || (a.lastAt ?? Infinity) - (b.lastAt ?? Infinity) ||
-    (a.no ?? 1e9) - (b.no ?? 1e9) || a.name.localeCompare(b.name));
+    noSort(a.no) - noSort(b.no) || a.name.localeCompare(b.name));
 }
 
 export function fmtElapsed(ms: number | null | undefined) {
@@ -28,3 +28,8 @@ export function fmtElapsed(ms: number | null | undefined) {
   const hh = h >= 24 ? `${Math.floor(h / 24)}d ${String(h % 24).padStart(2, '0')}` : String(h); // multi-day events
   return `${hh}:${String(m).padStart(2, '0')}:${String(x).padStart(2, '0')}`;
 }
+
+// Team numbers: teams 1, 2, 3…; Solo runners have their own series S1, S2, S3….
+export const noLabel = (no: number | null | undefined, solo: boolean) => (no == null ? null : solo ? `S${no}` : String(no));
+// Sort key: teams 1..N first, then Solos S1..SM, unnumbered last.
+export const noSort = (no: string | null | undefined) => (no == null ? 1e9 : /^s/i.test(no) ? 1e6 + Number(no.slice(1)) : Number(no));
