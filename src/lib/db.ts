@@ -371,5 +371,27 @@ CREATE INDEX IF NOT EXISTS idx_store_orders_race ON store_orders(race_id);
 ALTER TABLE races ADD COLUMN IF NOT EXISTS store_on BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE races ADD COLUMN IF NOT EXISTS store_pickup BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE races ADD COLUMN IF NOT EXISTS store_ship_fee INTEGER;
+
+-- Solos have their own number series (S1, S2…). Races numbered before that
+-- (Solos at 46+) are shifted back to start at 1, keeping their order.
+WITH s AS (
+  SELECT id, ROW_NUMBER() OVER (PARTITION BY race_id ORDER BY team_no, name) AS n FROM teams
+  WHERE is_solo AND team_no IS NOT NULL AND race_id IN (SELECT race_id FROM teams WHERE is_solo AND team_no IS NOT NULL GROUP BY race_id HAVING MIN(team_no) > 1)
+) UPDATE teams SET team_no = s.n FROM s WHERE teams.id = s.id;
+
+-- Repair names imported from UTF-8 CSVs read as Latin-1 ("GarcÃa" → "García").
+DO $$
+DECLARE r record; f text; v text;
+BEGIN
+  FOR r IN SELECT 'runners' AS t, unnest(ARRAY['first_name','last_name','emergency_name']) AS c
+           UNION ALL SELECT 'teams', unnest(ARRAY['name','captain_name']) LOOP
+    FOR f, v IN EXECUTE format('SELECT id, %I FROM %I WHERE %I ~ ''[ÃÂ]''', r.c, r.t, r.c) LOOP
+      BEGIN
+        EXECUTE format('UPDATE %I SET %I = $1 WHERE id = $2', r.t, r.c) USING convert_from(convert_to(v, 'LATIN1'), 'UTF8'), f;
+      EXCEPTION WHEN others THEN NULL;
+      END;
+    END LOOP;
+  END LOOP;
+END $$;
 `);
 }

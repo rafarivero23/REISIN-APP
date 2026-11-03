@@ -48,7 +48,11 @@ export function SolosPanel({ race, solos, runners, openRunner, NoteCell }: {
     setBusy(true); setLog(null);
     try {
       const XLSX = await import('xlsx');
-      const wb = XLSX.read(await f.arrayBuffer(), { type: 'array', cellDates: true });
+      // CSV: decode as UTF-8 (fallback Windows-1252) so accents don't turn into "GarcÃa".
+      const buf = await f.arrayBuffer();
+      let text: string | null = null;
+      if (/\.csv$/i.test(f.name)) { try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch { text = new TextDecoder('windows-1252').decode(buf); } }
+      const wb = text != null ? XLSX.read(text.replace(/^\uFEFF/, ''), { type: 'string', cellDates: true }) : XLSX.read(buf, { type: 'array', cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
       const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '', raw: false, dateNF: 'yyyy-mm-dd' })
         .map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [String(k).trim(), String(v ?? '').trim()])));
