@@ -268,7 +268,7 @@ export function PageEditor({ race, initial, uploads = [] }: { race: { id: string
 
 /* ---------- photo uploads ---------- */
 // Resize in the browser (1600px + 800px JPEG) so uploads stay small and fast.
-async function resize(file: File, max: number, q: number): Promise<{ url: string; w: number; h: number }> {
+export async function resize(file: File, max: number, q: number): Promise<{ url: string; w: number; h: number }> {
   const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' } as ImageBitmapOptions);
   const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
   const w = Math.round(bmp.width * k), h = Math.round(bmp.height * k);

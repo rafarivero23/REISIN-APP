@@ -10,6 +10,7 @@ import { ReisinGlitch } from './ReisinGlitch';
 import { SAV_ELEV } from '@/lib/savRoute';
 import { SavGallery } from './SavGallery';
 import { BxRoute } from './BxRoute';
+import { imgSrc, type Product } from '@/lib/store-shared';
 
 // Sal a Valle look (SAV27 brand kit): black, thin lines, mono labels,
 // one red accent, brand elements from the SAV .ai files in /public/brand/sav.
@@ -85,8 +86,8 @@ export function SavHero({ race, page, lang, kit = SAV_KIT }: { race: R; page: Pa
   );
 }
 
-export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono, kit = SAV_KIT }: {
-  race: R; page: PageData; t: T; lang: 'es' | 'en'; showBoard: boolean; sponsors: Sponsor[]; mono: boolean; kit?: Kit;
+export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono, kit = SAV_KIT, store = [] }: {
+  race: R; page: PageData; t: T; lang: 'es' | 'en'; showBoard: boolean; sponsors: Sponsor[]; mono: boolean; kit?: Kit; store?: Product[];
 }) {
   const B = kit.base;
   const elev = kit.elev && { max: r10(Math.max(...kit.elev.map((p) => p[1]))), min: r10(Math.min(...kit.elev.map((p) => p[1]))) };
@@ -147,8 +148,9 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono, kit
 
       {page.intro && <div className="sv-intro sv-bleed"><RichText text={page.intro} /></div>}
 
-      {(showBoard || page.links.length > 0) && (
+      {(showBoard || page.links.length > 0 || store.length > 0) && (
         <div className="sv-links sv-bleed">
+          {store.length > 0 && <Link href={`/r/${race.slug || race.id}/store`} className="mono sv-shop">{t('shop_title')} →</Link>}
           {showBoard && <Link href={`/r/${race.slug || race.id}/leaderboard`} className="mono sv-live"><i />{t('lb_title')}</Link>}
           {page.links.map((l, i) => <a key={i} className="mono" href={l.url} target={l.url.startsWith('mailto:') ? undefined : '_blank'} rel="noopener noreferrer">{l.label} ↗</a>)}
         </div>
@@ -180,7 +182,7 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono, kit
                     <span className="sv-dot" aria-hidden />
                     <span className="mono">{a.time}</span>
                     <b>{a.title}</b>
-                    {a.note && <p><RichText text={a.note} /></p>}
+                    {a.note && <div className="sv-tl-note"><RichText text={a.note} /></div>}
                   </li>
                 );
               })}
@@ -244,6 +246,21 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono, kit
                 <summary><span className="mono">{pad(i + 1)}</span><span>{f.q}</span><i aria-hidden>+</i></summary>
                 <div className="sv-faq-a"><RichText text={f.a} /></div>
               </details>
+            ))}
+          </section>
+        </>
+      )}
+
+      {store.length > 0 && (
+        <>
+          <Head title={t('shop_title')} aside={<Link href={`/r/${race.slug || race.id}/store`} className="sv-ul">{t('shop_all')} →</Link>} icon={kit.key === 'bx' ? icon() : undefined} />
+          <section className="st-teaser sv-bleed">
+            {store.slice(0, 4).map((p) => (
+              <Link key={p.id} href={`/r/${race.slug || race.id}/store?p=${p.id}`} className="st-card">
+                <div className="st-pic">{p.images[0] ? <img src={imgSrc(p.images[0], true)} alt={p.name} loading="lazy" /> : <div className="st-noimg mono">{p.name}</div>}
+                  {p.images[1] && <img className="alt" src={imgSrc(p.images[1], true)} alt="" loading="lazy" />}</div>
+                <div className="st-meta"><h3>{p.name}</h3><span className="st-price">{money(p.price, lang)}</span></div>
+              </Link>
             ))}
           </section>
         </>

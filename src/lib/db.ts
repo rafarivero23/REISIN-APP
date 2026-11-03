@@ -319,5 +319,57 @@ ALTER TABLE races ADD COLUMN IF NOT EXISTS settle_deadline TEXT;
 -- Solo Runner sales from the race page: price (0 = not for sale) and optional cap.
 ALTER TABLE races ADD COLUMN IF NOT EXISTS solo_price INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE races ADD COLUMN IF NOT EXISTS solo_capacity INTEGER;
+
+-- Race store (merch). Products with size/color options, each with its own stock
+-- (options JSON [{"label":"M","stock":10}]; empty = one stock in "stock").
+CREATE TABLE IF NOT EXISTS store_products (
+  id TEXT PRIMARY KEY,
+  race_id TEXT NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  price INTEGER NOT NULL DEFAULT 0,
+  stock INTEGER NOT NULL DEFAULT 0,
+  options TEXT NOT NULL DEFAULT '[]',
+  images TEXT NOT NULL DEFAULT '[]',
+  active BOOLEAN NOT NULL DEFAULT true,
+  sort INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_store_products_race ON store_products(race_id);
+CREATE TABLE IF NOT EXISTS store_images (
+  id TEXT PRIMARY KEY,
+  race_id TEXT NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  lg BYTEA NOT NULL,
+  sm BYTEA NOT NULL,
+  w INTEGER NOT NULL,
+  h INTEGER NOT NULL,
+  created_at TEXT NOT NULL
+);
+-- status: pending (checkout open) | paid | delivered | canceled.
+-- items JSON [{"product_id","name","option","qty","price"}]; delivery: pickup | ship.
+CREATE TABLE IF NOT EXISTS store_orders (
+  id TEXT PRIMARY KEY,
+  race_id TEXT NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  order_no INTEGER NOT NULL,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT,
+  delivery TEXT NOT NULL DEFAULT 'pickup',
+  address TEXT,
+  items TEXT NOT NULL DEFAULT '[]',
+  subtotal INTEGER NOT NULL DEFAULT 0,
+  shipping INTEGER NOT NULL DEFAULT 0,
+  total INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending',
+  stripe_session_id TEXT,
+  paid_at TEXT,
+  notes TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_store_orders_race ON store_orders(race_id);
+-- Store settings per race: on/off, pickup on/off, shipping fee (null = no shipping).
+ALTER TABLE races ADD COLUMN IF NOT EXISTS store_on BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE races ADD COLUMN IF NOT EXISTS store_pickup BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE races ADD COLUMN IF NOT EXISTS store_ship_fee INTEGER;
 `);
 }

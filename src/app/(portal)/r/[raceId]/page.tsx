@@ -17,6 +17,7 @@ import { SponsorStrip } from '@/components/Sponsors';
 import { brandKey, fmtDate } from '@/lib/format';
 import { HandFrame } from '@/components/HandFrame';
 import { SavHero, SavLanding, SAV_KIT, BX_KIT } from '@/components/SavLanding';
+import { productsOf } from '@/lib/store';
 
 export default async function RaceChoice({ params }: { params: { raceId: string } }) {
   const { t, lang } = getT();
@@ -48,7 +49,7 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
       <div className={kit.key === 'bx' ? 'sv bxl' : 'sv'} style={{ display: 'contents' }}>
         <SavHero race={svRace} page={page} lang={lang} kit={kit} />
         {locked ? <div className="sv-gate"><RaceGate raceId={r.id} /></div>
-          : <SavLanding race={svRace} page={page} t={t} lang={lang} showBoard={showBoard} sponsors={sponsors} mono={mono} kit={kit} />}
+          : <SavLanding race={svRace} page={page} t={t} lang={lang} showBoard={showBoard} sponsors={sponsors} mono={mono} kit={kit} store={raw.store_on ? await productsOf(raw.id, true) : []} />}
       </div>
     );
   }

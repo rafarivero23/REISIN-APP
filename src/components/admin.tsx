@@ -1,4 +1,7 @@
 'use client';
+import { StoreAdmin } from './store-admin';
+import type { Product, Order } from '@/lib/store-shared';
+type StoreProps = { settings: { on: boolean; pickup: boolean; shipFee: number | null }; products: Product[]; orders: Order[] };
 import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
@@ -178,7 +181,7 @@ type Modal = { type: 'race' } | { type: 'teamForm'; id?: string } | { type: 'tea
 
 export type AAgent = { id: string; name: string; email: string; phone: string | null; gender: string | null; half_avg_min: number | null; city: string | null;
   message: string | null; paid_claim: boolean; status: string; team_id: string | null; notes: string | null; created_at: string };
-export function RaceDetail({ race, teams, solos = [], runners, payments, agents, checkpoints = [], photos = [], sponsors = [], sponsorMono = false }: { sponsors?: Sponsor[]; sponsorMono?: boolean; race: ARace; teams: ATeam[]; solos?: ATeam[]; runners: ARunner[]; payments: APayment[]; agents: AAgent[]; checkpoints?: { id: string; num: number; name: string; km: number | null }[]; photos?: { id: string; w: number; h: number }[] }) {
+export function RaceDetail({ race, teams, solos = [], runners, payments, agents, checkpoints = [], photos = [], sponsors = [], sponsorMono = false, store }: { store?: StoreProps; sponsors?: Sponsor[]; sponsorMono?: boolean; race: ARace; teams: ATeam[]; solos?: ATeam[]; runners: ARunner[]; payments: APayment[]; agents: AAgent[]; checkpoints?: { id: string; num: number; name: string; km: number | null }[]; photos?: { id: string; w: number; h: number }[] }) {
   const { t, lang } = useT();
   const router = useRouter();
   const q = useSearchParams();
@@ -190,7 +193,7 @@ export function RaceDetail({ race, teams, solos = [], runners, payments, agents,
   const stats = raceStats(race, teams, runners, payments);
   const unassigned = payments.filter((p) => !p.team_id && !p.resolution).length;
   const tabs: [string, string][] = [['summary', t('summary')], ['teams', `${t('teams')} · ${stats.teams}`], ['runners', `${t('runners')} · ${stats.runners}`],
-    ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['agents', `${t('fa_tab')} · ${agents.filter((a) => a.status === 'open').length}`], ['solos', `${t('so_tab')} · ${solos.length}`], ['captains', t('cap_tab') + ` · ${teams.filter((x) => x.code_sent_at).length}/${teams.length}`], ['timing', t('tm_tab')], ['page', t('pg_tab') + (race.access_code ? ' 🔒' : '')], ['import', t('importTab')]];
+    ['payments', t('payments') + (unassigned ? ` · ⚠ ${unassigned}` : '')], ['agents', `${t('fa_tab')} · ${agents.filter((a) => a.status === 'open').length}`], ['solos', `${t('so_tab')} · ${solos.length}`], ['captains', t('cap_tab') + ` · ${teams.filter((x) => x.code_sent_at).length}/${teams.length}`], ['timing', t('tm_tab')], ['page', t('pg_tab') + (race.access_code ? ' 🔒' : '')], ['store', (lang === 'en' ? 'Store' : 'Tienda') + (store ? ` · ${store.orders.filter((o) => o.status === 'paid').length || ''}`.replace(/ · $/, '') : '')], ['import', t('importTab')]];
   // Hold races: a runner is "covered" when they fit inside the team's paid slots.
   const groups = parseGroups(race.start_groups);
   const info = (tm: ATeam) => {
@@ -253,6 +256,7 @@ export function RaceDetail({ race, teams, solos = [], runners, payments, agents,
       {tab === 'page' && <SettleEditor race={race} />}
       {tab === 'page' && <PageEditor race={race} initial={{ slug: race.slug || '', access_code: race.access_code || '', page: parsePage(race.page) }} uploads={photos} />}
       {tab === 'page' && <div style={{ marginTop: 16 }}><SponsorEditor raceId={race.id} sponsors={sponsors} mono={sponsorMono} /></div>}
+      {tab === 'store' && store && <StoreAdmin raceId={race.id} raceSlug={race.slug || race.id} {...store} />}
       {tab === 'agents' && <AgentsAdmin agents={agents} teamName={(id) => teamById(id)?.name || '—'} />}
 
       {modal?.type === 'race' && <RaceForm race={race} onClose={() => setModal(null)} />}
