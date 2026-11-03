@@ -5,6 +5,7 @@ import { useT } from './I18n';
 import { Field, Drawer, Bib, useToast, useCopy } from './ui';
 import { addSolo, importSolosRows, markCodesSent, removeTeam, saveTeamNotes } from '@/app/actions/admin';
 import { waLink, mailLink } from '@/lib/capmsg';
+import { renumberSolos } from '@/app/actions/timing';
 import { money, fmtDT } from '@/lib/format';
 import type { ARace, ATeam, ARunner } from './admin';
 
@@ -81,7 +82,12 @@ export function SolosPanel({ race, solos, runners, openRunner, NoteCell }: {
         <p className="muted" style={{ fontSize: 12 }}>{t('so_importHint')}</p>
         {log && <pre className="note" style={{ whiteSpace: 'pre-wrap', fontSize: 12, margin: 0, color: 'var(--ink)' }}>{log}</pre>}
       </div>
-      <div className="toolbar"><input className="search" type="search" placeholder={t('search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('search')} /></div>
+      <div className="toolbar"><input className="search" type="search" placeholder={t('search')} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t('search')} />
+        <button type="button" className="btn btn-sm" disabled={busy || !solos.length} onClick={async () => {
+          if (!confirm(t('tn_soloConfirm').replace('{n}', String(solos.length)))) return;
+          setBusy(true); const r = await renumberSolos(race.id, 'alpha'); setBusy(false);
+          toast(t('tn_soloDone').replace('{n}', String(r.count))); refresh();
+        }}># {t('tn_soloBtn')}</button></div>
       <div className="tbl-wrap">
         {shown.length ? (
           <table>

@@ -134,6 +134,17 @@ export async function renumberTeams(raceId: string, order: 'alpha' | 'created'):
   refresh(raceId);
   return { count: list.length };
 }
+// Renumbers only the Solo runners S1..SM (alphabetical or by registration); team numbers untouched.
+export async function renumberSolos(raceId: string, order: 'alpha' | 'created' = 'alpha'): Promise<{ count: number }> {
+  await guard();
+  const solos = (await many<Team>('SELECT * FROM teams WHERE race_id = ? AND is_solo', [raceId])).filter(isListedTeam)
+    .sort((a, b) => (order === 'created' ? a.created_at.localeCompare(b.created_at) : a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })));
+  await run('UPDATE teams SET team_no = NULL WHERE race_id = ? AND is_solo', [raceId]);
+  for (const [i, t] of solos.entries()) await run('UPDATE teams SET team_no = ? WHERE id = ?', [i + 1, t.id]);
+  revalidatePath('/admin', 'layout');
+  refresh(raceId);
+  return { count: solos.length };
+}
 export async function setTeamNumber(teamId: string, no: string): Promise<{ error?: string }> {
   await guard();
   const team = await getTeam(teamId);
