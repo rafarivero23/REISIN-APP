@@ -186,6 +186,8 @@ export function settleAmount(team: Team, race: Race, paid?: { total: number; dep
   if (team.settled_at || team.is_solo || team.reg_type === 'full') return 0;
   const size = teamSizeOf(team, race);
   const fixed = Number(parseSettle(race.settle_amounts)[String(size)]);
+  // Not paid at all (staff marked it unpaid): charge the full price = deposit + settlement.
+  if (fixed > 0 && paid && paid.total <= 0 && team.payment_status !== 'paid') return (paid.deposit || 0) + fixed;
   if (fixed > 0) return paid && paid.total > 0 && paid.deposit > 0 ? Math.min(fixed, Math.max(0, paid.deposit + fixed - paid.total)) : fixed;
   return Math.max(0, size - paidSlots(team, race)) * (race.runner_fee || 0);
 }
@@ -252,7 +254,7 @@ async function applyPayment(p: PaymentIn) {
     if (race && isHoldRace(race) && p.team_id) await run('UPDATE teams SET extra_slots = extra_slots + 1 WHERE id = ?', [p.team_id]);
   }
   if (p.kind === 'slots' && p.team_id) await addSlots(p.team_id, p.quantity, p.source);
-  if (p.kind === 'settle' && p.team_id) await updateTeam(p.team_id, { settled_at: p.paid_at || now() });
+  if (p.kind === 'settle' && p.team_id) await updateTeam(p.team_id, { ...paid, settled_at: p.paid_at || now() });
 }
 
 // Adds paid slots to a team, covers runners still owing their fee, and

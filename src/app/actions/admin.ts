@@ -123,6 +123,19 @@ export async function saveTeam(id: string | null, raceId: string, f: Record<stri
   refresh();
   return { id };
 }
+// Staff: undo "paid". Manual entries are removed; real payments (Stripe, Ecwid…)
+// go back to Pagos as unassigned so they can be reviewed or reassigned.
+// The captain then sees the full price (deposit + settlement) to pay.
+export async function teamMarkUnpaid(id: string): Promise<Result> {
+  await guard();
+  const t = await getTeam(id);
+  if (!t) return { error: 'not_found' };
+  await run(`DELETE FROM payments WHERE team_id = ? AND source = 'manual' AND kind IN ('team', 'settle')`, [id]);
+  await run(`UPDATE payments SET team_id = NULL WHERE team_id = ? AND kind IN ('team', 'settle')`, [id]);
+  await run(`UPDATE teams SET payment_status = 'pending', payment_method = 'manual', paid_at = NULL, settled_at = NULL, reg_type = 'presale' WHERE id = ?`, [id]);
+  refresh();
+  return {};
+}
 export async function teamMarkPaid(id: string): Promise<Result> {
   await guard();
   const t = await getTeam(id);

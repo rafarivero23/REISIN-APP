@@ -23,7 +23,7 @@ import { captainMessage, waLink, mailLink } from '@/lib/capmsg';
 import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
-  saveRace, removeRace, saveTeam, teamMarkPaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
+  saveRace, removeRace, saveTeam, teamMarkPaid, teamMarkUnpaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
   removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, teamsFromAllPayments, resolvePayment, setWaiverStaff, staffWaiverLink, saveSettleAmounts, teamMarkSettled, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
@@ -830,6 +830,7 @@ function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, o
       <CaptainMessage team={x} race={race} />
       <div className="row">
         {x.payment_status !== 'paid' && <button type="button" className="btn btn-primary btn-sm" onClick={() => act(() => teamMarkPaid(x.id))}>{t('markPaid')}</button>}
+        {x.payment_status === 'paid' && !x.is_solo && <button type="button" className="btn btn-sm" onClick={() => { if (confirm(t('markUnpaidConfirm'))) act(() => teamMarkUnpaid(x.id)); }}>{t('markUnpaid')}</button>}
         {!x.settled_at && !x.is_solo && <button type="button" className="btn btn-sm" onClick={() => confirm(t('st_markConfirm')) && act(() => teamMarkSettled(x.id))}>{t('st_markDone')}</button>}
         <button type="button" className="btn btn-sm" onClick={onEdit}>{t('edit')}</button>
         <button type="button" className="btn btn-sm" onClick={() => act(() => teamNewCode(x.id))}>{t('newCode')}</button>
