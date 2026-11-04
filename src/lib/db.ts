@@ -373,6 +373,8 @@ ALTER TABLE races ADD COLUMN IF NOT EXISTS store_pickup BOOLEAN NOT NULL DEFAULT
 ALTER TABLE races ADD COLUMN IF NOT EXISTS store_ship_fee INTEGER;
 -- Optional password to enter the shop (empty = public).
 ALTER TABLE races ADD COLUMN IF NOT EXISTS store_code TEXT;
+-- Full-screen cover image for the shop page (store_images id; empty = compact header).
+ALTER TABLE races ADD COLUMN IF NOT EXISTS store_hero TEXT;
 
 -- Solos have their own number series (S1, S2…). Races numbered before that
 -- (Solos at 46+) are shifted back to start at 1, keeping their order.

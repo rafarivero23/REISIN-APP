@@ -28,6 +28,13 @@ export async function saveStoreSettings(raceId: string, s: { on: boolean; pickup
   return {};
 }
 
+export async function setStoreHero(raceId: string, imageId: string | null) {
+  await staff();
+  await run('UPDATE races SET store_hero = ? WHERE id = ?', [imageId || null, raceId]);
+  done();
+  return {};
+}
+
 export type ProductInput = { id?: string; name: string; description: string; price: number; stock: number; options: StoreOption[]; images: string[]; active: boolean };
 export async function saveProduct(raceId: string, p: ProductInput): Promise<{ id?: string; error?: string }> {
   await staff();
