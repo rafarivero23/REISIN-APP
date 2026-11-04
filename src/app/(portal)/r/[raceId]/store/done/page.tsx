@@ -22,7 +22,7 @@ export default async function StoreDone({ params, searchParams }: { params: { ra
   const tx = (es: string, en: string) => (lang === 'en' ? en : es);
   const paid = o.status !== 'pending' && o.status !== 'canceled';
   return (
-    <div className={kit.key === 'bx' ? 'sv bxl' : 'sv'} style={{ display: 'contents' }}>
+    <div className={(kit.key === 'bx' ? 'sv bxl' : 'sv') + ' st-page'} style={{ display: 'contents' }}>
       <section className="st-hero sv-bleed st-hero-sm">
         <div className="sv-grid" aria-hidden />
         <img className="st-logo" src={`${kit.base}/${kit.logo}`} alt={race.name} />

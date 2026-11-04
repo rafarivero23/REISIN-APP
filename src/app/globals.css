@@ -1098,3 +1098,6 @@ a.sv-acc:hover .sv-cta{background:#fff;color:#050505}
 .bxl .sv-hero-shop:hover{background:var(--bx-p);color:#fff!important}
 @media (max-width:760px){.sv-hero-shop{right:18px;bottom:78px;padding:10px 14px}}
 .st-implog{flex-basis:100%;order:9;margin:6px 0 0;white-space:pre-wrap;font-size:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:10px 12px;cursor:pointer}
+/* Shop: products always in true color (no B/N filter, no film grain on the shop page) */
+.bxl .st-pic img,.bxl .st-card:hover .st-pic img,.bxl .st-main img,.bxl .st-thumbs img,.bxl .st-lines img{filter:none!important}
+.portal:has(.st-page)::after{display:none}

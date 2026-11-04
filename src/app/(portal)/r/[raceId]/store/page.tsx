@@ -21,7 +21,7 @@ export default async function StorePage({ params, searchParams }: { params: { ra
   const tick = [tx('Merch oficial', 'Official merch'), race.name, kit.tagline, tx('Recoge en entrega de kits', 'Pick up at kit pickup'), 'A race by Reisin'];
   const ticker: string[] = []; while (ticker.length < 16) ticker.push(...tick);
   return (
-    <div className={kit.key === 'bx' ? 'sv bxl' : 'sv'} style={{ display: 'contents' }}>
+    <div className={(kit.key === 'bx' ? 'sv bxl' : 'sv') + ' st-page'} style={{ display: 'contents' }}>
       <section className="st-hero sv-bleed">
         <div className="sv-grid" aria-hidden />
         <Link href={`/r/${slug}`} className="st-backlink mono">← {race.name}</Link>
