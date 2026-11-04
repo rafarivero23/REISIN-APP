@@ -66,7 +66,7 @@ function ElevProfile({ t, data }: { t: T; data: [number, number][] }) {
   );
 }
 
-export function SavHero({ race, page, lang, kit = SAV_KIT }: { race: R; page: PageData; lang: 'es' | 'en'; kit?: Kit }) {
+export function SavHero({ race, page, lang, kit = SAV_KIT, shop = false }: { race: R; page: PageData; lang: 'es' | 'en'; kit?: Kit; shop?: boolean }) {
   const cover = getPhoto(page.cover);
   const B = kit.base, ed = kit.ed + yy(race.race_date);
   return (
@@ -78,6 +78,7 @@ export function SavHero({ race, page, lang, kit = SAV_KIT }: { race: R; page: Pa
       {kit.hero.map((h) => <img key={h.src} className={'sv-el ' + h.cls} src={`${B}/${h.src}`} alt="" aria-hidden />)}
       <h1 className="sv-logo"><img src={`${B}/${kit.logo}`} alt={race.name} /></h1>
       <div className="sv-c sv-tl mono">{lang === 'en' ? 'Edition' : 'Edición'}<b>{ed}</b></div>
+      {shop && <Link href={`/r/${race.slug || race.id}/store`} className="sv-hero-shop mono">SHOP <span aria-hidden>→</span></Link>}
       <div className="sv-c sv-tr mono">{lang === 'en' ? 'Date' : 'Fecha'}<b>{fmtDate(race.race_date, lang)}</b></div>
       {race.location && <div className="sv-c sv-bl mono">{lang === 'en' ? 'Route' : 'Ruta'}<b>{race.location}</b></div>}
       <div className="sv-hud mono"><i />{kit.hud} · {ed}</div>

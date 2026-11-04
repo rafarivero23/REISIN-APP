@@ -6,7 +6,7 @@ import { Drawer, DeleteButton, useToast } from './ui';
 import { resize } from './racepage';
 import { money, fmtDate } from '@/lib/format';
 import { imgSrc, totalStock, type Product, type Order, type StoreOption } from '@/lib/store-shared';
-import { saveStoreSettings, saveProduct, deleteProduct, moveProduct, uploadStoreImage, setOrderStatus, setOrderNotes, type ProductInput } from '@/app/actions/store';
+import { saveStoreSettings, saveProduct, deleteProduct, moveProduct, uploadStoreImage, setOrderStatus, setOrderNotes, importInventory, type ProductInput } from '@/app/actions/store';
 
 // Admin → race → Tienda: settings, products (inventory per size, photos, description) and orders.
 type Settings = { on: boolean; pickup: boolean; shipFee: number | null };
@@ -61,7 +61,8 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders }: { r
 
       {view === 'products' && (
         <>
-          <div className="toolbar" style={{ justifyContent: 'flex-end' }}>
+          <div className="toolbar" style={{ justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8 }}>
+            <ImportInventory raceId={raceId} />
             <button type="button" className="btn btn-primary btn-sm" onClick={() => setEdit({ name: '', description: '', price: 0, stock: 0, options: [], images: [], active: true })}>+ {tx('Producto', 'Product')}</button>
           </div>
           {products.length === 0 ? <div className="card muted">{tx('Aún no hay productos. Agrega el primero con fotos, precio, descripción y existencias por talla.', 'No products yet. Add the first one with photos, price, description and stock per size.')}</div> : (
@@ -94,6 +95,56 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders }: { r
 
       {edit && <ProductDrawer raceId={raceId} p={edit} onClose={() => setEdit(null)} />}
     </div>
+  );
+}
+
+function ImportInventory({ raceId }: { raceId: string }) {
+  const { lang } = useT();
+  const tx = (es: string, en: string) => (lang === 'en' ? en : es);
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [log, setLog] = useState<string | null>(null);
+  const errs: Record<string, string> = { st_impEmpty: tx('El archivo no tiene filas.', 'The file has no rows.'), st_impNoName: tx('No encontré la columna "Producto" (o "Nombre").', 'No "Product" (or "Name") column found.') };
+  const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    setBusy(true); setLog(null);
+    try {
+      const XLSX = await import('xlsx');
+      const buf = await f.arrayBuffer();
+      let text: string | null = null;
+      if (/\.csv$/i.test(f.name)) { try { text = new TextDecoder('utf-8', { fatal: true }).decode(buf); } catch { text = new TextDecoder('windows-1252').decode(buf); } }
+      const wb = text != null ? XLSX.read(text.replace(/^﻿/, ''), { type: 'string' }) : XLSX.read(buf, { type: 'array' });
+      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false })
+        .map((r) => Object.fromEntries(Object.entries(r).map(([k, v]) => [String(k).trim(), String(v ?? '').trim()])));
+      const r = await importInventory(raceId, rows);
+      if (r.error) setLog(errs[r.error] || r.error);
+      else {
+        const cols = Object.entries(r.columns).filter(([, v]) => v).map(([k, v]) => `${k} → ${v}`).join(' · ');
+        setLog(`${f.name}: ${r.created} ${tx('nuevos', 'new')} · ${r.updated} ${tx('actualizados', 'updated')}${r.skipped ? ` · ${r.skipped} ${tx('filas vacías', 'empty rows')}` : ''}\n${cols}${r.warnings.length ? '\n' + r.warnings.join('\n') : ''}`);
+        router.refresh();
+      }
+    } catch { setLog(tx('No pude leer el archivo. Usa .xlsx, .xls o .csv.', 'Could not read the file. Use .xlsx, .xls or .csv.')); }
+    setBusy(false);
+  };
+  const template = async () => {
+    const XLSX = await import('xlsx');
+    const ws = XLSX.utils.aoa_to_sheet([['Producto', 'Precio', 'Descripción', 'Talla', 'Existencias'],
+      ['Playera técnica', 650, 'Tela técnica, corte unisex', 'S', 10], ['Playera técnica', '', '', 'M', 20], ['Playera técnica', '', '', 'L', 15], ['Gorra', 450, 'Trucker ajustable', '', 30]]);
+    ws['!cols'] = [{ wch: 24 }, { wch: 10 }, { wch: 40 }, { wch: 10 }, { wch: 12 }];
+    const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Inventario');
+    XLSX.writeFile(wb, 'plantilla-inventario.xlsx');
+  };
+  return (
+    <>
+      <button type="button" className="btn btn-sm" onClick={template}>{tx('Plantilla', 'Template')}</button>
+      <label className="btn btn-sm" style={{ cursor: 'pointer' }}>
+        {busy ? <><span className="spin" /> {tx('Importando…', 'Importing…')}</> : `↑ ${tx('Importar inventario (Excel)', 'Import inventory (Excel)')}`}
+        <input type="file" accept=".xlsx,.xls,.csv" hidden onChange={onFile} disabled={busy} />
+      </label>
+      {log && <pre className="st-implog" onClick={() => setLog(null)} title={tx('Cerrar', 'Close')}>{log}</pre>}
+    </>
   );
 }
 

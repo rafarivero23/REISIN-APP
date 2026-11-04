@@ -167,3 +167,76 @@ export async function confirmStoreOrder(orderId: string, proof: { sessionId?: st
   return { ok: true };
 }
 
+
+/* ---------- inventory import (Excel / CSV) ---------- */
+// Accepts either one row per product+size (Producto, Precio, Descripción, Talla, Existencias)
+// or one row per product with a column per size (S, M, L, XL…). Products are matched by name:
+// existing ones get price/description/stock updated, new ones are created (visible, no photos).
+const norm = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+const COL = {
+  name: ['producto', 'nombre', 'product', 'name', 'articulo', 'item', 'nombre del producto'],
+  price: ['precio', 'price', 'precio venta', 'precio mxn', 'costo'],
+  desc: ['descripcion', 'description', 'detalle', 'detalles'],
+  size: ['talla', 'size', 'opcion', 'variante', 'variant', 'color', 'talla color'],
+  stock: ['existencias', 'stock', 'inventario', 'cantidad', 'qty', 'piezas', 'disponible', 'disponibles', 'unidades'],
+  active: ['activo', 'visible', 'publicado'],
+};
+const SIZE_COL = /^(xxs|xs|s|m|l|xl|xxl|xxxl|2xl|3xl|ch|med|gde|eg|unitalla|os|\d{1,2}(\.5)?)$/i;
+const num = (v: unknown) => { const n = Number(String(v ?? '').replace(/[$,\s]/g, '')); return isFinite(n) ? n : NaN; };
+
+export async function importInventory(raceId: string, rows: Record<string, string>[]): Promise<{ error?: string; created: number; updated: number; skipped: number; warnings: string[]; columns: Record<string, string> }> {
+  await staff();
+  const empty = { created: 0, updated: 0, skipped: 0, warnings: [] as string[], columns: {} };
+  if (!rows.length) return { ...empty, error: 'st_impEmpty' };
+  const headers = Object.keys(rows[0]);
+  const pick = (k: keyof typeof COL) => headers.find((h) => COL[k].includes(norm(h))) || '';
+  const col = { name: pick('name'), price: pick('price'), desc: pick('desc'), size: pick('size'), stock: pick('stock'), active: pick('active') };
+  const sizeCols = col.size ? [] : headers.filter((h) => SIZE_COL.test(h.trim()));
+  if (!col.name) return { ...empty, error: 'st_impNoName' };
+  type G = { name: string; price?: number; desc?: string; active?: boolean; opts: Map<string, number>; stock?: number };
+  const groups = new Map<string, G>();
+  const warnings: string[] = [];
+  let skipped = 0;
+  for (const [i, r] of rows.entries()) {
+    const name = String(r[col.name] || '').trim();
+    if (!name) { skipped++; continue; }
+    const g: G = groups.get(norm(name)) || { name, opts: new Map<string, number>() };
+    const p = col.price ? num(r[col.price]) : NaN;
+    if (!isNaN(p) && p > 0) g.price = Math.round(p);
+    if (col.desc && String(r[col.desc] || '').trim()) g.desc = String(r[col.desc]).trim();
+    if (col.active && String(r[col.active] || '').trim()) g.active = !/^(no|0|false|oculto|n)$/i.test(String(r[col.active]).trim());
+    if (sizeCols.length) {
+      for (const h of sizeCols) { const q = num(r[h]); if (!isNaN(q) && String(r[h]).trim() !== '') g.opts.set(h.trim().toUpperCase(), Math.max(0, Math.round(q))); }
+    } else {
+      const q = col.stock ? num(r[col.stock]) : NaN;
+      const size = col.size ? String(r[col.size] || '').trim() : '';
+      if (col.stock && isNaN(q) && String(r[col.stock] || '').trim()) warnings.push(`Fila ${i + 2}: existencias "${r[col.stock]}" no es número`);
+      if (size) g.opts.set(size.toUpperCase(), (g.opts.get(size.toUpperCase()) || 0) + Math.max(0, Math.round(isNaN(q) ? 0 : q)));
+      else if (!isNaN(q)) g.stock = (g.stock || 0) + Math.max(0, Math.round(q));
+    }
+    groups.set(norm(name), g);
+  }
+  const existing = await productsOf(raceId);
+  let created = 0, updated = 0;
+  for (const g of groups.values()) {
+    const cur = existing.find((p) => norm(p.name) === norm(g.name));
+    if (cur) {
+      let options = cur.options;
+      if (g.opts.size) {
+        options = cur.options.map((o) => (g.opts.has(o.label.toUpperCase()) ? { ...o, stock: g.opts.get(o.label.toUpperCase())! } : o));
+        for (const [label, stock] of g.opts) if (!options.some((o) => o.label.toUpperCase() === label)) options.push({ label, stock });
+      }
+      await run('UPDATE store_products SET price = ?, description = ?, stock = ?, options = ?, active = ? WHERE id = ?',
+        [g.price ?? cur.price, g.desc ?? cur.description, g.stock ?? cur.stock, JSON.stringify(options), g.active ?? cur.active, cur.id]);
+      updated++;
+    } else {
+      if (g.price == null) warnings.push(`${g.name}: sin precio (quedó en $0, edítalo)`);
+      const n = await one<{ n: number }>('SELECT COALESCE(MAX(sort), 0) + 1 AS n FROM store_products WHERE race_id = ?', [raceId]);
+      await run('INSERT INTO store_products (id, race_id, name, description, price, stock, options, images, active, sort, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+        [newId(), raceId, g.name, g.desc || '', g.price || 0, g.stock || 0, JSON.stringify([...g.opts].map(([label, stock]) => ({ label, stock }))), '[]', g.active ?? true, Number(n?.n || 1), now()]);
+      created++;
+    }
+  }
+  done();
+  return { created, updated, skipped, warnings, columns: { producto: col.name, precio: col.price, descripcion: col.desc, talla: col.size || (sizeCols.length ? `columnas ${sizeCols.join(', ')}` : ''), existencias: col.stock } };
+}

@@ -42,14 +42,15 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
   // Sal a Valle: its own full-width landing (SAV27 brand kit).
   const sv = brandKey(r.brand) === 'sav' || brandKey(r.brand) === 'baja';
   const kit = brandKey(r.brand) === 'baja' ? BX_KIT : SAV_KIT;
+  const shopItems = sv && raw.store_on ? await productsOf(raw.id, true) : [];
   const svRace = { id: r.id, slug: raw.slug, name: r.name, race_date: r.race_date, location: r.location, team_price: r.team_price, solo_price: raw.solo_price, teams_left: r.teams_left };
   const locked = !!raw.access_code && !(await hasRaceAccess(raw.id, raw.access_code)) && !(await getCurrentUser());
   if (sv) {
     return (
       <div className={kit.key === 'bx' ? 'sv bxl' : 'sv'} style={{ display: 'contents' }}>
-        <SavHero race={svRace} page={page} lang={lang} kit={kit} />
+        <SavHero race={svRace} page={page} lang={lang} kit={kit} shop={shopItems.length > 0} />
         {locked ? <div className="sv-gate"><RaceGate raceId={r.id} /></div>
-          : <SavLanding race={svRace} page={page} t={t} lang={lang} showBoard={showBoard} sponsors={sponsors} mono={mono} kit={kit} store={raw.store_on ? await productsOf(raw.id, true) : []} />}
+          : <SavLanding race={svRace} page={page} t={t} lang={lang} showBoard={showBoard} sponsors={sponsors} mono={mono} kit={kit} store={shopItems} />}
       </div>
     );
   }

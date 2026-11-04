@@ -231,7 +231,7 @@ function Cart({ raceId, raceSlug, raceName, cart, byId, ship, onChange, onClose 
         )}
       </aside>
       {sim && (
-        <TestCheckout amount={sim.total} concept={`${tx('Tienda', 'Store')} · ${raceName}`} email={f.email} onClose={() => setSim(null)}
+        <TestCheckout amount={sim.total} concept={`Shop · ${raceName}`} email={f.email} onClose={() => setSim(null)}
           onPay={async () => {
             const r = await confirmStoreOrder(sim.orderId, { payToken: sim.payToken });
             if (!r.ok) throw new Error('Error');

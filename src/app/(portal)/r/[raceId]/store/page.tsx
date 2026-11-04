@@ -26,7 +26,7 @@ export default async function StorePage({ params, searchParams }: { params: { ra
         <div className="sv-grid" aria-hidden />
         <Link href={`/r/${slug}`} className="st-backlink mono">← {race.name}</Link>
         <img className="st-logo" src={`${kit.base}/${kit.logo}`} alt={race.name} />
-        <h1>{tx('Tienda', 'Store')}</h1>
+        <h1>SHOP</h1>
         <p className="mono">{tx('Merch oficial', 'Official merch')} · {products.length} {tx('productos', 'products')}</p>
         {kit.hero[0] && <img className="sv-el st-hero-el" src={`${kit.base}/${kit.hero[0].src}`} alt="" aria-hidden />}
       </section>
