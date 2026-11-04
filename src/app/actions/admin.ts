@@ -9,7 +9,7 @@ import { createSession, destroySession } from '@/lib/session';
 import {
   createRace, updateRace, deleteRace, getRace, getTeam, getRunner, createTeam, updateTeam, deleteTeam, updateRunner, deleteRunner,
   recordPayment, assignPayment, deletePayment, getPayment, findUserByEmail, createUser, deleteUser, getUserById, updateUserPassword,
-  sizeOptions, captainSizeOptions, setPaymentResolution, setRunnerWaiver, settleAmount, setCodeSent, setRaceGroups, setPaymentNotes, setRunnerNotes, type RaceInput, type RunnerInput,
+  sizeOptions, captainSizeOptions, setPaymentResolution, setRunnerWaiver, settleAmount, teamPaidTotal, setCodeSent, setRaceGroups, setPaymentNotes, setRunnerNotes, type RaceInput, type RunnerInput,
   paymentsOfRace,
 } from '@/lib/repo';
 import { importCsvText, rematch, importSolos } from '@/lib/importers';
@@ -272,7 +272,7 @@ export async function teamMarkSettled(id: string): Promise<Result> {
   const race = t ? await getRace(t.race_id) : null;
   if (!t || !race) return { error: 'not_found' };
   await recordPayment({ race_id: t.race_id, team_id: t.id, kind: 'settle', source: 'manual', external_id: 'manual:' + newId(), quantity: 1,
-    amount: settleAmount(t, race), payer_name: t.captain_name, payer_email: t.captain_email });
+    amount: settleAmount(t, race, await teamPaidTotal(t.id)), payer_name: t.captain_name, payer_email: t.captain_email });
   refresh();
   return {};
 }

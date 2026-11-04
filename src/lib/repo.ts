@@ -179,12 +179,23 @@ export const paidSlots = (t: Pick<Team, 'payment_status' | 'extra_slots'> & { is
 export function parseSettle(json: string | null | undefined): Record<string, number> {
   try { const o = JSON.parse(json || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; }
 }
-export function settleAmount(team: Team, race: Race): number {
-  if (team.settled_at || team.is_solo) return 0;
+// paid = everything the team has paid so far (payments ledger). A team that
+// already paid the full price (e.g. $35,000 instead of the $20,000 deposit)
+// owes nothing; one that paid part of the balance owes only the rest.
+export function settleAmount(team: Team, race: Race, paid?: { total: number; deposit: number }): number {
+  if (team.settled_at || team.is_solo || team.reg_type === 'full') return 0;
   const size = teamSizeOf(team, race);
   const fixed = Number(parseSettle(race.settle_amounts)[String(size)]);
-  if (fixed > 0) return fixed;
+  if (fixed > 0) return paid && paid.total > 0 && paid.deposit > 0 ? Math.min(fixed, Math.max(0, paid.deposit + fixed - paid.total)) : fixed;
   return Math.max(0, size - paidSlots(team, race)) * (race.runner_fee || 0);
+}
+// What a team has paid, and the race's deposit (smallest team payment = the
+// "apartado"). Full price = deposit + settlement, so a team that paid that
+// much (e.g. $35,000 = $20,000 + $15,000) owes nothing.
+export async function teamPaidTotal(teamId: string) {
+  const r = await one<{ n: string; d: string | null }>(`SELECT COALESCE((SELECT SUM(amount) FROM payments WHERE team_id = ? AND kind <> 'store'), 0) AS n,
+    (SELECT MIN(p.amount) FROM payments p WHERE p.kind = 'team' AND p.amount > 0 AND p.race_id = (SELECT race_id FROM teams WHERE id = ?)) AS d`, [teamId, teamId]);
+  return { total: Number(r?.n || 0), deposit: Number(r?.d || 0) };
 }
 export function sizeOptions(r: Pick<Race, 'team_sizes' | 'team_size'>) {
   const xs = (r.team_sizes || '').split(',').map((x) => parseInt(x.trim(), 10)).filter((n) => n > 0);
