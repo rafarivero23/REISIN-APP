@@ -5,11 +5,11 @@ import { useT } from './I18n';
 import { Drawer, DeleteButton, useToast } from './ui';
 import { resize } from './racepage';
 import { money, fmtDate } from '@/lib/format';
-import { imgSrc, totalStock, type Product, type Order, type StoreOption } from '@/lib/store-shared';
+import { imgSrc, heroList, totalStock, type Product, type Order, type StoreOption } from '@/lib/store-shared';
 import { saveStoreSettings, saveProduct, deleteProduct, moveProduct, uploadStoreImage, setOrderStatus, setOrderNotes, importInventory, setStoreHero, type ProductInput } from '@/app/actions/store';
 
 // Admin → race → Tienda: settings, products (inventory per size, photos, description) and orders.
-type Settings = { on: boolean; pickup: boolean; shipFee: number | null; code: string | null; hero: string | null };
+type Settings = { on: boolean; pickup: boolean; shipFee: number | null; code: string | null; hero: string[] };
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
 export function StoreAdmin({ raceId, raceSlug, settings, products, orders }: { raceId: string; raceSlug: string; settings: Settings; products: Product[]; orders: Order[] }) {
@@ -102,35 +102,51 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders }: { r
   );
 }
 
-// Full-screen cover photo for the public shop page.
-function HeroPicker({ raceId, hero }: { raceId: string; hero: string | null }) {
+// Full-screen cover photos (carousel) for the public shop page.
+function HeroPicker({ raceId, hero }: { raceId: string; hero: string[] }) {
   const { lang } = useT();
   const tx = (es: string, en: string) => (lang === 'en' ? en : es);
   const router = useRouter();
   const toast = useToast();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const save = async (ids: string[]) => { await setStoreHero(raceId, ids); router.refresh(); };
   const pick = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; e.target.value = '';
-    if (!f) return;
-    setBusy(true);
-    try {
-      const lg = await resize(f, 2400, 0.85), sm = await resize(f, 900, 0.8);
-      const r = await uploadStoreImage(raceId, lg.url, sm.url, lg.w, lg.h);
-      if (r.id) { await setStoreHero(raceId, r.id); router.refresh(); } else toast(f.name);
-    } catch { toast(f.name); }
-    setBusy(false);
+    const files = Array.from(e.target.files || []).filter((f) => f.type.startsWith('image/')); e.target.value = '';
+    const added: string[] = [];
+    for (const [i, f] of files.entries()) {
+      setBusy(`${i + 1}/${files.length}`);
+      try {
+        const lg = await resize(f, 2400, 0.85), sm = await resize(f, 900, 0.8);
+        const r = await uploadStoreImage(raceId, lg.url, sm.url, lg.w, lg.h);
+        if (r.id) added.push(r.id); else toast(f.name);
+      } catch { toast(f.name); }
+    }
+    setBusy(null);
+    if (added.length) await save([...hero, ...added]);
   };
+  const move = (i: number, d: number) => { const a = [...hero], j = i + d; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; save(a); };
   return (
     <div className="st-hero-pick">
-      {hero ? <img src={imgSrc(hero, true)} alt="" /> : <div className="st-hero-empty">{tx('Sin imagen', 'No image')}</div>}
-      <div>
-        <div className="label">{tx('Imagen de portada del shop', 'Shop cover image')}</div>
-        <p className="muted" style={{ fontSize: 13, margin: '2px 0 8px' }}>{tx('Foto horizontal del merch a pantalla completa arriba del shop. Sin imagen se muestra un encabezado compacto.', 'Horizontal merch photo shown full screen above the shop. Without one, a compact header is shown.')}</p>
-        <div className="row" style={{ gap: 8 }}>
-          <label className="btn btn-sm" style={{ cursor: 'pointer' }}>{busy ? <><span className="spin" /> {tx('Subiendo…', 'Uploading…')}</> : `↑ ${hero ? tx('Cambiar', 'Replace') : tx('Subir imagen', 'Upload image')}`}<input type="file" accept="image/*" hidden onChange={pick} disabled={busy} /></label>
-          {hero && <button type="button" className="btn btn-sm" onClick={async () => { await setStoreHero(raceId, null); router.refresh(); }}>{tx('Quitar', 'Remove')}</button>}
+      <div className="row" style={{ justifyContent: 'space-between', width: '100%' }}>
+        <div>
+          <div className="label">{tx('Portada del shop', 'Shop cover')} · {hero.length}</div>
+          <p className="muted" style={{ fontSize: 13, margin: '2px 0 0' }}>{tx('Fotos horizontales del merch a pantalla completa; si subes varias, se van disolviendo una tras otra. Sin fotos se muestra un encabezado compacto.', 'Horizontal merch photos shown full screen; several dissolve one after another. Without photos, a compact header is shown.')}</p>
         </div>
+        <label className="btn btn-sm" style={{ cursor: 'pointer' }}>{busy ? <><span className="spin" /> {busy}</> : `↑ ${tx('Subir fotos', 'Upload photos')}`}<input type="file" accept="image/*" multiple hidden onChange={pick} disabled={!!busy} /></label>
       </div>
+      {hero.length > 0 && (
+        <div className="st-hero-list">
+          {hero.map((id, i) => (
+            <div key={id} className="st-img"><img src={imgSrc(id, true)} alt="" />
+              <div className="st-img-bar">
+                <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="←">←</button>
+                <button type="button" onClick={() => save(hero.filter((x) => x !== id))} aria-label={tx('Quitar', 'Remove')}>✕</button>
+                <button type="button" onClick={() => move(i, 1)} disabled={i === hero.length - 1} aria-label="→">→</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

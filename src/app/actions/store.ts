@@ -28,9 +28,10 @@ export async function saveStoreSettings(raceId: string, s: { on: boolean; pickup
   return {};
 }
 
-export async function setStoreHero(raceId: string, imageId: string | null) {
+export async function setStoreHero(raceId: string, ids: string[]) {
   await staff();
-  await run('UPDATE races SET store_hero = ? WHERE id = ?', [imageId || null, raceId]);
+  const list = ids.filter(Boolean).slice(0, 12);
+  await run('UPDATE races SET store_hero = ? WHERE id = ?', [list.length ? JSON.stringify(list) : null, raceId]);
   done();
   return {};
 }

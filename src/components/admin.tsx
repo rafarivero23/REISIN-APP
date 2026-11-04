@@ -1,7 +1,7 @@
 'use client';
 import { StoreAdmin } from './store-admin';
 import type { Product, Order } from '@/lib/store-shared';
-type StoreProps = { settings: { on: boolean; pickup: boolean; shipFee: number | null; code: string | null; hero: string | null }; products: Product[]; orders: Order[] };
+type StoreProps = { settings: { on: boolean; pickup: boolean; shipFee: number | null; code: string | null; hero: string[] }; products: Product[]; orders: Order[] };
 import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';

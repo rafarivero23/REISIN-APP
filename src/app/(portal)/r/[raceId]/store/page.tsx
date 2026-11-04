@@ -3,7 +3,8 @@ import { notFound } from 'next/navigation';
 import { getRace } from '@/lib/repo';
 import { getT } from '@/lib/lang';
 import { brandKey } from '@/lib/format';
-import { productsOf, imgSrc } from '@/lib/store';
+import { productsOf, imgSrc, heroList } from '@/lib/store';
+import { ShopCover } from '@/components/ShopCover';
 import { SAV_KIT, BX_KIT } from '@/components/SavLanding';
 import { StoreFront, ShopGate } from '@/components/StoreFront';
 import { hasShopAccess } from '@/lib/team-session';
@@ -25,9 +26,9 @@ export default async function StorePage({ params, searchParams }: { params: { ra
   const ticker: string[] = []; while (ticker.length < 16) ticker.push(...tick);
   return (
     <div className={(kit.key === 'bx' ? 'sv bxl' : 'sv') + ' st-page'} style={{ display: 'contents' }}>
-      {race.store_hero ? (
+      {heroList(race.store_hero).length ? (
         <section className="st-cover sv-bleed">
-          <img className="st-cover-img" src={imgSrc(race.store_hero)} alt={`${race.name} merch`} />
+          <ShopCover srcs={heroList(race.store_hero).map((id) => imgSrc(id))} alt={`${race.name} merch`} />
           <Link href={`/r/${slug}`} className="st-backlink st-cover-back mono">← {race.name}</Link>
           <div className="st-cover-in">
             <img className="st-logo" src={`${kit.base}/${kit.logo}`} alt={race.name} />

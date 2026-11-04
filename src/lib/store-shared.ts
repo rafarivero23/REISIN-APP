@@ -17,3 +17,6 @@ export const imgSrc = (id: string, small = false) => `/api/store-img/${id}${smal
 export const totalStock = (p: Product) => (p.options.length ? p.options.reduce((a, o) => a + Math.max(0, o.stock), 0) : Math.max(0, p.stock));
 export const stockOf = (p: Product, option: string) => (p.options.length ? Math.max(0, p.options.find((o) => o.label === option)?.stock ?? 0) : Math.max(0, p.stock));
 
+
+// Shop cover: races.store_hero holds one image id or a JSON list of ids.
+export const heroList = (v: string | null | undefined): string[] => { if (!v) return []; if (v.startsWith('[')) { try { return (JSON.parse(v) as string[]).filter(Boolean); } catch { return []; } } return [v]; };
