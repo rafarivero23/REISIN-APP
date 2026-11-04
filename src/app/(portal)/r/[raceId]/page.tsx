@@ -4,7 +4,7 @@ import { money } from '@/lib/format';
 import { getT } from '@/lib/lang';
 import { getRace } from '@/lib/repo';
 import { getCurrentUser } from '@/lib/auth-guard';
-import { hasRaceAccess } from '@/lib/team-session';
+import { hasRaceAccess, hasShopAccess } from '@/lib/team-session';
 import { parsePage } from '@/lib/racepage';
 import { checkpointsOf } from '@/lib/timing';
 import { RichText } from '@/components/RichText';
@@ -48,9 +48,9 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
   if (sv) {
     return (
       <div className={kit.key === 'bx' ? 'sv bxl' : 'sv'} style={{ display: 'contents' }}>
-        <SavHero race={svRace} page={page} lang={lang} kit={kit} shop={shopItems.length > 0} />
+        <SavHero race={svRace} page={page} lang={lang} kit={kit} shop={shopItems.length > 0 || (!!raw.store_on && !!raw.store_code)} />
         {locked ? <div className="sv-gate"><RaceGate raceId={r.id} /></div>
-          : <SavLanding race={svRace} page={page} t={t} lang={lang} showBoard={showBoard} sponsors={sponsors} mono={mono} kit={kit} store={shopItems} />}
+          : <SavLanding race={svRace} page={page} t={t} lang={lang} showBoard={showBoard} sponsors={sponsors} mono={mono} kit={kit} store={raw.store_code && !(await getCurrentUser()) && !(await hasShopAccess(raw.id, raw.store_code)) ? [] : shopItems} />}
       </div>
     );
   }

@@ -371,6 +371,8 @@ CREATE INDEX IF NOT EXISTS idx_store_orders_race ON store_orders(race_id);
 ALTER TABLE races ADD COLUMN IF NOT EXISTS store_on BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE races ADD COLUMN IF NOT EXISTS store_pickup BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE races ADD COLUMN IF NOT EXISTS store_ship_fee INTEGER;
+-- Optional password to enter the shop (empty = public).
+ALTER TABLE races ADD COLUMN IF NOT EXISTS store_code TEXT;
 
 -- Solos have their own number series (S1, S2…). Races numbered before that
 -- (Solos at 46+) are shifted back to start at 1, keeping their order.

@@ -1101,3 +1101,8 @@ a.sv-acc:hover .sv-cta{background:#fff;color:#050505}
 /* Shop: products always in true color (no B/N filter, no film grain on the shop page) */
 .bxl .st-pic img,.bxl .st-card:hover .st-pic img,.bxl .st-main img,.bxl .st-thumbs img,.bxl .st-lines img{filter:none!important}
 .portal:has(.st-page)::after{display:none}
+.st-gate{padding:70px 32px 90px;border-bottom:1px solid var(--line);max-width:640px}
+.st-gate h2{font-size:clamp(36px,4.5vw,60px);font-weight:300;margin:14px 0 10px}
+.st-gate p{color:var(--muted);font-size:17px;margin:0 0 26px}
+.st-gate-f{padding:0}.st-gate-f .st-go{margin:10px 0 0}
+@media (max-width:760px){.st-gate{padding:44px 18px 60px}}

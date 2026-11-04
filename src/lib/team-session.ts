@@ -89,6 +89,9 @@ const fingerprint = async (code: string) => {
 export async function setRaceAccess(raceId: string, code: string) {
   cookies().set(raceCookie(raceId), await sign({ k: 'race', r: raceId, f: await fingerprint(code) }, '180d'), cookieOpts(60 * 60 * 24 * 180));
 }
+// Shop password: same signed cookie, separate key per race.
+export async function setShopAccess(raceId: string, code: string) { return setRaceAccess('shop:' + raceId, code); }
+export async function hasShopAccess(raceId: string, code: string | null) { return hasRaceAccess('shop:' + raceId, code); }
 export async function hasRaceAccess(raceId: string, code: string | null): Promise<boolean> {
   if (!code) return true;
   const p = await read(cookies().get(raceCookie(raceId))?.value, 'race');

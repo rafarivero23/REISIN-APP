@@ -6,7 +6,7 @@ import { TestCheckout } from './ui';
 import { RichText } from './RichText';
 import { money } from '@/lib/format';
 import { imgSrc, stockOf, totalStock, type Product } from '@/lib/store-shared';
-import { storeCheckout, confirmStoreOrder } from '@/app/actions/store';
+import { storeCheckout, confirmStoreOrder, unlockShop } from '@/app/actions/store';
 
 // Public race store: product grid → detail pop-up (big photos, sizes) → cart drawer → Stripe checkout.
 type Line = { productId: string; option: string; qty: number };
@@ -240,5 +240,33 @@ function Cart({ raceId, raceSlug, raceName, cart, byId, ship, onChange, onClose 
           }} />
       )}
     </div>
+  );
+}
+
+export function ShopGate({ raceId }: { raceId: string }) {
+  const { lang } = useT();
+  const tx = (es: string, en: string) => (lang === 'en' ? en : es);
+  const router = useRouter();
+  const [code, setCode] = useState('');
+  const [err, setErr] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const go = async (e: React.FormEvent) => {
+    e.preventDefault(); setBusy(true); setErr(false);
+    const r = await unlockShop(raceId, code);
+    setBusy(false);
+    if (r.error) return setErr(true);
+    router.refresh();
+  };
+  return (
+    <section className="st-gate sv-bleed">
+      <span className="mono">🔒 {tx('Acceso con contraseña', 'Password access')}</span>
+      <h2>{tx('Este shop es privado', 'This shop is private')}</h2>
+      <p>{tx('Escribe la contraseña que te compartimos para ver los productos.', 'Enter the password we shared with you to see the products.')}</p>
+      <form className="st-form st-gate-f" onSubmit={go}>
+        <label><span className="mono">{tx('Contraseña', 'Password')}</span><input type="password" value={code} onChange={(e) => setCode(e.target.value)} autoFocus autoComplete="off" required /></label>
+        {err && <p className="st-err">{tx('Contraseña incorrecta.', 'Wrong password.')}</p>}
+        <button type="submit" className="sv-cta st-go" disabled={busy}>{busy ? '…' : `${tx('Entrar', 'Enter')} →`}</button>
+      </form>
+    </section>
   );
 }

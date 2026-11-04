@@ -9,7 +9,7 @@ import { imgSrc, totalStock, type Product, type Order, type StoreOption } from '
 import { saveStoreSettings, saveProduct, deleteProduct, moveProduct, uploadStoreImage, setOrderStatus, setOrderNotes, importInventory, type ProductInput } from '@/app/actions/store';
 
 // Admin → race → Tienda: settings, products (inventory per size, photos, description) and orders.
-type Settings = { on: boolean; pickup: boolean; shipFee: number | null };
+type Settings = { on: boolean; pickup: boolean; shipFee: number | null; code: string | null };
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
 export function StoreAdmin({ raceId, raceSlug, settings, products, orders }: { raceId: string; raceSlug: string; settings: Settings; products: Product[]; orders: Order[] }) {
@@ -17,7 +17,7 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders }: { r
   const tx = (es: string, en: string) => (lang === 'en' ? en : es);
   const router = useRouter();
   const toast = useToast();
-  const [s, setS] = useState({ on: settings.on, pickup: settings.pickup, ship: settings.shipFee != null, fee: settings.shipFee ?? 0 });
+  const [s, setS] = useState({ on: settings.on, pickup: settings.pickup, ship: settings.shipFee != null, fee: settings.shipFee ?? 0, lock: !!settings.code, code: settings.code || '' });
   const [edit, setEdit] = useState<ProductInput | null>(null);
   const [view, setView] = useState<'products' | 'orders'>('products');
   const paid = orders.filter((o) => o.status !== 'canceled');
@@ -25,7 +25,8 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders }: { r
   const toDeliver = orders.filter((o) => o.status === 'paid').length;
 
   const saveSettings = async () => {
-    await saveStoreSettings(raceId, { on: s.on, pickup: s.pickup, shipFee: s.ship ? Number(s.fee) || 0 : null });
+    if (s.lock && !s.code.trim()) return toast(tx('Escribe la contraseña de la tienda', 'Enter the shop password'));
+    await saveStoreSettings(raceId, { on: s.on, pickup: s.pickup, shipFee: s.ship ? Number(s.fee) || 0 : null, code: s.lock ? s.code : '' });
     toast(tx('Guardado', 'Saved')); router.refresh();
   };
 
@@ -44,6 +45,8 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders }: { r
           <label className="chk"><input type="checkbox" checked={s.pickup} onChange={(e) => setS({ ...s, pickup: e.target.checked })} /> {tx('Recoger en entrega de kits', 'Pickup at kit pickup')}</label>
           <label className="chk"><input type="checkbox" checked={s.ship} onChange={(e) => setS({ ...s, ship: e.target.checked })} /> {tx('Envío en México', 'Shipping in Mexico')}</label>
           {s.ship && <label className="st-fee">{tx('Costo de envío', 'Shipping fee')} $<input type="number" min={0} value={s.fee} onChange={(e) => setS({ ...s, fee: Number(e.target.value) })} /></label>}
+          <label className="chk"><input type="checkbox" checked={s.lock} onChange={(e) => setS({ ...s, lock: e.target.checked })} /> 🔒 {tx('Con contraseña', 'Password protected')}</label>
+          {s.lock && <label className="st-fee">{tx('Contraseña', 'Password')} <input type="text" value={s.code} onChange={(e) => setS({ ...s, code: e.target.value })} style={{ width: 160 }} autoComplete="off" /></label>}
           <button type="button" className="btn btn-primary btn-sm" onClick={saveSettings}>{tx('Guardar', 'Save')}</button>
         </div>
         <div className="st-kpis">

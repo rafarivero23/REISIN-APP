@@ -7,7 +7,7 @@ import { many, one, run } from '@/lib/db';
 import { newId, now } from '@/lib/ids';
 import { getRace } from '@/lib/repo';
 import { stripe } from '@/lib/stripe';
-import { signPayToken, verifyPayToken } from '@/lib/team-session';
+import { signPayToken, verifyPayToken, setShopAccess, hasShopAccess } from '@/lib/team-session';
 import { createOrder, getOrder, markOrderPaid, productsOf, stockOf, type OrderItem, type StoreOption } from '@/lib/store';
 
 const staff = async () => { if (!(await getCurrentUser())) throw new Error('Not signed in'); };
@@ -20,10 +20,10 @@ function origin() {
 }
 
 /* ---------- admin ---------- */
-export async function saveStoreSettings(raceId: string, s: { on: boolean; pickup: boolean; shipFee: number | null }) {
+export async function saveStoreSettings(raceId: string, s: { on: boolean; pickup: boolean; shipFee: number | null; code?: string }) {
   await staff();
-  await run('UPDATE races SET store_on = ?, store_pickup = ?, store_ship_fee = ? WHERE id = ?',
-    [!!s.on, !!s.pickup, s.shipFee == null || isNaN(s.shipFee) ? null : Math.max(0, Math.round(s.shipFee)), raceId]);
+  await run('UPDATE races SET store_on = ?, store_pickup = ?, store_ship_fee = ?, store_code = ? WHERE id = ?',
+    [!!s.on, !!s.pickup, s.shipFee == null || isNaN(s.shipFee) ? null : Math.max(0, Math.round(s.shipFee)), (s.code || '').trim() || null, raceId]);
   done();
   return {};
 }
@@ -108,6 +108,7 @@ export async function storeCheckout(raceId: string, cart: CartLine[], b: Buyer):
   Promise<{ error: string; detail?: string } | { url: string } | { simulated: true; orderId: string; payToken: string; total: number }> {
   const race = await getRace(raceId);
   if (!race || !race.store_on) return { error: 'st_closed' };
+  if (race.store_code && !(await hasShopAccess(race.id, race.store_code)) && !(await getCurrentUser())) return { error: 'st_locked' };
   if (!b.name.trim() || !b.email.trim() || !b.phone.trim()) return { error: 'required' };
   const ship = b.delivery === 'ship';
   if (ship && race.store_ship_fee == null) return { error: 'st_noShip' };
@@ -239,4 +240,13 @@ export async function importInventory(raceId: string, rows: Record<string, strin
   }
   done();
   return { created, updated, skipped, warnings, columns: { producto: col.name, precio: col.price, descripcion: col.desc, talla: col.size || (sizeCols.length ? `columnas ${sizeCols.join(', ')}` : ''), existencias: col.stock } };
+}
+
+// Public: unlock a password-protected shop.
+export async function unlockShop(raceId: string, code: string): Promise<{ error?: string }> {
+  const race = await getRace(raceId);
+  if (!race?.store_code) return {};
+  if (String(code || '').trim().toLowerCase() !== race.store_code.trim().toLowerCase()) return { error: 'p_badPass' };
+  await setShopAccess(race.id, race.store_code);
+  return {};
 }

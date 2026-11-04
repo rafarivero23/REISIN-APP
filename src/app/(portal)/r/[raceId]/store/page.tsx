@@ -5,7 +5,9 @@ import { getT } from '@/lib/lang';
 import { brandKey } from '@/lib/format';
 import { productsOf } from '@/lib/store';
 import { SAV_KIT, BX_KIT } from '@/components/SavLanding';
-import { StoreFront } from '@/components/StoreFront';
+import { StoreFront, ShopGate } from '@/components/StoreFront';
+import { hasShopAccess } from '@/lib/team-session';
+import { getCurrentUser } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +17,8 @@ export default async function StorePage({ params, searchParams }: { params: { ra
   const race = await getRace(params.raceId);
   if (!race) notFound();
   const kit = brandKey(race.brand) === 'baja' ? BX_KIT : SAV_KIT;
-  const products = race.store_on ? await productsOf(race.id, true) : [];
+  const locked = !!race.store_code && !(await hasShopAccess(race.id, race.store_code)) && !(await getCurrentUser());
+  const products = race.store_on && !locked ? await productsOf(race.id, true) : [];
   const tx = (es: string, en: string) => (lang === 'en' ? en : es);
   const slug = race.slug || race.id;
   const tick = [tx('Merch oficial', 'Official merch'), race.name, kit.tagline, tx('Recoge en entrega de kits', 'Pick up at kit pickup'), 'A race by Reisin'];
@@ -27,11 +30,11 @@ export default async function StorePage({ params, searchParams }: { params: { ra
         <Link href={`/r/${slug}`} className="st-backlink mono">← {race.name}</Link>
         <img className="st-logo" src={`${kit.base}/${kit.logo}`} alt={race.name} />
         <h1>SHOP</h1>
-        <p className="mono">{tx('Merch oficial', 'Official merch')} · {products.length} {tx('productos', 'products')}</p>
+        <p className="mono">{tx('Merch oficial', 'Official merch')}{locked ? ' · 🔒' : ` · ${products.length} ${tx('productos', 'products')}`}</p>
         {kit.hero[0] && <img className="sv-el st-hero-el" src={`${kit.base}/${kit.hero[0].src}`} alt="" aria-hidden />}
       </section>
       <div className="sv-ticker sv-bleed mono" aria-hidden><div style={{ animationDuration: `${ticker.length * 5}s` }}>{[...ticker, ...ticker].map((x, i) => <span key={i}>{kit.tick} {x}</span>)}</div></div>
-      {!race.store_on ? <div className="st-empty">{tx('La tienda abre muy pronto.', 'The store opens soon.')}</div> : (
+      {race.store_on && locked ? <ShopGate raceId={race.id} /> : !race.store_on ? <div className="st-empty">{tx('La tienda abre muy pronto.', 'The store opens soon.')}</div> : (
         <StoreFront raceId={race.id} raceSlug={slug} raceName={race.name} products={products} canceled={!!searchParams.canceled} openId={searchParams.p}
           ship={{ pickup: race.store_pickup, fee: race.store_ship_fee }} />
       )}
