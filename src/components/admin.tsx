@@ -239,7 +239,7 @@ export function RaceDetail({ race, teams, solos = [], runners, payments, agents,
               <button type="button" className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'teamForm' })}>+ {t('addTeam')}</button>
             </div>
           </div>
-          <TeamsTable race={race} teams={[...teams].sort((a, b) => (a.team_no ?? 1e9) - (b.team_no ?? 1e9) || a.name.localeCompare(b.name)).filter((x) => !search || `#${x.team_no ?? ''} ${x.name} ${x.captain_name} ${x.captain_email} ${x.claim_code}`.toLowerCase().includes(search.toLowerCase()))}
+          <TeamsTable race={race} teams={[...teams].sort((a, b) => Number(a.no_race) - Number(b.no_race) || (a.team_no ?? 1e9) - (b.team_no ?? 1e9) || a.name.localeCompare(b.name)).filter((x) => !search || `#${x.team_no ?? ''} ${x.name} ${x.captain_name} ${x.captain_email} ${x.claim_code}`.toLowerCase().includes(search.toLowerCase()))}
             count={(id) => runnersOfTeam(id).length} open={(id) => setModal({ type: 'team', id })} info={info} />
         </>
       )}

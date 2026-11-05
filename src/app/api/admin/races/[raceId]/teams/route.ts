@@ -18,7 +18,7 @@ export async function GET(_req: Request, { params }: { params: { raceId: string 
   const runners = await runnersOfRace(race.id);
   const groups = parseGroups(race.start_groups);
   const tr = (k: string) => translate('es', k);
-  const byNo = (a: Team, b: Team) => (a.team_no ?? 1e9) - (b.team_no ?? 1e9) || a.name.localeCompare(b.name, 'es');
+  const byNo = (a: Team, b: Team) => Number(a.no_race) - Number(b.no_race) || (a.team_no ?? 1e9) - (b.team_no ?? 1e9) || a.name.localeCompare(b.name, 'es');
   const teams = all.filter((t) => !t.is_solo).sort(byNo);
   const solos = all.filter((t) => t.is_solo).sort(byNo);
   const rs = (id: string) => runners.filter((r) => r.team_id === id).sort((a, b) => (a.bib || 0) - (b.bib || 0));
