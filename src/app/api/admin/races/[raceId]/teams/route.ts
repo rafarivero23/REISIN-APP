@@ -38,7 +38,7 @@ export async function GET(_req: Request, { params }: { params: { raceId: string 
   };
 
   const teamRows: unknown[][] = [['No.', 'Equipo', 'Categoría', 'Integrantes', 'Grupo', 'Salida', 'Prom. medio maratón', 'Capitán', 'Correo capitán', 'Teléfono capitán', 'Código capitán', 'Código enviado',
-    'Corredores registrados', 'Faltan corredores', 'Exoneraciones firmadas', 'Sin exoneración', 'Estado registro', 'Pendientes', 'Pago', 'Tipo de registro', 'Contraseña de equipo', 'Logo', 'Notas']];
+    'Corredores registrados', 'Faltan corredores', 'Exoneraciones firmadas', 'Sin exoneración', 'Estado registro', 'Pendientes', 'Pago', 'Tipo de registro', 'Contraseña de equipo', 'Logo', 'Compite', 'Notas']];
   const stats = { complete: 0, incomplete: 0, runners: 0, slots: 0, waivers: 0, missing: 0, noWaiver: 0 };
   for (const t of teams) {
     const s = status(t), g = groupFor(t.half_avg_min, groups);
@@ -46,7 +46,7 @@ export async function GET(_req: Request, { params }: { params: { raceId: string 
     stats[s.complete ? 'complete' : 'incomplete']++; stats.runners += s.list.length; stats.slots += s.sl.size;
     stats.waivers += s.list.length - s.noWaiver.length; stats.missing += s.missing; stats.noWaiver += s.noWaiver.length;
     teamRows.push([t.team_no ?? '', t.name, cat, s.sl.size, g?.label ? `Grupo ${g.label}` : '', g?.start || '', t.half_avg_min ? fmtHalf(t.half_avg_min) : '', t.captain_name, t.captain_email, t.captain_phone || '', t.claim_code, t.code_sent_at ? `Sí · ${d(t.code_sent_at)}` : 'No',
-      `${s.list.length}/${s.sl.size}`, s.missing, s.list.length - s.noWaiver.length, s.noWaiver.length, s.complete ? 'Completo' : 'Incompleto', s.pend, s.pay, t.reg_type === 'full' ? 'Completo' : 'Preventa', t.password_hash ? 'Sí' : 'No', t.logo ? 'Sí' : 'No', t.notes || '']);
+      `${s.list.length}/${s.sl.size}`, s.missing, s.list.length - s.noWaiver.length, s.noWaiver.length, s.complete ? 'Completo' : 'Incompleto', s.pend, s.pay, t.reg_type === 'full' ? 'Completo' : 'Preventa', t.password_hash ? 'Sí' : 'No', t.logo ? 'Sí' : 'No', t.no_race ? 'NO COMPITE' : 'Sí', t.notes || '']);
   }
   const soloRows: unknown[][] = [['No.', 'Nombre', 'Correo', 'Teléfono', 'Código', 'Registro', 'Exoneración', 'Estado', 'Pago', 'Notas']];
   for (const t of solos) {

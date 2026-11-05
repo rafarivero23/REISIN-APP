@@ -1,4 +1,4 @@
-import { getRace, isListedTeam, type Race, type Team } from '@/lib/repo';
+import { getRace, isRacingTeam, type Race, type Team } from '@/lib/repo';
 import { many, one } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth-guard';
 import { timingAccess } from '@/lib/team-session';
@@ -61,7 +61,7 @@ export async function CheckinView({ race }: { race: Race }) {
   }
   const groups = parseGroups(race.start_groups);
   const [cps, cis, teams] = await Promise.all([checkpointsOf(race.id), checkinsOf(race.id), many<Team>('SELECT * FROM teams WHERE race_id = ?', [race.id])]);
-  const list = teams.filter(isListedTeam).map((x) => ({ id: x.id, no: noLabel(x.team_no, x.is_solo), name: x.name, solo: x.is_solo, group: x.is_solo ? null : groupFor(x.half_avg_min, groups)?.label || null }))
+  const list = teams.filter(isRacingTeam).map((x) => ({ id: x.id, no: noLabel(x.team_no, x.is_solo), name: x.name, solo: x.is_solo, group: x.is_solo ? null : groupFor(x.half_avg_min, groups)?.label || null }))
     .sort((a, b) => noSort(a.no) - noSort(b.no) || a.name.localeCompare(b.name));
   return (
     <div className="lb-wide">

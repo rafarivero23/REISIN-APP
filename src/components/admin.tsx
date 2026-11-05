@@ -5,7 +5,7 @@ type StoreProps = { settings: { on: boolean; pickup: boolean; shipFee: number | 
 import { useEffect, useState, useTransition } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { renumberTeams } from '@/app/actions/timing';
+import { renumberTeams, setNoRace } from '@/app/actions/timing';
 import { useT } from './I18n';
 import { Drawer, Field, PayChip, Bib, DeleteButton, useToast, useCopy } from './ui';
 import { RunnerFields, type RunnerForm } from './portal';
@@ -46,7 +46,7 @@ export type ATeam = {
   id: string; race_id: string; name: string; category: string | null; captain_name: string; captain_email: string;
   captain_phone: string | null; amount: number; payment_status: string; payment_method: string | null; paid_at: string | null;
   claim_code: string; has_password: boolean; created_at: string; team_size: number | null; extra_slots: number; notes: string | null;
-  half_avg_min: number | null; reg_type: string; logo_v: string | null; code_sent_at: string | null; team_no: number | null; is_solo: boolean; settled_at: string | null;
+  half_avg_min: number | null; reg_type: string; logo_v: string | null; code_sent_at: string | null; team_no: number | null; is_solo: boolean; settled_at: string | null; no_race: boolean;
 };
 export type ARunner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string; email: string;
@@ -413,9 +413,9 @@ function TeamsTable({ race, teams, count, open, info }: { race: ARace; teams: AT
             {teams.map((x) => {
               const sl = teamSlots(x, race), n = count(x.id), inf = info(x), lg = logoSrc(x);
               return (
-                <tr key={x.id} className="click" onClick={() => open(x.id)}>
+                <tr key={x.id} className={'click' + (x.no_race ? ' no-race' : '')} onClick={() => open(x.id)}>
                   <td className="num"><b className="team-no">{x.team_no ?? '—'}</b></td>
-                  <td><div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>{lg && <img src={lg} alt="" style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 4 }} />}<b>{x.name}</b></div></td>
+                  <td><div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>{lg && <img src={lg} alt="" style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 4 }} />}<b>{x.name}</b></div>{x.no_race && <span className="chip bad" style={{ marginTop: 4 }}>{t('noRace')}</span>}</td>
                   <td>{x.captain_name}<div className="muted" style={{ fontSize: 12 }}>{x.captain_email}</div></td>
                   <td><CatChip c={inf.cat} div={inf.div} /></td>
                   <td><GroupChip g={inf.group} />{x.half_avg_min && <div className="muted num" style={{ fontSize: 12 }}>{fmtHalf(x.half_avg_min)}</div>}</td>
@@ -810,6 +810,7 @@ function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, o
   const [add, setAdd] = useState<{ qty: string; amount: string } | null>(null);
   return (
     <Drawer title={x.name} sub={`${race.name} · ${x.category || ''}`} onClose={onClose}>
+      {x.no_race && <div className="chip bad" style={{ alignSelf: 'flex-start' }}>{t('noRace')} · {t('noRaceSub')}</div>}
       <div className="row"><PayChip status={x.payment_status} /><span className="chip plain num">{runners.length}/{sl.size} {t('runners').toLowerCase()}</span>
         {hold && <SlotBar paid={sl.paid} size={sl.size} />}{sl.balance > 0 && <span className="chip warn num">{t('balance')}: {money(sl.balance, lang)}</span>}</div>
       <div className="row"><CatChip c={info.cat} div={info.div} /><GroupChip g={info.group} /><span className="chip plain num">{t('halfAvg').split(' ')[0]}: {fmtHalf(x.half_avg_min)}</span>
@@ -831,6 +832,7 @@ function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, o
       <div className="row">
         {x.payment_status !== 'paid' && <button type="button" className="btn btn-primary btn-sm" onClick={() => act(() => teamMarkPaid(x.id))}>{t('markPaid')}</button>}
         {x.payment_status === 'paid' && !x.is_solo && <button type="button" className="btn btn-sm" onClick={() => { if (confirm(t('markUnpaidConfirm'))) act(() => teamMarkUnpaid(x.id)); }}>{t('markUnpaid')}</button>}
+        <button type="button" className={'btn btn-sm' + (x.no_race ? ' btn-primary' : '')} onClick={() => { if (x.no_race || confirm(t('noRaceConfirm'))) act(() => setNoRace(x.id, !x.no_race)); }}>{x.no_race ? t('noRaceUndo') : t('noRaceSet')}</button>
         {!x.settled_at && !x.is_solo && <button type="button" className="btn btn-sm" onClick={() => confirm(t('st_markConfirm')) && act(() => teamMarkSettled(x.id))}>{t('st_markDone')}</button>}
         <button type="button" className="btn btn-sm" onClick={onEdit}>{t('edit')}</button>
         <button type="button" className="btn btn-sm" onClick={() => act(() => teamNewCode(x.id))}>{t('newCode')}</button>

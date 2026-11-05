@@ -1,7 +1,7 @@
 // Live timing: checkpoints, check-ins and the leaderboard ranking.
 import { many, one, run } from './db';
 import { newId, now } from './ids';
-import { isListedTeam, type Race, type Team } from './repo';
+import { isRacingTeam, type Race, type Team } from './repo';
 import { categoryOf, divisionOf, groupFor, parseGroups } from './groups';
 import { START, rankTeams, noLabel, type Checkpoint, type Checkin, type BoardTeam, type Board } from './timing-shared';
 export * from './timing-shared';
@@ -47,7 +47,7 @@ export async function buildBoard(race: Race): Promise<Board> {
   const byTeam = new Map<string, Checkin[]>();
   for (const c of cis) byTeam.set(c.team_id, [...(byTeam.get(c.team_id) || []), c]);
   const numOf = new Map(cps.map((c) => [c.id, c.num]));
-  const list: BoardTeam[] = teams.filter(isListedTeam).map((t) => {
+  const list: BoardTeam[] = teams.filter(isRacingTeam).map((t) => {
     const mine = byTeam.get(t.id) || [];
     const start = mine.find((c) => c.checkpoint_id === START)?.at || null;
     const times: Record<string, number> = {}, clock: Record<string, string> = {};

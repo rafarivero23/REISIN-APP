@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { getRace, getTeam, isListedTeam, type Team } from '@/lib/repo';
+import { getRace, getTeam, isListedTeam, isRacingTeam, type Team } from '@/lib/repo';
 import { many, one, run } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth-guard';
 import { setTimingAccess, timingAccess } from '@/lib/team-session';
@@ -103,7 +103,7 @@ export async function clearCheckins(raceId: string): Promise<{ count: number }> 
 // Numbers every team (and Solo) without one: teams first, alphabetically.
 export async function assignTeamNumbers(raceId: string, from = 1): Promise<{ count: number }> {
   await guard();
-  const teams = (await many<Team>('SELECT * FROM teams WHERE race_id = ?', [raceId])).filter(isListedTeam);
+  const teams = (await many<Team>('SELECT * FROM teams WHERE race_id = ?', [raceId])).filter(isRacingTeam);
   let count = 0;
   // Teams and Solos are separate series (Solos show as S1, S2…).
   for (const solo of [false, true]) {
@@ -123,10 +123,11 @@ export async function assignTeamNumbers(raceId: string, from = 1): Promise<{ cou
 // Renumbers every confirmed team 1..N and every Solo S1..SM (alphabetical or by registration).
 export async function renumberTeams(raceId: string, order: 'alpha' | 'created'): Promise<{ count: number }> {
   await guard();
-  const all = (await many<Team>('SELECT * FROM teams WHERE race_id = ?', [raceId])).filter(isListedTeam);
+  const all = (await many<Team>('SELECT * FROM teams WHERE race_id = ?', [raceId])).filter(isRacingTeam);
   const by = (a: Team, b: Team) => (order === 'created' ? a.created_at.localeCompare(b.created_at) : a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
   const teams = all.filter((t) => !t.is_solo).sort(by), solos = all.filter((t) => t.is_solo).sort(by);
   await run('UPDATE teams SET team_no = NULL WHERE race_id = ?', [raceId]);
+  // Teams that won't race lose their number.
   for (const [i, t] of teams.entries()) await run('UPDATE teams SET team_no = ? WHERE id = ?', [i + 1, t.id]);
   for (const [i, t] of solos.entries()) await run('UPDATE teams SET team_no = ? WHERE id = ?', [i + 1, t.id]);
   const list = [...teams, ...solos];
@@ -137,7 +138,7 @@ export async function renumberTeams(raceId: string, order: 'alpha' | 'created'):
 // Renumbers only the Solo runners S1..SM (alphabetical or by registration); team numbers untouched.
 export async function renumberSolos(raceId: string, order: 'alpha' | 'created' = 'alpha'): Promise<{ count: number }> {
   await guard();
-  const solos = (await many<Team>('SELECT * FROM teams WHERE race_id = ? AND is_solo', [raceId])).filter(isListedTeam)
+  const solos = (await many<Team>('SELECT * FROM teams WHERE race_id = ? AND is_solo', [raceId])).filter(isRacingTeam)
     .sort((a, b) => (order === 'created' ? a.created_at.localeCompare(b.created_at) : a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })));
   await run('UPDATE teams SET team_no = NULL WHERE race_id = ? AND is_solo', [raceId]);
   for (const [i, t] of solos.entries()) await run('UPDATE teams SET team_no = ? WHERE id = ?', [i + 1, t.id]);
@@ -156,6 +157,17 @@ export async function setTeamNumber(teamId: string, no: string): Promise<{ error
     if (dup.length) return { error: 'tm_noTaken' };
   }
   await run('UPDATE teams SET team_no = ? WHERE id = ?', [n, team.id]);
+  revalidatePath('/admin', 'layout');
+  refresh(team.race_id);
+  return {};
+}
+
+// Staff: mark a team as not racing (DNS) or back to racing.
+export async function setNoRace(teamId: string, v: boolean): Promise<{ error?: string }> {
+  await guard();
+  const team = await getTeam(teamId);
+  if (!team) return { error: 'not_found' };
+  await run('UPDATE teams SET no_race = ? WHERE id = ?', [!!v, teamId]);
   revalidatePath('/admin', 'layout');
   refresh(team.race_id);
   return {};

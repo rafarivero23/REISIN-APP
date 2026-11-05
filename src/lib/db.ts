@@ -375,6 +375,8 @@ ALTER TABLE races ADD COLUMN IF NOT EXISTS store_ship_fee INTEGER;
 ALTER TABLE races ADD COLUMN IF NOT EXISTS store_code TEXT;
 -- Full-screen cover image for the shop page (store_images id; empty = compact header).
 ALTER TABLE races ADD COLUMN IF NOT EXISTS store_hero TEXT;
+-- Team won't race (DNS): stays in admin, hidden from leaderboard / check-in / numbering.
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS no_race BOOLEAN NOT NULL DEFAULT false;
 
 -- Solos have their own number series (S1, S2…). Races numbered before that
 -- (Solos at 46+) are shifted back to start at 1, keeping their order.

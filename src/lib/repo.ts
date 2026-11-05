@@ -15,7 +15,7 @@ export type Team = {
   payment_status: 'pending' | 'paid'; payment_method: string | null; paid_at: string | null;
   stripe_session_id: string | null; claim_code: string; password_hash: string | null; created_at: string;
   team_size: number | null; extra_slots: number; notes: string | null; half_avg_min: number | null; logo: string | null; reg_type: string;
-  code_sent_at: string | null; is_solo: boolean; external_id: string | null; team_no: number | null; settled_at: string | null;
+  code_sent_at: string | null; is_solo: boolean; external_id: string | null; team_no: number | null; settled_at: string | null; no_race: boolean;
 };
 export type Runner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string;
@@ -35,6 +35,8 @@ export async function liveSoloCount(raceId: string) {
 }
 export const LIVE_TEAM_SQL = `(NOT is_solo AND (payment_status = 'paid' OR payment_method = 'manual' OR created_at > ?))`;
 const holdSince = () => new Date(Date.now() - 30 * 60 * 1000).toISOString();
+// Teams that actually race (leaderboard, check-in, numbering).
+export const isRacingTeam = (t: Pick<Team, 'payment_status' | 'payment_method' | 'no_race'>) => isListedTeam(t) && !t.no_race;
 export const isListedTeam = (t: Pick<Team, 'payment_status' | 'payment_method'>) =>
   t.payment_status === 'paid' || t.payment_method === 'manual';
 
@@ -96,7 +98,7 @@ export async function listedTeamsWithCounts(raceId: string) {
   );
 }
 
-type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes' | 'half_avg_min' | 'logo' | 'reg_type' | 'code_sent_at' | 'is_solo' | 'external_id' | 'team_no' | 'settled_at'> &
+type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes' | 'half_avg_min' | 'logo' | 'reg_type' | 'code_sent_at' | 'is_solo' | 'external_id' | 'team_no' | 'settled_at' | 'no_race'> &
   { is_solo?: boolean; external_id?: string | null } &
   { password_hash?: string | null; team_size?: number | null; notes?: string | null; created_at?: string; half_avg_min?: number | null; reg_type?: string };
 export async function createTeam(t: NewTeam) {
