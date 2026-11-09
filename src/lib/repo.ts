@@ -193,12 +193,12 @@ export function settleAmount(team: Team, race: Race, paid?: { total: number; dep
   if (fixed > 0) return paid && paid.total > 0 && paid.deposit > 0 ? Math.min(fixed, Math.max(0, paid.deposit + fixed - paid.total)) : fixed;
   return Math.max(0, size - paidSlots(team, race)) * (race.runner_fee || 0);
 }
-// What a team has paid, and the race's deposit (smallest team payment = the
-// "apartado"). Full price = deposit + settlement, so a team that paid that
+// What a team has paid, and the race's deposit (the most common team payment,
+// Solos excluded = the "apartado"). Full price = deposit + settlement, so a team that paid that
 // much (e.g. $35,000 = $20,000 + $15,000) owes nothing.
 export async function teamPaidTotal(teamId: string) {
   const r = await one<{ n: string; d: string | null }>(`SELECT COALESCE((SELECT SUM(amount) FROM payments WHERE team_id = ? AND kind <> 'store'), 0) AS n,
-    (SELECT MIN(p.amount) FROM payments p WHERE p.kind = 'team' AND p.amount > 0 AND p.race_id = (SELECT race_id FROM teams WHERE id = ?)) AS d`, [teamId, teamId]);
+    (SELECT p.amount FROM payments p JOIN teams tt ON tt.id = p.team_id WHERE p.kind = 'team' AND p.amount > 0 AND NOT tt.is_solo AND p.race_id = (SELECT race_id FROM teams WHERE id = ?) GROUP BY p.amount ORDER BY COUNT(*) DESC, p.amount LIMIT 1) AS d`, [teamId, teamId]);
   return { total: Number(r?.n || 0), deposit: Number(r?.d || 0) };
 }
 export function sizeOptions(r: Pick<Race, 'team_sizes' | 'team_size'>) {
