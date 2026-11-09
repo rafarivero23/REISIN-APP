@@ -1145,3 +1145,52 @@ a.sv-acc:hover .sv-cta{background:#fff;color:#050505}
 @media (max-width:760px){.st-cover-dots{right:18px;bottom:auto;top:84px}}
 
 tr.no-race>td{opacity:.5}tr.no-race>td:nth-child(2){opacity:1}
+
+/* ---------- Team status sheet (print → PDF for group chats) ---------- */
+
+body:has(.ss){background:#050505}
+.ss{--acc:#EF2555;--bg:#050505;--ink:#F2F2F2;--mut:#8A8A8A;--line:rgba(242,242,242,.14);--fh:"Inter Tight",system-ui,sans-serif;--fl:"JetBrains Mono",monospace;
+  width:210mm;min-height:297mm;margin:0 auto;padding:14mm 12mm 12mm;background:var(--bg);color:var(--ink);font-family:var(--fh);-webkit-print-color-adjust:exact;print-color-adjust:exact;position:relative}
+.ss-bx{--acc:#EED314;--bg:#1B1C1D;--ink:#F2F2F0;--mut:#A3A3A0;--fh:"Archivo",system-ui,sans-serif;--fl:"Archivo",sans-serif;font-stretch:110%}
+.ss .lab{font-family:var(--fl);font-size:8.5pt;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+.ss-bx .lab{font-stretch:125%;font-weight:700;letter-spacing:.12em}
+.ss-h{display:flex;align-items:center;gap:8mm}
+.ss-logo{height:20mm;width:auto}
+.ss-ht{display:flex;flex-direction:column;gap:2mm}
+.ss h1{margin:0;font-size:24pt;line-height:1;font-weight:300;letter-spacing:-.02em;color:var(--ink)}
+.ss-bx h1,.ss-bx h2{font-family:"Baja Crossing",sans-serif;font-weight:400;letter-spacing:.01em;text-transform:uppercase}
+.ss-bar{height:2mm;margin:6mm 0 5mm;background:var(--acc)}
+.ss-bx .ss-bar{background:linear-gradient(90deg,#EED314,#F16A21 50%,#ED3B94)}
+.ss-k{display:grid;grid-template-columns:repeat(5,1fr);border:1px solid var(--line)}
+.ss-k>div{padding:3mm 3.5mm;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:1.5mm}
+.ss-k>div:last-child{border-right:0}
+.ss-k b{font-size:20pt;font-weight:300;line-height:1}.ss-k small{font-size:10pt;color:var(--mut)}
+.ss-k b.hot{color:var(--acc)}
+.ss-bx .ss-k b{font-family:"Baja Crossing",sans-serif;font-weight:400}
+.ss-legend{margin:3mm 0 4mm;font-size:7.5pt!important}
+.ss-t{width:100%;border-collapse:collapse;font-size:8.5pt}
+.ss-t th{font-family:var(--fl);font-size:7pt;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);text-align:left;font-weight:500;padding:2mm 2mm;border-bottom:1px solid var(--ink)}
+.ss-t td{padding:2.2mm 2mm;border-bottom:1px solid var(--line);vertical-align:middle}
+.ss-t tr{break-inside:avoid}
+.ss-t td.no{font-family:var(--fl);font-size:10pt;width:9mm;color:var(--ink)}
+.ss-t td.nm b{display:block;font-size:10pt;font-weight:600}
+.ss-bx .ss-t td.nm b{font-family:"Baja Crossing",sans-serif;font-weight:400;font-size:11.5pt;letter-spacing:.02em;text-transform:uppercase}
+.ss-t td.nm span,.ss-t small{display:block;color:var(--mut);font-size:7.5pt;margin-top:.6mm}
+.ss-t td.wv small{max-width:45mm}
+.dots{display:flex;gap:.8mm}.dots i{width:3mm;height:3mm;border:1px solid var(--mut);display:block}.dots i.on{background:var(--ink);border-color:var(--ink)}
+.c{font-style:normal;display:inline-block;font-family:var(--fl);font-size:7pt;letter-spacing:.06em;text-transform:uppercase;padding:.8mm 1.8mm;border:1px solid currentColor;white-space:nowrap}
+.c.ok{color:#5BD08A}.c.warn{color:#F5B342}.c.bad{color:#FF6B6B}.c.pend{color:var(--mut)}
+.ss-t tr.ok .c.ok{background:rgba(91,208,138,.12)}
+.ss-t td.st .c.ok{background:#5BD08A;color:#050505;border-color:#5BD08A}
+.mut{color:var(--mut)}
+.ss-sub{font-size:14pt;font-weight:300;margin:8mm 0 2mm}
+.ss-f{display:flex;justify-content:space-between;align-items:center;gap:6mm;margin-top:8mm;padding-top:3mm;border-top:1px solid var(--line);font-size:7pt!important}
+.ss-f img{height:5mm;vertical-align:middle;margin-left:2mm}
+.ss-print{position:fixed;right:20px;bottom:20px;z-index:10;padding:14px 20px;border:0;background:var(--acc,#EF2555);color:#050505;font:700 14px system-ui;cursor:pointer;border-radius:4px}
+@media print{.ss-print{display:none}.ss{margin:0;width:auto;min-height:0}}
+@media screen{.ss{margin:20px auto;box-shadow:0 10px 40px rgba(0,0,0,.5)}}
+.ss-t thead th{background:transparent!important;color:var(--mut)!important}
+.ss-t thead{display:table-header-group}
+html:has(.ss-sv),html:has(.ss-sv) body{background:#050505!important}
+html:has(.ss-bx),html:has(.ss-bx) body{background:#1B1C1D!important}
+@page{size:A4 portrait;margin:0}@media print{.ss{box-shadow:none}.ss-t thead th{padding-top:9mm}}

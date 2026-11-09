@@ -236,6 +236,7 @@ export function RaceDetail({ race, teams, solos = [], runners, payments, agents,
             <div className="row" style={{ gap: 8 }}>
               <NumberTeams raceId={race.id} total={teams.length} missing={teams.filter((x) => x.team_no == null).length} />
               <a className="btn btn-sm" href={`/api/admin/races/${race.id}/teams`}>{t('tn_export')}</a>
+              <a className="btn btn-sm" href={`/print/races/${race.id}`} target="_blank" rel="noreferrer">PDF de estatus ↗</a>
               <button type="button" className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'teamForm' })}>+ {t('addTeam')}</button>
             </div>
           </div>
