@@ -16,6 +16,7 @@ export type Team = {
   stripe_session_id: string | null; claim_code: string; password_hash: string | null; created_at: string;
   team_size: number | null; extra_slots: number; notes: string | null; half_avg_min: number | null; logo: string | null; reg_type: string;
   code_sent_at: string | null; is_solo: boolean; external_id: string | null; team_no: number | null; settled_at: string | null; no_race: boolean;
+  kit_at: string | null; kit_by: string | null; kit_count: number | null; kit_note: string | null;
 };
 export type Runner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string;
@@ -98,7 +99,7 @@ export async function listedTeamsWithCounts(raceId: string) {
   );
 }
 
-type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes' | 'half_avg_min' | 'logo' | 'reg_type' | 'code_sent_at' | 'is_solo' | 'external_id' | 'team_no' | 'settled_at' | 'no_race'> &
+type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes' | 'half_avg_min' | 'logo' | 'reg_type' | 'code_sent_at' | 'is_solo' | 'external_id' | 'team_no' | 'settled_at' | 'no_race' | 'kit_at' | 'kit_by' | 'kit_count' | 'kit_note'> &
   { is_solo?: boolean; external_id?: string | null } &
   { password_hash?: string | null; team_size?: number | null; notes?: string | null; created_at?: string; half_avg_min?: number | null; reg_type?: string };
 export async function createTeam(t: NewTeam) {

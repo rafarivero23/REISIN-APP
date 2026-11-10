@@ -377,6 +377,11 @@ ALTER TABLE races ADD COLUMN IF NOT EXISTS store_code TEXT;
 ALTER TABLE races ADD COLUMN IF NOT EXISTS store_hero TEXT;
 -- Team won't race (DNS): stays in admin, hidden from leaderboard / check-in / numbering.
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS no_race BOOLEAN NOT NULL DEFAULT false;
+-- Race-day check-in at kit pickup (staff link): when, by whom, how many showed up, notes.
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS kit_at TEXT;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS kit_by TEXT;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS kit_count INTEGER;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS kit_note TEXT;
 
 -- Solos have their own number series (S1, S2…). Races numbered before that
 -- (Solos at 46+) are shifted back to start at 1, keeping their order.

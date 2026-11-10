@@ -46,7 +46,7 @@ export type ATeam = {
   id: string; race_id: string; name: string; category: string | null; captain_name: string; captain_email: string;
   captain_phone: string | null; amount: number; payment_status: string; payment_method: string | null; paid_at: string | null;
   claim_code: string; has_password: boolean; created_at: string; team_size: number | null; extra_slots: number; notes: string | null;
-  half_avg_min: number | null; reg_type: string; logo_v: string | null; code_sent_at: string | null; team_no: number | null; is_solo: boolean; settled_at: string | null; no_race: boolean;
+  half_avg_min: number | null; reg_type: string; logo_v: string | null; code_sent_at: string | null; team_no: number | null; is_solo: boolean; settled_at: string | null; no_race: boolean; kit_at: string | null;
 };
 export type ARunner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string; email: string;
@@ -238,6 +238,7 @@ export function RaceDetail({ race, teams, solos = [], runners, payments, agents,
               <a className="btn btn-sm" href={`/api/admin/races/${race.id}/teams`}>{t('tn_export')}</a>
               <a className="btn btn-sm" href={`/print/races/${race.id}`} target="_blank" rel="noreferrer">PDF de estatus ↗</a>
               <a className="btn btn-sm" href={`/estatus/${race.slug || race.id}`} target="_blank" rel="noreferrer">Estatus en vivo ↗</a>
+              <a className="btn btn-sm" href={`/r/${race.slug || race.id}/registro`} target="_blank" rel="noreferrer">Check-in staff ↗</a>
               <button type="button" className="btn btn-primary btn-sm" onClick={() => setModal({ type: 'teamForm' })}>+ {t('addTeam')}</button>
             </div>
           </div>
@@ -417,7 +418,7 @@ function TeamsTable({ race, teams, count, open, info }: { race: ARace; teams: AT
               return (
                 <tr key={x.id} className={'click' + (x.no_race ? ' no-race' : '')} onClick={() => open(x.id)}>
                   <td className="num"><b className="team-no">{x.team_no ?? '—'}</b></td>
-                  <td><div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>{lg && <img src={lg} alt="" style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 4 }} />}<b>{x.name}</b></div>{x.no_race && <span className="chip bad" style={{ marginTop: 4 }}>{t('noRace')}</span>}</td>
+                  <td><div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>{lg && <img src={lg} alt="" style={{ width: 28, height: 28, objectFit: 'contain', borderRadius: 4 }} />}<b>{x.name}</b></div>{x.no_race && <span className="chip bad" style={{ marginTop: 4 }}>{t('noRace')}</span>}{x.kit_at && <span className="chip ok" style={{ marginTop: 4 }}>✓ Check-in</span>}</td>
                   <td>{x.captain_name}<div className="muted" style={{ fontSize: 12 }}>{x.captain_email}</div></td>
                   <td><CatChip c={inf.cat} div={inf.div} /></td>
                   <td><GroupChip g={inf.group} />{x.half_avg_min && <div className="muted num" style={{ fontSize: 12 }}>{fmtHalf(x.half_avg_min)}</div>}</td>
