@@ -62,7 +62,7 @@ export function RoutePlan({ raceName }: { raceName: string }) {
   const ts = TEAM_START;
   const [solH, setSolH] = useState(30);
   const solP = (solH * 60) / KM;
-  const [spd, setSpd] = useState(50);
+  const spd = 50; // solo ambulance average speed, km/h (half on gravel)
   const [view, setView] = useState<View>('all');
   const showS = view !== 'team', showT = view !== 'solo';
   const lead = SOLO_P[0], last = SOLO_P[SOLO_P.length - 1];
@@ -140,9 +140,7 @@ export function RoutePlan({ raceName }: { raceName: string }) {
             {SOLO_HOURS.map((h) => <button key={h} type="button" aria-pressed={solH === h} onClick={() => setSolH(h)}>{h} h</button>)}
           </div>
         </div>}
-        {showS && <div className="rpl-ctl"><label className="rpl-lab" htmlFor="rpl-spd">Ambulancia solo (km/h)</label>
-          <select id="rpl-spd" value={spd} onChange={(e) => setSpd(+e.target.value)}>{[40, 50, 60].map((v) => <option key={v} value={v}>{v}</option>)}</select>
-        </div>}
+
       </div>
 
       <div className="rpl-facts">
