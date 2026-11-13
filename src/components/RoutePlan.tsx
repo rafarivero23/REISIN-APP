@@ -23,11 +23,7 @@ const CP_AMB: [number, number, number][] = [[1, 60, 300], [2, 240, 600], [3, 420
 const GRAVEL: [number, number] = [152.36, 191.4];
 const SOLO_P = [6, 8, 9];
 const TEAM_P = [4, 5, 6, 7];
-const STARTS = [
-  { l: 'Sáb 14:00', v: 2 * 1440 + 14 * 60 },
-  { l: 'Sáb 18:00', v: 2 * 1440 + 18 * 60 },
-  { l: 'Sáb 00:00', v: 2 * 1440 },
-];
+const TEAM_START = 2 * 1440 + 14 * 60; // Sat 14 14:00 (Teams start, final)
 const KM = 218.2;
 const GPX = '/routes/baja-crossing-2026.gpx';
 const VIEWS = [{ v: 'all', l: 'Todo' }, { v: 'solo', l: 'Solo Runners' }, { v: 'team', l: 'Teams' }] as const;
@@ -60,7 +56,7 @@ function soloAmbulance(spd: number) {
 }
 
 export function RoutePlan({ raceName }: { raceName: string }) {
-  const [ts, setTs] = useState(STARTS[0].v);
+  const ts = TEAM_START;
   const [spd, setSpd] = useState(50);
   const [view, setView] = useState<View>('all');
   const showS = view !== 'team', showT = view !== 'solo';
@@ -123,11 +119,9 @@ export function RoutePlan({ raceName }: { raceName: string }) {
             {VIEWS.map((o) => <button key={o.v} type="button" aria-pressed={view === o.v} onClick={() => setView(o.v)}>{o.l}</button>)}
           </div>
         </div>
-        {showT && <div className="rpl-ctl"><span className="rpl-lab">Salida Teams</span>
-          <div className="rpl-seg" role="group" aria-label="Salida de Teams">
-            {STARTS.map((s) => <button key={s.v} type="button" aria-pressed={ts === s.v} onClick={() => setTs(s.v)}>{s.l}</button>)}
-          </div>
-        </div>}
+        <div className="rpl-ctl"><span className="rpl-lab">Salidas</span>
+          <span className="rpl-v">{showS && <>Solo Runners <b>vie 16:30</b></>}{showS && showT && ' · '}{showT && <>Teams <b>sáb 14:00</b></>}</span>
+        </div>
         {showS && <div className="rpl-ctl"><label className="rpl-lab" htmlFor="rpl-spd">Ambulancia solo (km/h)</label>
           <select id="rpl-spd" value={spd} onChange={(e) => setSpd(+e.target.value)}>{[40, 50, 60].map((v) => <option key={v} value={v}>{v}</option>)}</select>
         </div>}
