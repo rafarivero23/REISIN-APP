@@ -5,7 +5,7 @@ import { useT } from './I18n';
 import { Drawer, DeleteButton, useToast } from './ui';
 import { resize } from './racepage';
 import { money, fmtDate } from '@/lib/format';
-import { imgSrc, heroList, totalStock, netTotal, codeLabel, codeProblem, type Product, type Order, type StoreOption, type StoreCode } from '@/lib/store-shared';
+import { imgSrc, heroList, totalStock, netTotal, liveQty, codeLabel, codeProblem, type Product, type Order, type StoreOption, type StoreCode } from '@/lib/store-shared';
 import { saveStoreSettings, saveProduct, deleteProduct, moveProduct, uploadStoreImage, setOrderStatus, setOrderNotes, importInventory, setStoreHero, saveStoreCode, deleteStoreCode, type ProductInput, type CodeInput } from '@/app/actions/store';
 
 // Admin → race → Tienda: settings, products (inventory per size, photos, description) and orders.
@@ -23,6 +23,10 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders, codes
   const paid = orders.filter((o) => o.status !== 'canceled');
   const sales = orders.reduce((a, o) => a + netTotal(o), 0);
   const toDeliver = orders.filter((o) => o.status === 'paid').length;
+  // Units sold (paid or delivered, minus refunds) per product|size.
+  const sold = new Map<string, number>();
+  for (const o of orders) if (o.status === 'paid' || o.status === 'delivered') for (const it of o.items) sold.set(`${it.product_id}|${it.option}`, (sold.get(`${it.product_id}|${it.option}`) || 0) + liveQty(it));
+  const soldOf = (id: string, opt?: string) => (opt != null ? sold.get(`${id}|${opt}`) || 0 : [...sold].reduce((a, [k, n]) => a + (k.startsWith(id + '|') ? n : 0), 0));
 
   const saveSettings = async () => {
     if (s.lock && !s.code.trim()) return toast(tx('Escribe la contraseña de la tienda', 'Enter the shop password'));
@@ -76,16 +80,26 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders, codes
           </div>
           {products.length === 0 ? <div className="card muted">{tx('Aún no hay productos. Agrega el primero con fotos, precio, descripción y existencias por talla.', 'No products yet. Add the first one with photos, price, description and stock per size.')}</div> : (
             <div className="tbl-wrap"><table>
-              <thead><tr><th /><th>{tx('Producto', 'Product')}</th><th>{tx('Precio', 'Price')}</th><th>{tx('Existencias', 'Stock')}</th><th>{tx('Estado', 'Status')}</th><th /></tr></thead>
+              <thead><tr><th /><th>{tx('Producto', 'Product')}</th><th>{tx('Precio', 'Price')}</th><th>{tx('Vendidas', 'Sold')}</th><th>{tx('Quedan', 'Left')}</th><th>{tx('Estado', 'Status')}</th><th /></tr></thead>
               <tbody>
                 {products.map((p, i) => {
                   const st = totalStock(p);
                   return (
-                    <tr key={p.id} className="clickable" onClick={() => setEdit({ ...p })}>
+                    <tr key={p.id} className="clickable" onClick={() => setEdit({ ...p, orig: { stock: p.stock, options: p.options.map((o) => ({ ...o })) } })}>
                       <td style={{ width: 64 }}>{p.images[0] ? <img className="st-thumb" src={imgSrc(p.images[0], true)} alt="" /> : <span className="st-thumb empty" />}</td>
-                      <td><b>{p.name}</b><div className="muted" style={{ fontSize: 12 }}>{p.options.map((o) => `${o.label}: ${o.stock}`).join(' · ')}</div></td>
+                      <td><b>{p.name}</b>
+                        {p.options.length > 0 && (
+                          <div className="st-inv">
+                            {p.options.map((o) => (
+                              <span key={o.label} className={o.stock <= 0 ? 'out' : o.stock <= 2 ? 'low' : ''}>
+                                <em>{o.label}</em><b>{o.stock}</b><small>{soldOf(p.id, o.label)} {tx('vend.', 'sold')}</small>
+                              </span>
+                            ))}
+                          </div>
+                        )}</td>
                       <td className="num">{money(p.price, lang)}</td>
-                      <td className="num">{st === 0 ? <span className="chip bad">{tx('Agotado', 'Sold out')}</span> : st}</td>
+                      <td className="num">{soldOf(p.id)}</td>
+                      <td className="num">{st === 0 ? <span className="chip bad">{tx('Agotado', 'Sold out')}</span> : <b>{st}</b>}</td>
                       <td>{p.active ? <span className="chip ok">{tx('Visible', 'Visible')}</span> : <span className="chip">{tx('Oculto', 'Hidden')}</span>}</td>
                       <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
                         <button type="button" className="btn btn-sm" disabled={i === 0} onClick={async () => { await moveProduct(raceId, p.id, -1); router.refresh(); }} aria-label="↑">↑</button>{' '}
@@ -103,7 +117,7 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders, codes
       {view === 'orders' && <Orders raceId={raceId} orders={orders} />}
       {view === 'codes' && <Codes raceId={raceId} codes={codes} orders={orders} />}
 
-      {edit && <ProductDrawer raceId={raceId} p={edit} onClose={() => setEdit(null)} />}
+      {edit && <ProductDrawer raceId={raceId} p={edit} sold={(opt) => (edit.id ? soldOf(edit.id, opt) : 0)} onClose={() => setEdit(null)} />}
     </div>
   );
 }
@@ -207,7 +221,7 @@ function ImportInventory({ raceId }: { raceId: string }) {
   );
 }
 
-function ProductDrawer({ raceId, p: p0, onClose }: { raceId: string; p: ProductInput; onClose: () => void }) {
+function ProductDrawer({ raceId, p: p0, sold, onClose }: { raceId: string; p: ProductInput; sold: (opt: string) => number; onClose: () => void }) {
   const { lang } = useT();
   const tx = (es: string, en: string) => (lang === 'en' ? en : es);
   const router = useRouter();
@@ -287,18 +301,21 @@ function ProductDrawer({ raceId, p: p0, onClose }: { raceId: string; p: ProductI
         </div>
         {p.options.length === 0 ? (
           <div className="field" style={{ maxWidth: 200, marginTop: 10 }}><label htmlFor="sp-stock">{tx('Piezas disponibles', 'Units available')}</label><input id="sp-stock" type="number" min={0} value={p.stock} onChange={(e) => set('stock', Number(e.target.value))} /></div>
-        ) : (
-          <div className="st-opts">
-            <div className="muted" style={{ fontSize: 12 }}>{tx('Talla / color', 'Size / color')}</div><div className="muted" style={{ fontSize: 12 }}>{tx('Piezas', 'Units')}</div><div />
+        ) : (<>
+          <div className="st-opts st-opts-s">
+            <div className="muted" style={{ fontSize: 12 }}>{tx('Talla / color', 'Size / color')}</div><div className="muted" style={{ fontSize: 12 }}>{tx('Quedan', 'Left')}</div><div className="muted" style={{ fontSize: 12 }}>{tx('Vendidas', 'Sold')}</div><div />
             {p.options.map((o, i) => (
               <div key={i} style={{ display: 'contents' }}>
                 <input value={o.label} onChange={(e) => setOpt(i, { label: e.target.value })} aria-label={tx('Talla', 'Size')} />
-                <input type="number" min={0} value={o.stock} onChange={(e) => setOpt(i, { stock: Number(e.target.value) })} aria-label={tx('Piezas', 'Units')} />
+                <input type="number" min={0} value={o.stock} onChange={(e) => setOpt(i, { stock: Number(e.target.value) })} aria-label={tx('Quedan', 'Left')} />
+                <span className="st-sold">{sold(o.label)}</span>
                 <button type="button" className="btn btn-sm" onClick={() => set('options', p.options.filter((_, j) => j !== i))} aria-label={tx('Quitar', 'Remove')}>✕</button>
               </div>
             ))}
-            <div className="muted" style={{ fontSize: 12 }}>{tx('Total', 'Total')}</div><b>{p.options.reduce((a, o) => a + (Number(o.stock) || 0), 0)}</b><div />
+            <div className="muted" style={{ fontSize: 12 }}>{tx('Total', 'Total')}</div><b>{p.options.reduce((a, o) => a + (Number(o.stock) || 0), 0)}</b><b className="st-sold">{p.options.reduce((a, o) => a + sold(o.label), 0)}</b><div />
           </div>
+          <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>{tx('"Quedan" ya tiene restadas las vendidas. Si cambias un número, solo se aplica la diferencia: las ventas que entren mientras editas no se pierden.', '"Left" already has sold units taken out. Changing a number only applies the difference, so sales made while you edit are kept.')}</p>
+        </>
         )}
       </div>
 

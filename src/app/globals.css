@@ -1372,3 +1372,13 @@ body:has(.sg){background:#1B1C1D}
 .st-code input{flex:1;min-width:0;padding:12px;border:1px solid currentColor;background:transparent;color:inherit;font:inherit;letter-spacing:.08em;text-transform:uppercase;opacity:.9}
 .st-code button{padding:0 16px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;letter-spacing:.12em;text-transform:uppercase;font-size:12px}
 .st-sum .st-disc{color:#5BD08A}
+/* Store inventory: left / sold per size */
+.st-inv{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.st-inv span{display:inline-flex;align-items:baseline;gap:5px;padding:4px 8px;border-radius:6px;background:var(--surface-2);font-size:12px}
+.st-inv em{font-style:normal;color:var(--muted);font-weight:600}
+.st-inv b{font-size:14px}
+.st-inv small{color:var(--muted);font-size:11px}
+.st-inv span.low{outline:1px solid #e0a020}.st-inv span.low b{color:#e0a020}
+.st-inv span.out{opacity:.55}.st-inv span.out b{color:#e5484d}
+.st-opts.st-opts-s{grid-template-columns:1fr 110px 70px auto}
+.st-sold{align-self:center;text-align:center;color:var(--muted)}

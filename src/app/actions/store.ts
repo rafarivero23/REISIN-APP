@@ -36,12 +36,25 @@ export async function setStoreHero(raceId: string, ids: string[]) {
   return {};
 }
 
-export type ProductInput = { id?: string; name: string; description: string; price: number; stock: number; options: StoreOption[]; images: string[]; active: boolean };
+// orig = stock as the form loaded it. Saving applies only what was changed on top of the
+// current stock, so sales made while the form was open aren't overwritten.
+export type ProductInput = { id?: string; name: string; description: string; price: number; stock: number; options: StoreOption[]; images: string[]; active: boolean; orig?: { stock: number; options: StoreOption[] } };
 export async function saveProduct(raceId: string, p: ProductInput): Promise<{ id?: string; error?: string }> {
   await staff();
   if (!p.name.trim()) return { error: 'required' };
   const options = p.options.filter((o) => o.label.trim()).map((o) => ({ label: o.label.trim(), stock: Math.max(0, Math.round(Number(o.stock) || 0)) }));
   const vals = [p.name.trim(), p.description || '', Math.max(0, Math.round(Number(p.price) || 0)), Math.max(0, Math.round(Number(p.stock) || 0)), JSON.stringify(options), JSON.stringify(p.images.slice(0, 12)), !!p.active];
+  if (p.id && p.orig) {
+    const cur = await one<{ stock: number; options: string }>('SELECT stock, options FROM store_products WHERE id = ? AND race_id = ?', [p.id, raceId]);
+    if (cur) {
+      const now0: StoreOption[] = (() => { try { return JSON.parse(cur.options || '[]'); } catch { return []; } })();
+      const was = new Map(p.orig.options.map((o) => [o.label.trim(), Number(o.stock) || 0]));
+      const live = new Map(now0.map((o) => [o.label, Number(o.stock) || 0]));
+      const merged = options.map((o) => (was.has(o.label) && live.has(o.label) ? { ...o, stock: Math.max(0, live.get(o.label)! + (o.stock - was.get(o.label)!)) } : o));
+      vals[3] = Math.max(0, Number(cur.stock) + (Math.round(Number(p.stock) || 0) - (Number(p.orig.stock) || 0)));
+      vals[4] = JSON.stringify(merged);
+    }
+  }
   if (p.id) {
     await run('UPDATE store_products SET name = ?, description = ?, price = ?, stock = ?, options = ?, images = ?, active = ? WHERE id = ? AND race_id = ?', [...vals, p.id, raceId]);
     done();
