@@ -1277,7 +1277,7 @@ body:has(.rpl){background:#1B1C1D}
 .rpl-seg button:focus-visible,.rpl select:focus-visible{outline:2px solid var(--rpl-yellow);outline-offset:2px}
 .rpl-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
 .rpl-fact{background:var(--rpl-panel);border:1px solid var(--rpl-line);border-top:3px solid var(--rpl-mut);padding:10px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
-.rpl-fact.solo{border-top-color:var(--rpl-solo)}.rpl-fact.team{border-top-color:var(--rpl-team)}.rpl-fact.amb{border-top-color:var(--rpl-amb)}
+.rpl-fact.solo{border-top-color:var(--rpl-solo)}.rpl-fact.team{border-top-color:var(--rpl-team)}.rpl-fact.amb{border-top-color:var(--rpl-amb)}.rpl-fact.urr{border-top-color:var(--rpl-yellow)}
 .rpl-v{font-size:14px;font-weight:600}
 .rpl-v b{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
 .rpl-warn{color:var(--rpl-amb)}

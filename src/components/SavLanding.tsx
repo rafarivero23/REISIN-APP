@@ -196,7 +196,7 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono, kit
         <>
           <Head title={t('sv_route')} aside={race.location || undefined} icon={icon()} />
           <BxRoute l={{
-            route: `${t('sv_route')}${race.location ? ` / ${race.location}` : ''}`, strava: strava?.url, stravaLabel: t('sv_strava'),
+            route: `${t('sv_route')}${race.location ? ` / ${race.location}` : ''}`, strava: strava?.url, stravaLabel: t('sv_strava'), gpx: '/routes/baja-crossing-2026.gpx', gpxLabel: t('sv_gpx'),
             text: routeSec ? <RichText text={routeSec.body} /> : undefined,
             dist: t('sv_dist'), max: t('sv_elevMax'), cps: t('sv_cps'), start: 'La Paz', finish: 'San José del Cabo', elev: t('sv_elevHint'),
           }} />

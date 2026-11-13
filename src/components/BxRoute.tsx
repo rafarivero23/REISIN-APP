@@ -5,7 +5,7 @@ import { BX_ROUTE } from '@/lib/bxRoute';
 
 // Baja route block: grey map traced from Strava (route draws itself on scroll),
 // checkpoints, and an elevation profile you can scrub — a dot follows on the map.
-type L = { route: string; strava?: string; stravaLabel: string; text?: React.ReactNode; dist: string; max: string; cps: string; start: string; finish: string; elev: string };
+type L = { route: string; strava?: string; stravaLabel: string; gpx?: string; gpxLabel?: string; text?: React.ReactNode; dist: string; max: string; cps: string; start: string; finish: string; elev: string };
 const elev = BX_ROUTE.elev as unknown as [number, number][];
 const KM = elev[elev.length - 1][0];
 const MAXM = Math.max(...elev.map((p) => p[1]));
@@ -85,6 +85,7 @@ export function BxRoute({ l, km }: { l: L; km?: string }) {
           <div className="bxr-x mono">{[0, 50, 100, 150, 200].filter((x) => x < KM - 25).map((x) => <span key={x} style={{ left: `${(x / KM) * 100}%` }}>{x}</span>)}<span style={{ right: 0 }}>{Math.round(KM)} km</span></div>
         </div>
         {l.strava && <a className="mono sv-ul" href={l.strava} target="_blank" rel="noopener noreferrer">{l.stravaLabel} ↗</a>}
+        {l.gpx && <a className="mono sv-ul" href={l.gpx} download>{l.gpxLabel} ↓</a>}
       </div>
     </section>
   );
