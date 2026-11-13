@@ -33,7 +33,7 @@ export default async function KitPage({ params }: { params: { raceId: string } }
       id: t.id, no: noLabel(t.team_no, t.is_solo), solo: t.is_solo, name: t.is_solo && rs[0] ? `${rs[0].first_name} ${rs[0].last_name}` : t.name,
       captain: t.captain_name, phone: t.captain_phone, size: sl.size,
       cat: branch(categoryOf(rs.map((r) => r.gender), t.is_solo)), group: t.is_solo ? null : groupFor(t.half_avg_min, groups)?.label || null,
-      pay: t.payment_status !== 'paid' ? 'pending' : sl.balance > 0 ? 'balance' : 'paid',
+      pay: sl.paid >= sl.size && sl.balance <= 0 ? 'paid' : t.payment_status !== 'paid' && sl.paid === 0 ? 'pending' : 'balance',
       runners: await Promise.all(rs.map(async (r) => ({ id: r.id, name: `${r.first_name} ${r.last_name}`.trim(), bib: r.bib, shirt: r.shirt_size, gender: r.gender,
         waiver: !!r.waiver_accepted_at, sign: r.waiver_accepted_at ? null : '/w/' + (await waiverToken(r.id)) }))),
       kit: t.kit_at ? { at: t.kit_at, by: t.kit_by || '', count: t.kit_count ?? 0, note: t.kit_note || '' } : null,

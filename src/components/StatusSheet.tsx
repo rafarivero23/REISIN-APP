@@ -21,7 +21,8 @@ export async function StatusSheet({ race, live = false }: { race: Race; live?: b
   const branch = (b: string | null) => (b === 'femenil' ? 'Femenil' : b === 'mixto' ? 'Mixto' : b === 'varonil' ? 'Varonil' : '');
   const pay = (t: Team) => {
     const sl = teamSlots(t, race);
-    if (t.payment_status !== 'paid') return { k: 'bad', l: 'Pago pendiente' };
+    if (sl.paid >= sl.size && sl.balance <= 0) return { k: 'ok', l: 'Pagado' };
+    if (t.payment_status !== 'paid' && sl.paid === 0) return { k: 'bad', l: 'Pago pendiente' };
     if (sl.balance > 0) return { k: 'warn', l: 'Saldo pendiente' };
     return { k: 'ok', l: 'Pagado' };
   };
