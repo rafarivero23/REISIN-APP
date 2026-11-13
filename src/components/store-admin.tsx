@@ -5,21 +5,21 @@ import { useT } from './I18n';
 import { Drawer, DeleteButton, useToast } from './ui';
 import { resize } from './racepage';
 import { money, fmtDate } from '@/lib/format';
-import { imgSrc, heroList, totalStock, netTotal, type Product, type Order, type StoreOption } from '@/lib/store-shared';
-import { saveStoreSettings, saveProduct, deleteProduct, moveProduct, uploadStoreImage, setOrderStatus, setOrderNotes, importInventory, setStoreHero, type ProductInput } from '@/app/actions/store';
+import { imgSrc, heroList, totalStock, netTotal, codeLabel, codeProblem, type Product, type Order, type StoreOption, type StoreCode } from '@/lib/store-shared';
+import { saveStoreSettings, saveProduct, deleteProduct, moveProduct, uploadStoreImage, setOrderStatus, setOrderNotes, importInventory, setStoreHero, saveStoreCode, deleteStoreCode, type ProductInput, type CodeInput } from '@/app/actions/store';
 
 // Admin → race → Tienda: settings, products (inventory per size, photos, description) and orders.
 type Settings = { on: boolean; pickup: boolean; shipFee: number | null; code: string | null; hero: string[] };
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
-export function StoreAdmin({ raceId, raceSlug, settings, products, orders }: { raceId: string; raceSlug: string; settings: Settings; products: Product[]; orders: Order[] }) {
+export function StoreAdmin({ raceId, raceSlug, settings, products, orders, codes = [] }: { raceId: string; raceSlug: string; settings: Settings; products: Product[]; orders: Order[]; codes?: StoreCode[] }) {
   const { lang } = useT();
   const tx = (es: string, en: string) => (lang === 'en' ? en : es);
   const router = useRouter();
   const toast = useToast();
   const [s, setS] = useState({ on: settings.on, pickup: settings.pickup, ship: settings.shipFee != null, fee: settings.shipFee ?? 0, lock: !!settings.code, code: settings.code || '' });
   const [edit, setEdit] = useState<ProductInput | null>(null);
-  const [view, setView] = useState<'products' | 'orders'>('products');
+  const [view, setView] = useState<'products' | 'orders' | 'codes'>('products');
   const paid = orders.filter((o) => o.status !== 'canceled');
   const sales = orders.reduce((a, o) => a + netTotal(o), 0);
   const toDeliver = orders.filter((o) => o.status === 'paid').length;
@@ -65,6 +65,7 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders }: { r
       <div className="tabs" role="tablist" style={{ marginBottom: 0 }}>
         <button type="button" role="tab" aria-selected={view === 'products'} onClick={() => setView('products')}>{tx('Inventario', 'Inventory')} · {products.length}</button>
         <button type="button" role="tab" aria-selected={view === 'orders'} onClick={() => setView('orders')}>{tx('Pedidos', 'Orders')} · {orders.length}</button>
+        <button type="button" role="tab" aria-selected={view === 'codes'} onClick={() => setView('codes')}>{tx('Descuentos', 'Discounts')} · {codes.length}</button>
       </div>
 
       {view === 'products' && (
@@ -100,6 +101,7 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders }: { r
       )}
 
       {view === 'orders' && <Orders raceId={raceId} orders={orders} />}
+      {view === 'codes' && <Codes raceId={raceId} codes={codes} orders={orders} />}
 
       {edit && <ProductDrawer raceId={raceId} p={edit} onClose={() => setEdit(null)} />}
     </div>
@@ -338,7 +340,7 @@ function Orders({ raceId, orders }: { raceId: string; orders: Order[] }) {
               <td style={{ fontSize: 13 }}>{o.items.map((i, k) => <div key={k} style={i.refunded && i.refunded >= i.qty ? { textDecoration: 'line-through', opacity: .5 } : undefined}>{i.qty - (i.refunded || 0) || i.qty}× {i.name}{i.option ? <span className="chip" style={{ marginLeft: 6 }}>{i.option}</span> : null}</div>)}</td>
               <td style={{ fontSize: 13, maxWidth: 240 }}>{o.delivery === 'ship' ? <><b>{tx('Envío', 'Ship')}</b><div className="muted">{o.address}</div></> : tx('Recoge en kits', 'Kit pickup')}
                 <input className="st-note" defaultValue={o.notes || ''} placeholder={tx('Nota / guía…', 'Note / tracking…')} onBlur={async (e) => { if (e.target.value !== (o.notes || '')) await setOrderNotes(raceId, o.id, e.target.value); }} /></td>
-              <td className="num">{money(o.total, lang)}{o.refunded ? <div style={{ fontSize: 12, color: '#e0a020' }}>−{money(o.refunded, lang)} {tx('reembolso', 'refund')}</div> : null}{o.delivered_by ? <div className="muted" style={{ fontSize: 12 }}>✓ {o.delivered_by}</div> : null}{o.shipping ? <div className="muted" style={{ fontSize: 12 }}>{tx('incl. envío', 'incl. ship')} {money(o.shipping, lang)}</div> : null}</td>
+              <td className="num">{money(o.total, lang)}{o.discount ? <div className="muted" style={{ fontSize: 12 }}>{o.discount_code} −{money(o.discount, lang)}</div> : null}{o.refunded ? <div style={{ fontSize: 12, color: '#e0a020' }}>−{money(o.refunded, lang)} {tx('reembolso', 'refund')}</div> : null}{o.delivered_by ? <div className="muted" style={{ fontSize: 12 }}>✓ {o.delivered_by}</div> : null}{o.shipping ? <div className="muted" style={{ fontSize: 12 }}>{tx('incl. envío', 'incl. ship')} {money(o.shipping, lang)}</div> : null}</td>
               <td>
                 <select value={o.status} onChange={async (e) => { await setOrderStatus(raceId, o.id, e.target.value as 'paid'); router.refresh(); }}>
                   <option value="paid">{tx('Pagado · por entregar', 'Paid · to deliver')}</option>
@@ -350,6 +352,73 @@ function Orders({ raceId, orders }: { raceId: string; orders: Order[] }) {
           ))}
         </tbody>
       </table></div>
+    </>
+  );
+}
+
+const blankCode: CodeInput = { code: '', kind: 'pct', value: 10, maxUses: null, expires: '', active: true };
+function Codes({ raceId, codes, orders }: { raceId: string; codes: StoreCode[]; orders: Order[] }) {
+  const { lang } = useT();
+  const tx = (es: string, en: string) => (lang === 'en' ? en : es);
+  const router = useRouter();
+  const toast = useToast();
+  const [f, setF] = useState<CodeInput | null>(null);
+  const [err, setErr] = useState('');
+  const save = async () => {
+    if (!f) return;
+    setErr('');
+    const r = await saveStoreCode(raceId, f);
+    if (r.error) return setErr(r.error);
+    toast(tx('Código guardado', 'Code saved')); setF(null); router.refresh();
+  };
+  const given = (code: string) => orders.filter((o) => o.discount_code === code && o.status !== 'pending').reduce((a, o) => a + (o.discount || 0), 0);
+  return (
+    <>
+      <div className="toolbar" style={{ justifyContent: 'space-between' }}>
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>{tx('El cliente lo escribe en el carrito. Descuenta sobre los productos (no sobre el envío).', 'Customers enter it in the cart. Applies to products, not shipping.')}</p>
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => { setErr(''); setF({ ...blankCode }); }}>+ {tx('Código', 'Code')}</button>
+      </div>
+      {codes.length === 0 ? <div className="card muted">{tx('Aún no hay códigos de descuento.', 'No discount codes yet.')}</div> : (
+        <div className="tbl-wrap"><table>
+          <thead><tr><th>{tx('Código', 'Code')}</th><th>{tx('Descuento', 'Discount')}</th><th>{tx('Usos', 'Uses')}</th><th>{tx('Vence', 'Expires')}</th><th>{tx('Descontado', 'Given')}</th><th>{tx('Estado', 'Status')}</th></tr></thead>
+          <tbody>
+            {codes.map((c) => {
+              const bad = codeProblem(c);
+              return (
+                <tr key={c.id} className="clickable" onClick={() => { setErr(''); setF({ id: c.id, code: c.code, kind: c.kind, value: c.value, maxUses: c.max_uses, expires: c.expires_at || '', active: c.active }); }}>
+                  <td><b className="mono" style={{ letterSpacing: '.06em' }}>{c.code}</b></td>
+                  <td className="num">{codeLabel(c)}</td>
+                  <td className="num">{c.uses}{c.max_uses != null ? ` / ${c.max_uses}` : ''}</td>
+                  <td>{c.expires_at ? fmtDate(c.expires_at, lang) : '—'}</td>
+                  <td className="num">{money(given(c.code), lang)}</td>
+                  <td>{!bad ? <span className="chip ok">{tx('Activo', 'Active')}</span> : <span className="chip">{bad === 'st_codeExpired' ? tx('Vencido', 'Expired') : bad === 'st_codeUsed' ? tx('Agotado', 'Used up') : tx('Pausado', 'Paused')}</span>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table></div>
+      )}
+      {f && (
+        <Drawer title={f.id ? tx('Editar código', 'Edit code') : tx('Nuevo código de descuento', 'New discount code')} onClose={() => setF(null)}>
+          <div className="stack" style={{ gap: 12 }}>
+            <div className="field"><label>{tx('Código', 'Code')}</label><input value={f.code} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase().replace(/\s+/g, '') })} placeholder="STAFF20" autoFocus style={{ letterSpacing: '.08em' }} /></div>
+            <div className="row" style={{ gap: 8 }}>
+              <div className="field" style={{ flex: 1 }}><label>{tx('Tipo', 'Type')}</label><select value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value as 'pct' | 'amt' })}><option value="pct">{tx('Porcentaje (%)', 'Percent (%)')}</option><option value="amt">{tx('Monto fijo ($)', 'Fixed amount ($)')}</option></select></div>
+              <div className="field" style={{ flex: 1 }}><label>{f.kind === 'pct' ? '%' : '$ MXN'}</label><input type="number" min={1} max={f.kind === 'pct' ? 100 : undefined} value={f.value} onChange={(e) => setF({ ...f, value: Number(e.target.value) })} /></div>
+            </div>
+            <div className="row" style={{ gap: 8 }}>
+              <div className="field" style={{ flex: 1 }}><label>{tx('Máximo de usos (vacío = sin límite)', 'Max uses (empty = unlimited)')}</label><input type="number" min={1} value={f.maxUses ?? ''} onChange={(e) => setF({ ...f, maxUses: e.target.value ? Number(e.target.value) : null })} /></div>
+              <div className="field" style={{ flex: 1 }}><label>{tx('Vence (último día válido)', 'Expires (last valid day)')}</label><input type="date" value={f.expires} onChange={(e) => setF({ ...f, expires: e.target.value })} /></div>
+            </div>
+            <label className="chk"><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {tx('Activo', 'Active')}</label>
+            {err && <p className="err">{err}</p>}
+            <div className="row" style={{ justifyContent: 'space-between', marginTop: 6 }}>
+              {f.id ? <DeleteButton onConfirm={async () => { await deleteStoreCode(raceId, f.id!); setF(null); router.refresh(); }} /> : <span />}
+              <div className="row"><button type="button" className="btn" onClick={() => setF(null)}>{tx('Cancelar', 'Cancel')}</button><button type="button" className="btn btn-primary" onClick={save}>{tx('Guardar', 'Save')}</button></div>
+            </div>
+          </div>
+        </Drawer>
+      )}
     </>
   );
 }

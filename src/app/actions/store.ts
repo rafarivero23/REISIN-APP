@@ -8,7 +8,7 @@ import { newId, now } from '@/lib/ids';
 import { getRace } from '@/lib/repo';
 import { stripe } from '@/lib/stripe';
 import { signPayToken, verifyPayToken, setShopAccess, hasShopAccess } from '@/lib/team-session';
-import { createOrder, getOrder, markOrderPaid, productsOf, stockOf, type OrderItem, type StoreOption } from '@/lib/store';
+import { createOrder, getOrder, markOrderPaid, productsOf, stockOf, findCode, normCode, discountFor, codeProblem, type OrderItem, type StoreOption } from '@/lib/store';
 
 const staff = async () => { if (!(await getCurrentUser())) throw new Error('Not signed in'); };
 const done = () => { revalidatePath('/admin', 'layout'); revalidatePath('/r', 'layout'); };
@@ -99,9 +99,43 @@ export async function setOrderNotes(raceId: string, id: string, notes: string) {
   return {};
 }
 
+/* ---------- discount codes ---------- */
+export type CodeInput = { id?: string; code: string; kind: 'pct' | 'amt'; value: number; maxUses: number | null; expires: string; active: boolean };
+export async function saveStoreCode(raceId: string, c: CodeInput): Promise<{ error?: string }> {
+  await staff();
+  const code = normCode(c.code);
+  if (!/^[A-Z0-9_-]{3,30}$/.test(code)) return { error: 'El código debe tener de 3 a 30 letras o números, sin espacios.' };
+  const value = Math.round(Number(c.value) || 0);
+  if (value <= 0 || (c.kind === 'pct' && value > 100)) return { error: c.kind === 'pct' ? 'El porcentaje va de 1 a 100.' : 'Escribe el monto del descuento.' };
+  const dup = await one<{ id: string }>('SELECT id FROM store_codes WHERE race_id = ? AND code = ?', [raceId, code]);
+  if (dup && dup.id !== c.id) return { error: `Ya existe el código ${code}.` };
+  const maxUses = c.maxUses == null || !(Number(c.maxUses) > 0) ? null : Math.round(Number(c.maxUses));
+  const vals = [code, c.kind === 'amt' ? 'amt' : 'pct', value, maxUses, /^\d{4}-\d{2}-\d{2}$/.test(c.expires || '') ? c.expires : null, !!c.active];
+  if (c.id) await run('UPDATE store_codes SET code = ?, kind = ?, value = ?, max_uses = ?, expires_at = ?, active = ? WHERE id = ? AND race_id = ?', [...vals, c.id, raceId]);
+  else await run('INSERT INTO store_codes (id, race_id, code, kind, value, max_uses, expires_at, active, created_at) VALUES (?,?,?,?,?,?,?,?,?)', [newId(), raceId, ...vals, now()]);
+  done();
+  return {};
+}
+export async function deleteStoreCode(raceId: string, id: string) {
+  await staff();
+  await run('DELETE FROM store_codes WHERE id = ? AND race_id = ?', [id, raceId]);
+  done();
+  return {};
+}
+
+// Public: check a code in the cart (the real discount is recomputed at checkout).
+export async function checkStoreCode(raceId: string, code: string): Promise<{ error?: string; code?: string; kind?: 'pct' | 'amt'; value?: number }> {
+  const race = await getRace(raceId);
+  if (!race) return { error: 'st_codeBad' };
+  const c = await findCode(race.id, code);
+  const bad = codeProblem(c);
+  if (bad) return { error: bad };
+  return { code: c!.code, kind: c!.kind, value: c!.value };
+}
+
 /* ---------- public checkout ---------- */
 type CartLine = { productId: string; option: string; qty: number };
-type Buyer = { name: string; email: string; phone: string; delivery: 'pickup' | 'ship'; address: string };
+type Buyer = { name: string; email: string; phone: string; delivery: 'pickup' | 'ship'; address: string; code?: string };
 
 // Units held by checkouts opened in the last 30 min (so two people can't buy the last one).
 async function heldQty(raceId: string) {
@@ -139,11 +173,24 @@ export async function storeCheckout(raceId: string, cart: CartLine[], b: Buyer):
   }
   const subtotal = items.reduce((a, it) => a + it.qty * it.price, 0);
   const shipping = ship ? race.store_ship_fee || 0 : 0;
+  let discount = 0, code: string | null = null;
+  if (b.code && normCode(b.code)) {
+    const c = await findCode(race.id, b.code);
+    const bad = codeProblem(c);
+    if (bad) return { error: bad };
+    discount = discountFor(c!, subtotal);
+    code = c!.code;
+  }
+  const total = subtotal - discount + shipping;
   const orderId = await createOrder({ race_id: race.id, name: b.name.trim(), email: b.email.trim(), phone: b.phone.trim(), delivery: ship ? 'ship' : 'pickup',
-    address: ship ? b.address.trim() : null, items, subtotal, shipping, total: subtotal + shipping });
+    address: ship ? b.address.trim() : null, items, subtotal, shipping, total, discount_code: code, discount });
   const s = stripe();
   const back = `/r/${race.slug || race.id}/store`;
-  if (!s) return { simulated: true, orderId, payToken: await signPayToken('store', orderId), total: subtotal + shipping };
+  // 100% off and nothing to ship: nothing to charge, the order is paid right away.
+  if (total <= 0) { await markOrderPaid(orderId, null); done(); return { url: `${back}/done?order=${orderId}` }; }
+  if (!s) return { simulated: true, orderId, payToken: await signPayToken('store', orderId), total };
+  // Stripe applies the discount as a one-time coupon for exactly this amount.
+  const coupon = discount ? await s.coupons.create({ amount_off: discount * 100, currency: 'mxn', duration: 'once', max_redemptions: 1, name: `${code}`.slice(0, 40) }) : null;
   const session = await s.checkout.sessions.create({
     mode: 'payment',
     customer_email: b.email.trim(),
@@ -151,6 +198,7 @@ export async function storeCheckout(raceId: string, cart: CartLine[], b: Buyer):
       ...items.map((it) => ({ quantity: it.qty, price_data: { currency: 'mxn', unit_amount: it.price * 100, product_data: { name: `${it.name}${it.option ? ` · ${it.option}` : ''}` } } })),
       ...(shipping ? [{ quantity: 1, price_data: { currency: 'mxn', unit_amount: shipping * 100, product_data: { name: 'Envío' } } }] : []),
     ],
+    ...(coupon ? { discounts: [{ coupon: coupon.id }] } : {}),
     metadata: { kind: 'store', id: orderId, qty: '1' },
     success_url: `${origin()}${back}/done?order=${orderId}&session_id={CHECKOUT_SESSION_ID}`,
     cancel_url: `${origin()}${back}?canceled=1`,

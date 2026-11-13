@@ -395,6 +395,22 @@ ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivered_at TEXT;
 ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivered_by TEXT;
 ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS refunded INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS history TEXT;
+-- Shop discount codes (percent or fixed MXN off the products subtotal; shipping not discounted).
+CREATE TABLE IF NOT EXISTS store_codes (
+  id TEXT PRIMARY KEY,
+  race_id TEXT NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'pct',
+  value INTEGER NOT NULL DEFAULT 0,
+  max_uses INTEGER,
+  uses INTEGER NOT NULL DEFAULT 0,
+  expires_at TEXT,
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_store_codes_code ON store_codes(race_id, code);
+ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS discount_code TEXT;
+ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS discount INTEGER NOT NULL DEFAULT 0;
 
 -- Solos have their own number series (S1, S2…). Races numbered before that
 -- (Solos at 46+) are shifted back to start at 1, keeping their order.

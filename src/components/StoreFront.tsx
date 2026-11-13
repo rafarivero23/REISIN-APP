@@ -5,8 +5,8 @@ import { useT } from './I18n';
 import { TestCheckout } from './ui';
 import { RichText } from './RichText';
 import { money } from '@/lib/format';
-import { imgSrc, stockOf, totalStock, type Product } from '@/lib/store-shared';
-import { storeCheckout, confirmStoreOrder, unlockShop } from '@/app/actions/store';
+import { imgSrc, stockOf, totalStock, discountFor, codeLabel, type Product } from '@/lib/store-shared';
+import { storeCheckout, confirmStoreOrder, unlockShop, checkStoreCode } from '@/app/actions/store';
 
 // Public race store: product grid → detail pop-up (big photos, sizes) → cart drawer → Stripe checkout.
 type Line = { productId: string; option: string; qty: number };
@@ -156,6 +156,18 @@ function Cart({ raceId, raceSlug, raceName, cart, byId, ship, onChange, onClose 
   const lines = cart.map((l) => ({ ...l, p: byId.get(l.productId)! })).filter((l) => l.p);
   const subtotal = lines.reduce((a, l) => a + l.qty * l.p.price, 0);
   const shipping = f.delivery === 'ship' ? ship.fee || 0 : 0;
+  const [codeIn, setCodeIn] = useState('');
+  const [code, setCode] = useState<{ code: string; kind: 'pct' | 'amt'; value: number } | null>(null);
+  const [codeErr, setCodeErr] = useState('');
+  const discount = code ? discountFor(code, subtotal) : 0;
+  const total = subtotal - discount + shipping;
+  const applyCode = async () => {
+    setCodeErr('');
+    if (!codeIn.trim()) return;
+    const r = await checkStoreCode(raceId, codeIn);
+    if (r.error || !r.code) { setCode(null); return setCodeErr(errs[r.error || 'st_codeBad'] || tx('Código no válido.', 'Invalid code.')); }
+    setCode({ code: r.code, kind: r.kind!, value: r.value! }); setCodeIn(r.code);
+  };
   const setQty = (i: number, q: number) => onChange(cart.map((l, j) => (j === i ? { ...l, qty: Math.max(1, Math.min(q, stockOf(byId.get(l.productId)!, l.option))) } : l)));
   useEffect(() => {
     const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
@@ -165,11 +177,12 @@ function Cart({ raceId, raceSlug, raceName, cart, byId, ship, onChange, onClose 
     required: tx('Completa nombre, email y teléfono.', 'Fill in name, email and phone.'), st_address: tx('Escribe la dirección completa de envío.', 'Enter your full shipping address.'),
     st_stock: tx('Ya no hay suficientes piezas de', 'Not enough stock left for'), st_gone: tx('Un producto ya no está disponible. Revisa tu carrito.', 'A product is no longer available. Check your cart.'),
     st_closed: tx('La tienda está cerrada.', 'The store is closed.'), st_empty: tx('Tu carrito está vacío.', 'Your cart is empty.'),
+    st_codeBad: tx('Código no válido.', 'Invalid code.'), st_codeExpired: tx('Este código ya venció.', 'This code has expired.'), st_codeUsed: tx('Este código ya se usó el máximo de veces.', 'This code has reached its limit.'),
   };
   const pay = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(''); setBusy(true);
-    const r = await storeCheckout(raceId, cart, f);
+    const r = await storeCheckout(raceId, cart, { ...f, code: code?.code || '' });
     if ('error' in r) { setErr(`${errs[r.error] || r.error}${r.detail ? ` ${r.detail}.` : ''}`); setBusy(false); return; }
     if ('url' in r) { window.location.href = r.url; return; }
     setSim(r); setBusy(false);
@@ -219,13 +232,21 @@ function Cart({ raceId, raceSlug, raceName, cart, byId, ship, onChange, onClose 
             {f.delivery === 'ship' && <label><span className="mono">{tx('Dirección completa (calle, número, colonia, CP, ciudad, estado)', 'Full address (street, number, area, ZIP, city, state)')}</span><textarea rows={3} value={f.address} onChange={(e) => setF({ ...f, address: e.target.value })} autoComplete="street-address" required /></label>}
             <div className="st-sum">
               <div><span>Subtotal</span><span>{money(subtotal, lang)}</span></div>
+              {discount > 0 && <div className="st-disc"><span>{tx('Descuento', 'Discount')} {code!.code} ({codeLabel(code!)})</span><span>−{money(discount, lang)}</span></div>}
               {f.delivery === 'ship' && <div><span>{tx('Envío', 'Shipping')}</span><span>{money(shipping, lang)}</span></div>}
-              <div className="t"><span>Total</span><b>{money(subtotal + shipping, lang)}</b></div>
+              <div className="t"><span>Total</span><b>{money(total, lang)}</b></div>
             </div>
+            <div className="st-code">
+              <input value={codeIn} onChange={(e) => { setCodeIn(e.target.value.toUpperCase()); setCodeErr(''); }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyCode(); } }}
+                placeholder={tx('Código de descuento', 'Discount code')} aria-label={tx('Código de descuento', 'Discount code')} autoCapitalize="characters" disabled={!!code} />
+              {code ? <button type="button" className="mono" onClick={() => { setCode(null); setCodeIn(''); }}>{tx('Quitar', 'Remove')}</button>
+                : <button type="button" className="mono" onClick={applyCode}>{tx('Aplicar', 'Apply')}</button>}
+            </div>
+            {codeErr && <p className="st-err">{codeErr}</p>}
             {err && <p className="st-err">{err}</p>}
             <div className="st-form-act">
               <button type="button" className="st-back mono" onClick={() => setStep('cart')}>← {tx('Carrito', 'Cart')}</button>
-              <button type="submit" className="sv-cta st-go" disabled={busy}>{busy ? tx('Abriendo pago…', 'Opening checkout…') : `${tx('Pagar', 'Pay')} ${money(subtotal + shipping, lang)} →`}</button>
+              <button type="submit" className="sv-cta st-go" disabled={busy}>{busy ? tx('Abriendo pago…', 'Opening checkout…') : total <= 0 ? `${tx('Confirmar pedido', 'Place order')} →` : `${tx('Pagar', 'Pay')} ${money(total, lang)} →`}</button>
             </div>
           </form>
         )}

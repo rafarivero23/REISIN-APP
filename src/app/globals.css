@@ -1367,3 +1367,8 @@ body:has(.sg){background:#1B1C1D}
 .sd-ok{color:#2f9e5b;margin:0}
 .sd-log ul{margin:6px 0 0 16px;padding:0;font-size:13px;display:flex;flex-direction:column;gap:4px}
 @media (max-width:560px){.sd-form{grid-template-columns:1fr}}
+/* Shop discount code */
+.st-code{display:flex;gap:8px;margin-top:10px}
+.st-code input{flex:1;min-width:0;padding:12px;border:1px solid currentColor;background:transparent;color:inherit;font:inherit;letter-spacing:.08em;text-transform:uppercase;opacity:.9}
+.st-code button{padding:0 16px;border:1px solid currentColor;background:transparent;color:inherit;cursor:pointer;letter-spacing:.12em;text-transform:uppercase;font-size:12px}
+.st-sum .st-disc{color:#5BD08A}

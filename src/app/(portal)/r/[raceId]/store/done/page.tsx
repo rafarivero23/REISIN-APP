@@ -34,6 +34,7 @@ export default async function StoreDone({ params, searchParams }: { params: { ra
         <div>
           <span className="mono">{tx('Tu pedido', 'Your order')}</span>
           <ul>{o.items.map((i, k) => <li key={k}><span>{i.qty}× {i.name}{i.option ? ` · ${i.option}` : ''}</span><span>{money(i.qty * i.price, lang)}</span></li>)}
+            {o.discount > 0 && <li><span>{tx('Descuento', 'Discount')} {o.discount_code}</span><span>−{money(o.discount, lang)}</span></li>}
             {o.shipping > 0 && <li><span>{tx('Envío', 'Shipping')}</span><span>{money(o.shipping, lang)}</span></li>}
             <li className="t"><span>Total</span><b>{money(o.total, lang)}</b></li></ul>
         </div>

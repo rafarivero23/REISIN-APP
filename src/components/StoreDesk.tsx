@@ -149,7 +149,7 @@ function ManageCard({ raceId, o, products, open, onToggle }: { raceId: string; o
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState<{ k: 'ok' | 'err'; t: string } | null>(null);
-  const auto = o.items.reduce((a, it, i) => a + (rq[i] || 0) * it.price, 0);
+  const auto = Math.round(o.items.reduce((a, it, i) => a + (rq[i] || 0) * it.price, 0) * (o.subtotal ? 1 - (o.discount || 0) / o.subtotal : 1));
   const left = o.total - (o.refunded || 0);
   const act = async (k: string, fn: () => Promise<{ error?: string }>, ok: string) => {
     setBusy(k); setMsg(null);
@@ -173,7 +173,7 @@ function ManageCard({ raceId, o, products, open, onToggle }: { raceId: string; o
       <Head o={o} onToggle={onToggle} open={open} />
       {open && (
         <div className="kit-body sd-body">
-          <div className="sd-meta muted">Pedido {hhmm(o.created_at)} · Total {$(o.total)}{o.shipping ? ` (envío ${$(o.shipping)})` : ''}{o.refunded ? ` · Reembolsado ${$(o.refunded)}` : ''} · {o.stripe_session_id ? 'Pagado con Stripe' : 'Pago manual / prueba'}</div>
+          <div className="sd-meta muted">Pedido {hhmm(o.created_at)} · Total {$(o.total)}{o.discount ? ` (código ${o.discount_code} −${$(o.discount)})` : ''}{o.shipping ? ` (envío ${$(o.shipping)})` : ''}{o.refunded ? ` · Reembolsado ${$(o.refunded)}` : ''} · {o.stripe_session_id ? 'Pagado con Stripe' : 'Pago manual / prueba'}</div>
 
           <div className="label">Productos · cambiar talla o reembolsar</div>
           <ul className="sd-edit">
