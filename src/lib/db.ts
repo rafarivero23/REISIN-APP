@@ -292,6 +292,14 @@ CREATE INDEX IF NOT EXISTS idx_race_photos_race ON race_photos(race_id);
 ALTER TABLE races ADD COLUMN IF NOT EXISTS settle_amounts TEXT;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS settled_at TEXT;
 
+-- Staff guide per race (password-protected public page /guia/[raceId]).
+CREATE TABLE IF NOT EXISTS staff_guides (
+  race_id TEXT PRIMARY KEY REFERENCES races(id) ON DELETE CASCADE,
+  password TEXT NOT NULL,
+  data TEXT NOT NULL DEFAULT '{}',
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS agent_invites (
   id TEXT PRIMARY KEY,
   agent_id TEXT NOT NULL REFERENCES free_agents(id) ON DELETE CASCADE,

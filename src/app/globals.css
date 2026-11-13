@@ -1299,3 +1299,45 @@ body:has(.rpl){background:#1B1C1D}
 .rpl-notes{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;font-size:13px}
 .rpl-notes div{background:var(--rpl-panel);border:1px solid var(--rpl-line);padding:10px 14px}
 .rpl-notes b{display:block;margin-bottom:4px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--rpl-mut)}
+
+/* ---------- Guía de staff (/guia/[raceId]) ----------
+   Same dark Baja world as the route plan; one reading column, sticky section nav. */
+body:has(.sg){background:#1B1C1D}
+.sg{--sg-bg:#1B1C1D;--sg-panel:#242526;--sg-panel2:#2C2D2E;--sg-ink:#F2F2F0;--sg-mut:#A3A3A0;--sg-line:rgba(242,242,240,.16);--sg-cyan:#53E2E4;--sg-yellow:#FFE52E;--sg-orange:#F26A2E;
+  --f-title:"Baja Crossing","Barlow Condensed","Arial Narrow",system-ui,sans-serif;--f-title-w:400;
+  color-scheme:dark;background:var(--sg-bg);color:var(--sg-ink);min-height:100vh;
+  font-family:"Archivo",var(--f-body);font-stretch:105%;font-size:15px;line-height:1.55;
+  max-width:780px;margin:0 auto;padding:28px max(16px,env(safe-area-inset-right,0px)) 56px max(16px,env(safe-area-inset-left,0px));
+  display:flex;flex-direction:column;gap:18px}
+.sg h1{font-size:clamp(40px,10vw,64px);line-height:.95;color:var(--sg-ink)}
+.sg h2{font-size:28px;color:var(--sg-ink)}
+.sg a{color:var(--sg-cyan)}
+.sg-head{display:flex;flex-direction:column;gap:8px}
+.sg-tag,.sg-lab{font-family:"JetBrains Mono",ui-monospace,monospace;font-weight:700;text-transform:uppercase;letter-spacing:.1em;font-size:11px}
+.sg-tag{color:var(--sg-cyan)}
+.sg-lab{color:var(--sg-mut)}
+.sg-mut{color:var(--sg-mut);font-size:13px}
+.sg-links{display:flex;flex-wrap:wrap;gap:8px 18px;font-family:"JetBrains Mono",ui-monospace,monospace;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.sg-note{border-left:3px solid var(--sg-yellow);background:var(--sg-panel);padding:10px 14px;font-size:14px}
+.sg-nav{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--sg-bg);border-bottom:1px solid var(--sg-line);margin:0 calc(-1 * max(16px,env(safe-area-inset-left,0px)));padding:0 max(16px,env(safe-area-inset-left,0px));overflow-x:auto;scrollbar-width:none}
+.sg-nav::-webkit-scrollbar{display:none}
+.sg-nav ul{display:flex;gap:2px;list-style:none;margin:0;padding:8px 0;white-space:nowrap}
+.sg-nav a{display:block;text-decoration:none;color:var(--sg-ink);font-family:"JetBrains Mono",ui-monospace,monospace;font-weight:700;text-transform:uppercase;font-size:12px;letter-spacing:.06em;padding:6px 10px;border:1px solid transparent}
+.sg-nav a:hover,.sg-nav a:focus-visible{border-color:var(--sg-cyan);color:var(--sg-cyan);outline:none}
+.sg-sec{display:flex;flex-direction:column;gap:12px;padding-top:22px;scroll-margin-top:52px}
+.sg-card{background:var(--sg-panel);border:1px solid var(--sg-line);padding:14px 16px;font-size:14px}
+.sg-card .rich,.sg-row .rich,.sg-note .rich{display:flex;flex-direction:column;gap:8px}
+.sg-card ul,.sg-row ul,.sg-note ul{margin:0;padding-left:18px}
+.sg-card b,.sg-row b{color:var(--sg-ink)}
+.sg select,.sg input{font:inherit;font-size:16px;font-weight:600;padding:10px 12px;border:1px solid var(--sg-cyan);background:var(--sg-panel);color:var(--sg-ink);max-width:100%;border-radius:0}
+.sg select:focus-visible,.sg input:focus-visible,.sg button:focus-visible{outline:2px solid var(--sg-yellow);outline-offset:2px}
+.sg-me{border:1px solid var(--sg-mut);background:var(--sg-panel)}
+.sg-row{display:grid;grid-template-columns:110px 1fr;gap:6px 14px;padding:12px 16px;border-bottom:1px solid var(--sg-line);font-size:14px}
+.sg-row:last-child{border-bottom:0}
+.sg-row>span:first-child{font-family:"JetBrains Mono",ui-monospace,monospace;font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.08em;color:var(--sg-cyan);padding-top:3px}
+.sg-foot{font-family:"JetBrains Mono",ui-monospace,monospace;font-size:11px;color:var(--sg-mut);padding-top:24px}
+.sg-gate{justify-content:center;min-height:100vh}
+.sg-gate form{display:flex;flex-direction:column;gap:10px;max-width:420px;width:100%;margin:0 auto}
+.sg-gate button{font-family:"JetBrains Mono",ui-monospace,monospace;font-weight:700;text-transform:uppercase;letter-spacing:.06em;padding:12px;background:var(--sg-cyan);color:var(--sg-bg);border:0;cursor:pointer;font-size:13px}
+.sg-err{color:var(--sg-orange);font-size:13px}
+@media (max-width:480px){.sg-row{grid-template-columns:1fr;gap:4px}}
