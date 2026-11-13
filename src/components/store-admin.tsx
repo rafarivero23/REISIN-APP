@@ -5,7 +5,7 @@ import { useT } from './I18n';
 import { Drawer, DeleteButton, useToast } from './ui';
 import { resize } from './racepage';
 import { money, fmtDate } from '@/lib/format';
-import { imgSrc, heroList, totalStock, type Product, type Order, type StoreOption } from '@/lib/store-shared';
+import { imgSrc, heroList, totalStock, netTotal, type Product, type Order, type StoreOption } from '@/lib/store-shared';
 import { saveStoreSettings, saveProduct, deleteProduct, moveProduct, uploadStoreImage, setOrderStatus, setOrderNotes, importInventory, setStoreHero, type ProductInput } from '@/app/actions/store';
 
 // Admin → race → Tienda: settings, products (inventory per size, photos, description) and orders.
@@ -21,7 +21,7 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders }: { r
   const [edit, setEdit] = useState<ProductInput | null>(null);
   const [view, setView] = useState<'products' | 'orders'>('products');
   const paid = orders.filter((o) => o.status !== 'canceled');
-  const sales = paid.reduce((a, o) => a + o.total, 0);
+  const sales = orders.reduce((a, o) => a + netTotal(o), 0);
   const toDeliver = orders.filter((o) => o.status === 'paid').length;
 
   const saveSettings = async () => {
@@ -38,7 +38,11 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders }: { r
             <div className="label">{tx('Tienda', 'Store')}</div>
             <p className="muted" style={{ fontSize: 13, marginTop: 2 }}>{tx('Merch de la carrera. Se vende con Stripe; el botón "Tienda" aparece en la página cuando está activa y tiene productos.', 'Race merch, paid with Stripe. The "Store" button shows on the race page when it is on and has products.')}</p>
           </div>
-          <a className="btn btn-sm" href={`/r/${raceSlug}/store`} target="_blank" rel="noreferrer">{tx('Ver tienda', 'View store')} ↗</a>
+          <div className="row" style={{ gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+            <a className="btn btn-sm" href={`/r/${raceSlug}/pedidos`} target="_blank" rel="noreferrer">{tx('Surtido staff', 'Staff fulfillment')} ↗</a>
+            <a className="btn btn-sm" href={`/r/${raceSlug}/ordenes`} target="_blank" rel="noreferrer">{tx('Órdenes / reembolsos', 'Orders / refunds')} ↗</a>
+            <a className="btn btn-sm" href={`/r/${raceSlug}/store`} target="_blank" rel="noreferrer">{tx('Ver tienda', 'View store')} ↗</a>
+          </div>
         </div>
         <div className="st-set-row">
           <label className="chk"><input type="checkbox" checked={s.on} onChange={(e) => setS({ ...s, on: e.target.checked })} /> {tx('Tienda activa', 'Store on')}</label>
@@ -331,10 +335,10 @@ function Orders({ raceId, orders }: { raceId: string; orders: Order[] }) {
             <tr key={o.id}>
               <td className="num"><b>#{o.order_no}</b><div className="muted" style={{ fontSize: 12 }}>{fmtDate(o.created_at.slice(0, 10), lang)}</div></td>
               <td><b>{o.name}</b><div className="muted" style={{ fontSize: 12 }}>{o.email}<br />{o.phone}</div></td>
-              <td style={{ fontSize: 13 }}>{o.items.map((i, k) => <div key={k}>{i.qty}× {i.name}{i.option ? <span className="chip" style={{ marginLeft: 6 }}>{i.option}</span> : null}</div>)}</td>
+              <td style={{ fontSize: 13 }}>{o.items.map((i, k) => <div key={k} style={i.refunded && i.refunded >= i.qty ? { textDecoration: 'line-through', opacity: .5 } : undefined}>{i.qty - (i.refunded || 0) || i.qty}× {i.name}{i.option ? <span className="chip" style={{ marginLeft: 6 }}>{i.option}</span> : null}</div>)}</td>
               <td style={{ fontSize: 13, maxWidth: 240 }}>{o.delivery === 'ship' ? <><b>{tx('Envío', 'Ship')}</b><div className="muted">{o.address}</div></> : tx('Recoge en kits', 'Kit pickup')}
                 <input className="st-note" defaultValue={o.notes || ''} placeholder={tx('Nota / guía…', 'Note / tracking…')} onBlur={async (e) => { if (e.target.value !== (o.notes || '')) await setOrderNotes(raceId, o.id, e.target.value); }} /></td>
-              <td className="num">{money(o.total, lang)}{o.shipping ? <div className="muted" style={{ fontSize: 12 }}>{tx('incl. envío', 'incl. ship')} {money(o.shipping, lang)}</div> : null}</td>
+              <td className="num">{money(o.total, lang)}{o.refunded ? <div style={{ fontSize: 12, color: '#e0a020' }}>−{money(o.refunded, lang)} {tx('reembolso', 'refund')}</div> : null}{o.delivered_by ? <div className="muted" style={{ fontSize: 12 }}>✓ {o.delivered_by}</div> : null}{o.shipping ? <div className="muted" style={{ fontSize: 12 }}>{tx('incl. envío', 'incl. ship')} {money(o.shipping, lang)}</div> : null}</td>
               <td>
                 <select value={o.status} onChange={async (e) => { await setOrderStatus(raceId, o.id, e.target.value as 'paid'); router.refresh(); }}>
                   <option value="paid">{tx('Pagado · por entregar', 'Paid · to deliver')}</option>

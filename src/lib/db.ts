@@ -390,6 +390,11 @@ ALTER TABLE teams ADD COLUMN IF NOT EXISTS kit_at TEXT;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS kit_by TEXT;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS kit_count INTEGER;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS kit_note TEXT;
+-- Store orders: who handed it out and when (staff link), cash refunded so far, change log.
+ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivered_at TEXT;
+ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivered_by TEXT;
+ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS refunded INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS history TEXT;
 
 -- Solos have their own number series (S1, S2…). Races numbered before that
 -- (Solos at 46+) are shifted back to start at 1, keeping their order.
