@@ -1256,7 +1256,7 @@ html:has(.ss-bx),html:has(.ss-bx) body{background:#1B1C1D!important}
    Dark charcoal like the race manual; time → right, km ↑. Single dark theme by choice. */
 body:has(.rpl){background:#1B1C1D}
 .rpl{--rpl-bg:#1B1C1D;--rpl-panel:#242526;--rpl-panel2:#2C2D2E;--rpl-ink:#F2F2F0;--rpl-mut:#A3A3A0;--rpl-line:rgba(242,242,240,.16);--rpl-grid:#2A2B2C;
-  --rpl-solo:#F26A2E;--rpl-team:#53E2E4;--rpl-amb:#FF4B55;--rpl-yellow:#FFE52E;--rpl-night:#121314;--rpl-gravel:#3B3420;
+  --rpl-solo:#F26A2E;--rpl-team:#53E2E4;--rpl-amb:#FF4B55;--rpl-yellow:#FFE52E;--rpl-night:#08090A;--rpl-day:#3A3628;--rpl-sun:#F5C451;--rpl-moon:#8FA8D8;--rpl-gravel:#3B3420;
   --f-title:"Baja Crossing","Barlow Condensed","Arial Narrow",system-ui,sans-serif;--f-title-w:400;
   color-scheme:dark;background:var(--rpl-bg);color:var(--rpl-ink);min-height:100vh;
   font-family:"Archivo",var(--f-body);font-stretch:110%;font-size:15px;line-height:1.5;
@@ -1277,7 +1277,7 @@ body:has(.rpl){background:#1B1C1D}
 .rpl-seg button:focus-visible,.rpl select:focus-visible{outline:2px solid var(--rpl-yellow);outline-offset:2px}
 .rpl-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
 .rpl-fact{background:var(--rpl-panel);border:1px solid var(--rpl-line);border-top:3px solid var(--rpl-mut);padding:10px 14px;display:flex;flex-direction:column;gap:4px;min-width:0}
-.rpl-fact.solo{border-top-color:var(--rpl-solo)}.rpl-fact.team{border-top-color:var(--rpl-team)}.rpl-fact.amb{border-top-color:var(--rpl-amb)}.rpl-fact.urr{border-top-color:var(--rpl-yellow)}
+.rpl-fact.solo{border-top-color:var(--rpl-solo)}.rpl-fact.team{border-top-color:var(--rpl-team)}.rpl-fact.amb{border-top-color:var(--rpl-amb)}.rpl-fact.urr{border-top-color:var(--rpl-yellow)}.rpl-fact.sel{border-top-color:var(--rpl-ink)}
 .rpl-v{font-size:14px;font-weight:600}
 .rpl-v b{font-family:"JetBrains Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
 .rpl-warn{color:var(--rpl-amb)}

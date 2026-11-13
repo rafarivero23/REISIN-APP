@@ -22,6 +22,9 @@ const CP_AMB: [number, number, number][] = [[1, 60, 300], [2, 240, 600], [3, 420
 // Route: Strava 3555288480705899176 (BAJA X-ING 2026 V2), km measured on its GPX.
 const GRAVEL: [number, number] = [152.36, 191.4];
 const SOLO_P = [6, 8, 9];
+const SOLO_HOURS = [20, 25, 30, 35, 40, 45];
+const SUNRISE = 6 * 60 + 20, SUNSET = 17 * 60 + 30; // approx., Baja California Sur mid-November
+const isNight = (t: number) => { const m = ((t % 1440) + 1440) % 1440; return m < SUNRISE || m >= SUNSET; };
 const TEAM_P = [4, 5, 6, 7];
 const TEAM_START = 2 * 1440 + 14 * 60; // Sat 14 14:00 (Teams start, final)
 const KM = 218.2;
@@ -57,6 +60,8 @@ function soloAmbulance(spd: number) {
 
 export function RoutePlan({ raceName }: { raceName: string }) {
   const ts = TEAM_START;
+  const [solH, setSolH] = useState(30);
+  const solP = (solH * 60) / KM;
   const [spd, setSpd] = useState(50);
   const [view, setView] = useState<View>('all');
   const showS = view !== 'team', showT = view !== 'solo';
@@ -65,8 +70,8 @@ export function RoutePlan({ raceName }: { raceName: string }) {
 
   const sa = useMemo(() => soloAmbulance(spd), [spd]);
   const t0 = Math.floor(((showS ? SOLO_START : ts) - 120) / 60) * 60;
-  const t1 = Math.ceil((Math.max(showS ? SOLO_START + KM * last : 0, showT ? Math.max(ts + KM * slow, ts + 1440) : 0) + 60) / 60) * 60;
-  const W = Math.max(1100, Math.round(((t1 - t0) / 60) * 30)), H = 560, ml = 150, mr = 24, mt = 40, mb = 50;
+  const t1 = Math.ceil((Math.max(showS ? SOLO_START + KM * Math.max(last, solP) : 0, showT ? Math.max(ts + KM * slow, ts + 1440) : 0) + 60) / 60) * 60;
+  const W = Math.max(1100, Math.round(((t1 - t0) / 60) * 30)), H = 600, ml = 150, mr = 24, mt = 70, mb = 50;
   const pw = W - ml - mr, ph = H - mt - mb;
   const X = (t: number) => ml + ((t - t0) / (t1 - t0)) * pw;
   const Y = (km: number) => mt + ph - (km / KM) * ph;
@@ -83,12 +88,20 @@ export function RoutePlan({ raceName }: { raceName: string }) {
   const urr = [...(showS ? [{ l: 'Solos', a: gS[0] - URR_PRE, b: gS[1] + URR_POST }] : []), ...(showT ? [{ l: 'Teams', a: gT[0] - URR_PRE, b: gT[1] + URR_POST }] : [])];
 
   const hours: number[] = []; for (let t = t0; t <= t1; t += 60) hours.push(t);
-  const nights: [number, number][] = [];
-  for (let d = 0; d < 5; d++) { const ns = Math.max(t0, d * 1440 + 17 * 60 + 30), ne = Math.min(t1, (d + 1) * 1440 + 6 * 60 + 20); if (ne > ns) nights.push([ns, ne]); }
+  const nights: [number, number][] = [], days: [number, number][] = [];
+  for (let d = -1; d < 6; d++) {
+    const ns = Math.max(t0, d * 1440 + SUNSET), ne = Math.min(t1, (d + 1) * 1440 + SUNRISE); if (ne > ns) nights.push([ns, ne]);
+    const ds = Math.max(t0, d * 1440 + SUNRISE), de = Math.min(t1, d * 1440 + SUNSET); if (de > ds) days.push([ds, de]);
+  }
+  const sunMarks: { t: number; up: boolean }[] = [];
+  for (let d = 0; d < 6; d++) { [[SUNRISE, true], [SUNSET, false]].forEach(([m, up]) => { const t = d * 1440 + (m as number); if (t > t0 && t < t1) sunMarks.push({ t, up: up as boolean }); }); }
+  const sol = CPS.map((c) => ({ ...c, t: SOLO_START + c.km * solP }));
+  const solGravel = [SOLO_START + GRAVEL[0] * solP, SOLO_START + GRAVEL[1] * solP];
   const band = (start: number, a: number, b: number) => `${X(start)},${Y(0)} ${X(start + KM * a)},${Y(KM)} ${X(start + KM * b)},${Y(KM)}`;
 
   const facts: { k: string; c: string; g: View; v: React.ReactNode }[] = [
     { k: 'Solo Runners en ruta', c: 'solo', g: 'solo', v: <>Salen <b>{fmt(SOLO_START)}</b> · primero llega <b>{fmt(SOLO_START + KM * lead)}</b> · último <b>{fmt(SOLO_START + KM * last)}</b></> },
+    { k: `Solo de ${solH} h · ${pace(solP)} min/km`, c: 'sel', g: 'solo', v: <>Llega a meta <b>{fmt(SOLO_START + KM * solP)}</b>{sol.slice(1, -1).map((c) => <span key={c.n}> · {c.n} <b>{hm(c.t)}</b>{isNight(c.t) ? ' (noche)' : ''}</span>)}<br />Brecha {isNight(solGravel[0]) || isNight(solGravel[1]) ? 'con tramo de noche' : 'de día'}: <b>{fmt(solGravel[0])}</b> → <b>{hm(solGravel[1])}</b></> },
     { k: 'Teams en ruta', c: 'team', g: 'team', v: <>Salen <b>{fmt(ts)}</b> · primero llega <b>{fmt(ts + KM * fast)}</b> · último <b>{fmt(ts + KM * slow)}</b></> },
     { k: '¿Se cruzan?', c: 'solo', g: 'all', v: ov ? <>El team más rápido alcanza al último solo en el <b>km {ov.km}</b>, <b>{fmt(ov.t)}</b>. El líder solo nunca ve un team.</> : <>Ningún team alcanza a ningún solo. Nunca comparten tramo.</> },
     { k: 'Ambulancia solo', c: 'amb', g: 'solo', v: sa.gap ? <span className="rpl-warn">Pierde al líder en el <b>km {sa.gap.km}</b> ({fmt(sa.gap.t)}). Desde ahí el líder va sin ambulancia adelante.</span> : <>Siempre va delante del líder solo.</> },
@@ -122,6 +135,11 @@ export function RoutePlan({ raceName }: { raceName: string }) {
         <div className="rpl-ctl"><span className="rpl-lab">Salidas</span>
           <span className="rpl-v">{showS && <>Solo Runners <b>vie 16:30</b></>}{showS && showT && ' · '}{showT && <>Teams <b>sáb 14:00</b></>}</span>
         </div>
+        {showS && <div className="rpl-ctl"><span className="rpl-lab">Solo termina en</span>
+          <div className="rpl-seg" role="group" aria-label="Tiempo total del Solo">
+            {SOLO_HOURS.map((h) => <button key={h} type="button" aria-pressed={solH === h} onClick={() => setSolH(h)}>{h} h</button>)}
+          </div>
+        </div>}
         {showS && <div className="rpl-ctl"><label className="rpl-lab" htmlFor="rpl-spd">Ambulancia solo (km/h)</label>
           <select id="rpl-spd" value={spd} onChange={(e) => setSpd(+e.target.value)}>{[40, 50, 60].map((v) => <option key={v} value={v}>{v}</option>)}</select>
         </div>}
@@ -139,12 +157,23 @@ export function RoutePlan({ raceName }: { raceName: string }) {
         {showS && <span><i className="sw" style={{ height: 0, borderTop: '3px dashed var(--rpl-amb)' }} />Ambulancia solo (salta cada 20 km)</span>}
         <span><i className="sw" style={{ background: 'var(--rpl-gravel)' }} />Brecha sin ambulancia</span>
         <span><i className="sw" style={{ background: 'var(--rpl-yellow)', opacity: 0.35, borderTop: '2px solid var(--rpl-yellow)' }} />Unidad de respuesta rápida en brecha</span>
-        <span><i className="sw" style={{ background: 'var(--rpl-night)', border: '1px solid var(--rpl-line)' }} />Noche</span>
+        {showS && <span><i className="sw" style={{ height: 4, background: 'var(--rpl-ink)' }} />Solo seleccionado ({solH} h)</span>}
+        <span><i className="sw" style={{ background: 'var(--rpl-day)', border: '1px solid var(--rpl-sun)' }} />Día</span>
+        <span><i className="sw" style={{ background: 'var(--rpl-night)', border: '1px solid var(--rpl-moon)' }} />Noche</span>
       </div>
 
       <div className="rpl-chart">
         <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Gráfica distancia contra tiempo de corredores y ambulancias">
-          {nights.map(([a, b]) => <rect key={a} x={X(a)} y={mt} width={X(b) - X(a)} height={ph} fill="var(--rpl-night)" />)}
+          {days.map(([a, b]) => <rect key={'d' + a} x={X(a)} y={mt - 30} width={X(b) - X(a)} height={ph + 30} fill="var(--rpl-day)" />)}
+          {nights.map(([a, b]) => <rect key={'n' + a} x={X(a)} y={mt - 30} width={X(b) - X(a)} height={ph + 30} fill="var(--rpl-night)" />)}
+          {days.map(([a, b]) => X(b) - X(a) > 60 && <text key={'dl' + a} x={(X(a) + X(b)) / 2} y={mt + ph - 10} textAnchor="middle" style={{ fill: 'var(--rpl-sun)', fontWeight: 700, letterSpacing: '.14em' }}>DÍA</text>)}
+          {nights.map(([a, b]) => X(b) - X(a) > 60 && <text key={'nl' + a} x={(X(a) + X(b)) / 2} y={mt + ph - 10} textAnchor="middle" style={{ fill: 'var(--rpl-moon)', fontWeight: 700, letterSpacing: '.14em' }}>NOCHE</text>)}
+          {sunMarks.map((m) => (
+            <g key={'s' + m.t}>
+              <line x1={X(m.t)} x2={X(m.t)} y1={mt - 30} y2={mt + ph} stroke={m.up ? 'var(--rpl-sun)' : 'var(--rpl-moon)'} strokeWidth={1.5} strokeDasharray="3 4" opacity={0.8} />
+              <text x={X(m.t) + (m.up ? 4 : -4)} y={mt - 34} textAnchor={m.up ? 'start' : 'end'} style={{ fill: m.up ? 'var(--rpl-sun)' : 'var(--rpl-moon)', fontSize: 10, fontWeight: 700 }}>{m.up ? `Amanecer ${hm(m.t)}` : `Atardecer ${hm(m.t)}`}</text>
+            </g>
+          ))}
           <rect x={ml} y={Y(GRAVEL[1])} width={pw} height={Y(GRAVEL[0]) - Y(GRAVEL[1])} fill="var(--rpl-gravel)" opacity={0.55} />
           <text x={ml + 8} y={Y((GRAVEL[0] + GRAVEL[1]) / 2) + 4} style={{ fill: 'var(--rpl-yellow)', fontWeight: 700, letterSpacing: '.06em' }}>BRECHA · SIN AMBULANCIA</text>
           {urr.map((u) => (
@@ -188,6 +217,18 @@ export function RoutePlan({ raceName }: { raceName: string }) {
           {showS && <polyline points={sa.pts.map(([t, k]) => `${X(t)},${Y(k)}`).join(' ')} fill="none" stroke="var(--rpl-amb)" strokeWidth={2.5} strokeDasharray="7 4" />}
           {showS && SOLO_P.map((p) => endLabel(SOLO_START, p, `Solo ${pace(p)}`, 'var(--rpl-solo)'))}
           {showT && TEAM_P.map((p) => endLabel(ts, p, `Team ${pace(p)}`, 'var(--rpl-team)'))}
+          {showS && (
+            <g>
+              <line x1={X(SOLO_START)} y1={Y(0)} x2={X(SOLO_START + KM * solP)} y2={Y(KM)} stroke="var(--rpl-ink)" strokeWidth={3.5} strokeLinecap="round" />
+              {sol.slice(1, -1).map((c) => (
+                <g key={'sol' + c.n}>
+                  <circle cx={X(c.t)} cy={Y(c.km)} r={5} fill="var(--rpl-bg)" stroke="var(--rpl-ink)" strokeWidth={2.5} />
+                  <text x={X(c.t) - 8} y={Y(c.km) - 8} textAnchor="end" style={{ fill: 'var(--rpl-ink)', fontWeight: 700, fontSize: 12 }}>{fmt(c.t)}</text>
+                </g>
+              ))}
+              <text x={X(SOLO_START + KM * solP) + 8} y={Y(KM) + 16} style={{ fill: 'var(--rpl-ink)', fontWeight: 700, fontSize: 12 }}>Solo {solH} h · {pace(solP)} · llega {fmt(SOLO_START + KM * solP)}</text>
+            </g>
+          )}
           {showS && sa.gap && (
             <g>
               <circle cx={X(sa.gap.t)} cy={Y(sa.gap.km)} r={9} fill="none" stroke="var(--rpl-amb)" strokeWidth={2.5} />
@@ -207,7 +248,7 @@ export function RoutePlan({ raceName }: { raceName: string }) {
         <table>
           <thead><tr><th>Paso por checkpoint</th>{CPS.slice(1).map((c) => <th key={c.n}>{c.n} · {c.p}</th>)}</tr></thead>
           <tbody>
-            {[...(showS ? SOLO_P.map((p) => ({ l: 'Solo', c: 'var(--rpl-solo)', s: SOLO_START, p })) : []), ...(showT ? TEAM_P.map((p) => ({ l: 'Team', c: 'var(--rpl-team)', s: ts, p })) : [])].map((r) => (
+            {[...(showS ? [{ l: `Solo ${solH} h ·`, c: 'var(--rpl-ink)', s: SOLO_START, p: solP }, ...SOLO_P.map((p) => ({ l: 'Solo', c: 'var(--rpl-solo)', s: SOLO_START, p }))] : []), ...(showT ? TEAM_P.map((p) => ({ l: 'Team', c: 'var(--rpl-team)', s: ts, p })) : [])].map((r) => (
               <tr key={r.l + r.p}>
                 <td><i className="dot" style={{ background: r.c }} />{r.l} {pace(r.p)}</td>
                 {CPS.slice(1).map((c, i) => {
