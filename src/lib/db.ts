@@ -390,6 +390,12 @@ ALTER TABLE teams ADD COLUMN IF NOT EXISTS kit_at TEXT;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS kit_by TEXT;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS kit_count INTEGER;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS kit_note TEXT;
+-- Did not finish: when they stopped, at what km, why and who recorded it.
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS dnf_at TEXT;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS dnf_km NUMERIC;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS dnf_note TEXT;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS dnf_by TEXT;
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS dnf BOOLEAN NOT NULL DEFAULT false;
 -- Store orders: who handed it out and when (staff link), cash refunded so far, change log.
 ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivered_at TEXT;
 ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivered_by TEXT;

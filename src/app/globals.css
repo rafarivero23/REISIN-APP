@@ -1382,3 +1382,14 @@ body:has(.sg){background:#1B1C1D}
 .st-inv span.out{opacity:.55}.st-inv span.out b{color:#e5484d}
 .st-opts.st-opts-s{grid-template-columns:1fr 110px 70px auto}
 .st-sold{align-self:center;text-align:center;color:var(--muted)}
+
+/* Leaderboard: DNF / final */
+.lb-table tr.lb-out td,.lb-cards li.lb-out{opacity:.6}
+.lb-dnf{font-weight:800;letter-spacing:.06em}
+.lb-final{font-size:15px}
+.lb-posn{white-space:nowrap}
+
+.ck-dnf{display:flex;flex-direction:column;gap:8px;padding:12px;border:1px solid var(--bad,#e5484d);border-radius:10px;background:rgba(229,72,77,.08)}
+.ck-dnf.on{flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px 10px}
+.ck-dnf.on .btn{margin-left:auto}
+.ck-dnf-btn{align-self:flex-start;color:var(--bad,#e5484d)}

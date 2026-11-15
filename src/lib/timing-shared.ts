@@ -2,6 +2,7 @@
 export type Checkpoint = { id: string; race_id: string; num: number; name: string; km: number | null };
 export type Checkin = { id: string; team_id: string; checkpoint_id: string; at: string; by_name: string | null };
 export const START = 'start'; // checkpoint_id used for the start line
+export const fmtKm = (km: number | null | undefined) => (km == null ? '' : `${Number(km.toFixed(1))} km`);
 
 export type BoardTeam = {
   id: string; no: string | null; name: string; logo: string | null; category: string | null; div: string; group: string | null; groupColor: string | null;
@@ -9,6 +10,9 @@ export type BoardTeam = {
   clock: Record<string, string>; // checkpoint id → pass time (ISO), even without a start
   last: number; lastMs: number | null; // furthest checkpoint num reached (0 = started, -1 = not started)
   lastAt?: number | null; // pass time at the furthest checkpoint (tiebreak when there is no start)
+  km?: number | null; // furthest km reached (DNF: the km where they stopped)
+  finishMs?: number | null; // elapsed time at the last checkpoint (the finish)
+  dnf?: { km: number | null; ms: number | null; at: string | null; note: string | null } | null;
 };
 export type Board = { checkpoints: Checkpoint[]; teams: BoardTeam[]; updated: string };
 
@@ -16,8 +20,11 @@ export type Board = { checkpoints: Checkpoint[]; teams: BoardTeam[]; updated: st
 // that haven't started go last, by number then name.
 // Teams with a pass but no start time rank after timed teams at the same point,
 // by who passed first.
-export function rankTeams<T extends Pick<BoardTeam, 'last' | 'lastMs' | 'lastAt' | 'no' | 'name'>>(list: T[]): T[] {
+// DNF teams go after everyone still in the race, furthest km first.
+export function rankTeams<T extends Pick<BoardTeam, 'last' | 'lastMs' | 'lastAt' | 'no' | 'name' | 'dnf' | 'km'>>(list: T[]): T[] {
   return [...list].sort((a, b) =>
+    Number(!!a.dnf) - Number(!!b.dnf) ||
+    (a.dnf && b.dnf ? (b.km ?? -1) - (a.km ?? -1) || (a.dnf.ms ?? Infinity) - (b.dnf.ms ?? Infinity) : 0) ||
     b.last - a.last || (a.lastMs ?? Infinity) - (b.lastMs ?? Infinity) || (a.lastAt ?? Infinity) - (b.lastAt ?? Infinity) ||
     noSort(a.no) - noSort(b.no) || a.name.localeCompare(b.name));
 }

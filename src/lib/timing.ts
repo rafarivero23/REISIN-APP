@@ -62,11 +62,21 @@ export async function buildBoard(race: Race): Promise<Board> {
       if (n > last || (n === last && (elapsed ?? Infinity) < (lastMs ?? Infinity))) { last = n; lastMs = elapsed; lastAt = at; }
     }
     const g = t.is_solo ? null : groupFor(t.half_avg_min, groups);
+    const lastCp = cps.find((c) => c.num === last);
+    const finalCp = cps.length ? cps[cps.length - 1] : null;
+    const finishMs = finalCp && times[finalCp.id] != null ? times[finalCp.id] : null;
+    const kmReached = lastCp?.km ?? (last === 0 ? 0 : null);
+    const dnf = t.dnf ? {
+      km: t.dnf_km != null ? Number(t.dnf_km) : kmReached,
+      ms: lastMs, // time at the last checkpoint they passed (the DNF moment itself is just a log)
+      at: t.dnf_at, note: t.dnf_note,
+    } : null;
     return {
       id: t.id, no: noLabel(t.team_no, t.is_solo), name: t.name, logo: t.logo ? `/api/logo/${t.id}?v=${t.logo.length}` : null,
       category: categoryOf(runners.filter((r) => r.team_id === t.id).map((r) => r.gender), t.is_solo),
       div: divisionOf(t.team_size || race.team_size, t.is_solo),
       group: g?.label || null, groupColor: g?.color || null, start, times, clock, last, lastMs, lastAt,
+      km: dnf ? dnf.km : kmReached, finishMs: dnf ? null : finishMs, dnf,
     };
   });
   return { checkpoints: cps, teams: rankTeams(list), updated: now() };

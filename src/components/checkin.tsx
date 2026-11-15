@@ -3,10 +3,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useT } from './I18n';
 import { Field, useToast } from './ui';
-import { timingLogin, recordCheckin, removeCheckin, startWave } from '@/app/actions/timing';
+import { timingLogin, recordCheckin, removeCheckin, startWave, setDnf } from '@/app/actions/timing';
 import { START, fmtElapsed } from '@/lib/timing-shared';
 
-type T = { id: string; no: string | null; name: string; solo: boolean; group: string | null };
+type T = { id: string; no: string | null; name: string; solo: boolean; group: string | null; dnf?: { km: number | null; at: string | null; note: string | null; by: string | null } | null };
 type CP = { id: string; num: number; name: string; km: number | null };
 type CI = { team_id: string; checkpoint_id: string; at: string; by: string | null };
 // Pending writes survive no-signal spots: kept in localStorage and retried.
@@ -191,6 +191,12 @@ export function CheckinApp({ raceId, raceName, staff, teams, checkpoints, checki
         {already && <p className="note" style={{ color: 'var(--ink)' }}>{t('tm_replace').replace('{t}', stamp(already))}</p>}
         {pick && cp !== START && !startOf(pick.id) && <p className="note" style={{ color: 'var(--ink)' }}>{t('tm_noStartWarn')}</p>}
         <button type="submit" className="btn btn-primary btn-lg ck-go" disabled={!pick || !day || !hour}>{t('tm_save')}</button>
+        {pick && <DnfBox key={pick.id} raceId={raceId} team={pick} kmDefault={(() => {
+          // furthest checkpoint this team has passed (or the one selected)
+          const passed = checkpoints.filter((c) => times.has(`${pick.id}|${c.id}`)).sort((a, b) => b.num - a.num)[0];
+          return passed?.km ?? cpObj?.km ?? null;
+        })()} atDefault={day && hour ? fromLocalInput(`${day}T${hour.length === 5 ? hour + ':00' : hour}`) : null}
+          onDone={() => { setPick(null); setQ(''); router.refresh(); }} />}
       </form>
 
       {undo && (
@@ -230,6 +236,15 @@ export function CheckinApp({ raceId, raceName, staff, teams, checkpoints, checki
           </div>
         ) : <p className="muted">{t('tm_logEmpty')}</p>}
       </div>
+
+      {teams.some((x) => x.dnf) && (
+        <details className="card"><summary style={{ cursor: 'pointer' }}><b>DNF · {teams.filter((x) => x.dnf).length}</b></summary>
+          <div className="list" style={{ marginTop: 8 }}>
+            {teams.filter((x) => x.dnf).map((x) => <button key={x.id} type="button" className="it" style={{ all: 'unset', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 8, padding: '8px 0', borderTop: '1px solid var(--line)' }}
+              onClick={() => { setPick(x); window.scrollTo({ top: 0, behavior: 'smooth' }); }}><span>{x.no?.startsWith('S') ? '' : '#'}{x.no ?? '–'} {x.name}</span><span className="muted">{x.dnf!.km != null ? `km ${x.dnf!.km}` : ''}{x.dnf!.note ? ` · ${x.dnf!.note}` : ''}</span></button>)}
+          </div>
+        </details>
+      )}
 
       {todo.length > 0 && done.length > 0 && (
         <details className="card"><summary style={{ cursor: 'pointer' }}><b>{t('tm_missing')} · {todo.length}</b></summary>
@@ -285,6 +300,46 @@ function WaveStart({ raceId, waves, onDone }: { raceId: string; waves: string[];
           if ('error' in r) return toast(t(r.error));
           toast(t('tm_waveDone').replace('{n}', String(r.count))); onDone();
         }}>{t('tm_waveGo')}</button>
+      </div>
+    </div>
+  );
+}
+
+// Did not finish: km where they stopped (defaults to the furthest checkpoint passed), time and reason.
+function DnfBox({ raceId, team, kmDefault, atDefault, onDone }: { raceId: string; team: T; kmDefault: number | null; atDefault: string | null; onDone: () => void }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [km, setKm] = useState<string>(team.dnf?.km != null ? String(team.dnf.km) : kmDefault != null ? String(kmDefault) : '');
+  const [note, setNote] = useState(team.dnf?.note || '');
+  const [busy, setBusy] = useState(false);
+  const save = async (v: Parameters<typeof setDnf>[2]) => {
+    setBusy(true);
+    try {
+      const r = await setDnf(raceId, team.id, v);
+      if ('error' in r) { toast(r.error === 'tm_locked' ? 'Tu acceso expiró. Vuelve a entrar.' : 'No se pudo guardar.'); return; }
+      toast(v ? `${team.name}: DNF registrado` : `${team.name}: DNF quitado`);
+      onDone();
+    } catch { toast('Sin señal. Intenta de nuevo cuando tengas conexión.'); }
+    finally { setBusy(false); }
+  };
+  if (team.dnf) return (
+    <div className="ck-dnf on">
+      <b>DNF</b> {team.dnf.km != null ? `· km ${team.dnf.km}` : ''}{team.dnf.at ? ` · ${new Date(team.dnf.at).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}` : ''}{team.dnf.note ? ` · ${team.dnf.note}` : ''}{team.dnf.by ? <small className="muted"> · {team.dnf.by}</small> : null}
+      <button type="button" className="btn btn-sm" disabled={busy} onClick={() => { if (confirm(`¿Quitar el DNF de ${team.name}? Vuelve a la clasificación.`)) save(null); }}>Quitar DNF</button>
+    </div>
+  );
+  if (!open) return <button type="button" className="btn btn-ghost btn-sm ck-dnf-btn" onClick={() => setOpen(true)}>✕ Marcar DNF (no terminó)</button>;
+  return (
+    <div className="ck-dnf">
+      <b>DNF · {team.name}</b>
+      <div className="ck-when">
+        <div><label className="ck-lbl" htmlFor="dnf-km">Km donde se quedó</label><input id="dnf-km" className="ck-input" type="number" step="0.1" min={0} value={km} onChange={(e) => setKm(e.target.value)} /></div>
+        <div><label className="ck-lbl" htmlFor="dnf-note">Motivo (opcional)</label><input id="dnf-note" className="ck-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Lesión, abandono…" /></div>
+      </div>
+      <small className="muted">Hora: la de arriba ({atDefault ? new Date(atDefault).toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : '—'}). En el leaderboard sale al final como DNF, con este km y su tiempo en el último punto que pasó.</small>
+      <div className="row" style={{ gap: 8 }}>
+        <button type="button" className="btn btn-sm" onClick={() => setOpen(false)}>Cancelar</button>
+        <button type="button" className="btn btn-sm btn-danger" disabled={busy} onClick={() => save({ km: km === '' ? null : Number(km), at: atDefault, note })}>{busy ? '…' : 'Guardar DNF'}</button>
       </div>
     </div>
   );

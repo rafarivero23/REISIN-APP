@@ -172,3 +172,20 @@ export async function setNoRace(teamId: string, v: boolean): Promise<{ error?: s
   refresh(team.race_id);
   return {};
 }
+
+// Did not finish. km defaults to the furthest checkpoint reached; at = when they stopped (optional).
+export async function setDnf(raceId: string, teamId: string, v: { km: number | null; at: string | null; note: string } | null): Promise<Err | { ok: true }> {
+  const by = await writer(raceId);
+  if (!by) return { error: 'tm_locked' };
+  const team = await getTeam(teamId);
+  if (!team || team.race_id !== raceId) return { error: 'not_found' };
+  if (!v) {
+    await run('UPDATE teams SET dnf = false, dnf_at = NULL, dnf_km = NULL, dnf_note = NULL, dnf_by = NULL WHERE id = ?', [teamId]);
+  } else {
+    const km = v.km == null || !isFinite(Number(v.km)) ? null : Math.max(0, Math.round(Number(v.km) * 10) / 10);
+    const at = v.at && validAt(v.at) ? new Date(v.at).toISOString() : null;
+    await run('UPDATE teams SET dnf = true, dnf_at = ?, dnf_km = ?, dnf_note = ?, dnf_by = ? WHERE id = ?', [at, km, String(v.note || '').trim().slice(0, 300) || null, by, teamId]);
+  }
+  refresh(raceId);
+  return { ok: true };
+}

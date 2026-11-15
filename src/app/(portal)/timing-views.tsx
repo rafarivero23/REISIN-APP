@@ -61,7 +61,8 @@ export async function CheckinView({ race }: { race: Race }) {
   }
   const groups = parseGroups(race.start_groups);
   const [cps, cis, teams] = await Promise.all([checkpointsOf(race.id), checkinsOf(race.id), many<Team>('SELECT * FROM teams WHERE race_id = ?', [race.id])]);
-  const list = teams.filter(isRacingTeam).map((x) => ({ id: x.id, no: noLabel(x.team_no, x.is_solo), name: x.name, solo: x.is_solo, group: x.is_solo ? null : groupFor(x.half_avg_min, groups)?.label || null }))
+  const list = teams.filter(isRacingTeam).map((x) => ({ id: x.id, no: noLabel(x.team_no, x.is_solo), name: x.name, solo: x.is_solo, group: x.is_solo ? null : groupFor(x.half_avg_min, groups)?.label || null,
+      dnf: x.dnf ? { km: x.dnf_km != null ? Number(x.dnf_km) : null, at: x.dnf_at, note: x.dnf_note, by: x.dnf_by } : null }))
     .sort((a, b) => noSort(a.no) - noSort(b.no) || a.name.localeCompare(b.name));
   return (
     <div className="lb-wide">
