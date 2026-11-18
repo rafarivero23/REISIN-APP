@@ -14,7 +14,7 @@ import { imgSrc, type Product } from '@/lib/store-shared';
 
 // Sal a Valle look (SAV27 brand kit): black, thin lines, mono labels,
 // one red accent, brand elements from the SAV .ai files in /public/brand/sav.
-type R = { id: string; slug: string | null; name: string; race_date: string | null; location: string | null; team_price: number; solo_price: number; teams_left: number };
+type R = { id: string; slug: string | null; name: string; race_date: string | null; location: string | null; team_price: number; solo_price: number; teams_left: number; closed?: boolean };
 type T = (k: string) => string;
 
 // One landing, two brand kits: SAV (black, thin lines, red) and Baja Crossing
@@ -130,7 +130,7 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono, kit
         {page.stats.map((s, i) => (
           <div key={i}><span className="mono">{pad(i + 1)} / {s.label}</span><b>{s.value}<small>{s.unit}</small></b></div>
         ))}
-        {!full && (
+        {!full && !race.closed && (
           <Link href={`/r/${race.id}/buy`} className="sv-acc">
             {kit.acc && <img className="sv-el" src={`${B}/${kit.acc}`} alt="" aria-hidden />}
             <span className="mono">{t('sv_signup')}</span>
@@ -138,7 +138,7 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono, kit
             <span className="sv-cta">{kit.ctaTeam} →</span>
           </Link>
         )}
-        {race.solo_price > 0 && (
+        {race.solo_price > 0 && !race.closed && (
           <Link href={`/r/${race.id}/solo`} className="sv-acc">
             <span className="mono">Solo runner</span>
             <b className="sv-acc-t">{t('sv_soloAvail')}</b>
@@ -157,6 +157,7 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono, kit
         </div>
       )}
 
+      {!race.closed && <>
       <Head title={t('sv_signup')} aside={t('sv_pick')} icon={icon()} />
       <section className="sv-acts sv-bleed">
         {rows.map((x) => (
@@ -169,6 +170,7 @@ export function SavLanding({ race, page, t, lang, showBoard, sponsors, mono, kit
           </Link>
         ))}
       </section>
+      </>}
 
       {flat.length > 0 && (
         <>

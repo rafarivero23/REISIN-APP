@@ -23,7 +23,7 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
   const { t, lang } = getT();
   const raw = await getRace(params.raceId);
   if (!raw) notFound();
-  const res = await loadOpenRace(raw.id);
+  const res = await loadOpenRace(raw.id, { allowClosed: true });
   if ('closed' in res) return <Closed name={res.closed} />;
   const r = res.race;
   const page = parsePage(raw.page);
@@ -43,7 +43,7 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
   const sv = brandKey(r.brand) === 'sav' || brandKey(r.brand) === 'baja';
   const kit = brandKey(r.brand) === 'baja' ? BX_KIT : SAV_KIT;
   const shopItems = sv && raw.store_on ? await productsOf(raw.id, true) : [];
-  const svRace = { id: r.id, slug: raw.slug, name: r.name, race_date: r.race_date, location: r.location, team_price: r.team_price, solo_price: raw.solo_price, teams_left: r.teams_left };
+  const svRace = { id: r.id, slug: raw.slug, name: r.name, race_date: r.race_date, location: r.location, team_price: r.team_price, solo_price: raw.solo_price, teams_left: r.teams_left, closed: !!r.closed };
   const locked = !!raw.access_code && !(await hasRaceAccess(raw.id, raw.access_code)) && !(await getCurrentUser());
   if (sv) {
     return (
@@ -82,7 +82,7 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
           ))}
         </div>
       )}
-      <div className="choice">
+      {!r.closed && <div className="choice">
         <Link href={`/r/${r.id}/buy`} aria-disabled={r.teams_left <= 0} className="hb ch-main"><HandFrame seed={1} />
           <b>{t('p_buy')}</b><span>{r.teams_left > 0 ? t('p_buySub') : t('p_fullRace')}</span>
           <span className="num" style={{ color: 'var(--ink)', fontWeight: 600, marginTop: 6 }}>{money(r.team_price, lang)}</span>
@@ -91,7 +91,7 @@ export default async function RaceChoice({ params }: { params: { raceId: string 
         <Link href={`/r/${r.id}/join`} className="hb"><HandFrame seed={3} /><b>{t('p_join')}</b><span>{t('p_joinSub')}</span></Link>
         <Link href={`/r/${r.id}/agents`} className="hb"><HandFrame seed={4} /><b>{t('fa_title')}</b><span>{t('fa_cardSub')}</span></Link>
         <Link href={`/r/${r.id}/solo`} className="hb"><HandFrame seed={5} /><b>{t('so_card')}</b><span>{raw.solo_price > 0 ? t('so_cardBuy').replace('{p}', money(raw.solo_price, lang)) : t('so_cardSub')}</span></Link>
-      </div>
+      </div>}
       {(days.length > 0 || page.sections.length > 0) && (
         <div className="rp-grid">
           {days.length > 0 && (

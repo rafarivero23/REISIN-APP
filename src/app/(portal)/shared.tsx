@@ -22,13 +22,16 @@ export function Back({ href }: { href: string }) {
 }
 
 // Loads an open race for a portal page, or shows a closed/not-found state.
-export async function loadOpenRace(raceId: string): Promise<{ race: PublicRace } | { closed: string }> {
+// allowClosed: the race page itself stays up after registration closes (route, shop,
+// leaderboard, photos…), only the sign-up options are hidden.
+export async function loadOpenRace(raceId: string, opts: { allowClosed?: boolean } = {}): Promise<{ race: PublicRace & { closed?: boolean } } | { closed: string }> {
   const race = await getRace(raceId);
   if (!race) notFound();
-  if (race.status !== 'open') return { closed: race.name };
+  const isClosed = race.status === 'closed' && !!opts.allowClosed;
+  if (race.status !== 'open' && !isClosed) return { closed: race.name };
   const live = await liveTeamCount(race.id);
   const { id, name, brand, race_date, location, team_price, runner_fee, team_size, categories, waiver, hold_slots } = race;
-  return { race: { id, name, brand, race_date, location, team_price, runner_fee, team_size, categories, waiver, hold_slots, sizes: sizeOptions(race), teams_left: Math.max(0, race.capacity_teams - live) } };
+  return { race: { id, name, brand, race_date, location, team_price, runner_fee, team_size, categories, waiver, hold_slots, sizes: sizeOptions(race), teams_left: Math.max(0, race.capacity_teams - live), closed: isClosed } };
 }
 
 export function Closed({ name }: { name: string }) {
