@@ -1,25 +1,25 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useT } from './I18n';
 import { Drawer, DeleteButton, useToast } from './ui';
 import { resize } from './racepage';
 import { money, fmtDate } from '@/lib/format';
-import { imgSrc, heroList, totalStock, netTotal, liveQty, codeLabel, codeProblem, type Product, type Order, type StoreOption, type StoreCode } from '@/lib/store-shared';
-import { saveStoreSettings, saveProduct, deleteProduct, moveProduct, uploadStoreImage, setOrderStatus, setOrderNotes, importInventory, setStoreHero, saveStoreCode, deleteStoreCode, type ProductInput, type CodeInput } from '@/app/actions/store';
+import { imgSrc, heroList, totalStock, netTotal, liveQty, codeLabel, codeProblem, type Product, type Order, type StoreOption, type StoreCode, type StoreGift } from '@/lib/store-shared';
+import { saveStoreSettings, saveProduct, deleteProduct, moveProduct, uploadStoreImage, setOrderStatus, setOrderNotes, importInventory, setStoreHero, saveStoreCode, deleteStoreCode, saveStoreGift, deleteStoreGift, type ProductInput, type CodeInput, type GiftInput } from '@/app/actions/store';
 
 // Admin → race → Tienda: settings, products (inventory per size, photos, description) and orders.
 type Settings = { on: boolean; pickup: boolean; shipFee: number | null; code: string | null; hero: string[] };
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
-export function StoreAdmin({ raceId, raceSlug, settings, products, orders, codes = [] }: { raceId: string; raceSlug: string; settings: Settings; products: Product[]; orders: Order[]; codes?: StoreCode[] }) {
+export function StoreAdmin({ raceId, raceSlug, settings, products, orders, codes = [], gifts = [] }: { raceId: string; raceSlug: string; settings: Settings; products: Product[]; orders: Order[]; codes?: StoreCode[]; gifts?: StoreGift[] }) {
   const { lang } = useT();
   const tx = (es: string, en: string) => (lang === 'en' ? en : es);
   const router = useRouter();
   const toast = useToast();
   const [s, setS] = useState({ on: settings.on, pickup: settings.pickup, ship: settings.shipFee != null, fee: settings.shipFee ?? 0, lock: !!settings.code, code: settings.code || '' });
   const [edit, setEdit] = useState<ProductInput | null>(null);
-  const [view, setView] = useState<'products' | 'orders' | 'codes'>('products');
+  const [view, setView] = useState<'products' | 'orders' | 'codes' | 'gifts'>('products');
   const paid = orders.filter((o) => o.status !== 'canceled');
   const sales = orders.reduce((a, o) => a + netTotal(o), 0);
   const toDeliver = orders.filter((o) => o.status === 'paid').length;
@@ -70,6 +70,7 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders, codes
         <button type="button" role="tab" aria-selected={view === 'products'} onClick={() => setView('products')}>{tx('Inventario', 'Inventory')} · {products.length}</button>
         <button type="button" role="tab" aria-selected={view === 'orders'} onClick={() => setView('orders')}>{tx('Pedidos', 'Orders')} · {orders.length}</button>
         <button type="button" role="tab" aria-selected={view === 'codes'} onClick={() => setView('codes')}>{tx('Descuentos', 'Discounts')} · {codes.length}</button>
+        <button type="button" role="tab" aria-selected={view === 'gifts'} onClick={() => setView('gifts')}>Gift cards · {gifts.length}</button>
       </div>
 
       {view === 'products' && (
@@ -116,6 +117,7 @@ export function StoreAdmin({ raceId, raceSlug, settings, products, orders, codes
 
       {view === 'orders' && <Orders raceId={raceId} orders={orders} />}
       {view === 'codes' && <Codes raceId={raceId} codes={codes} orders={orders} />}
+      {view === 'gifts' && <Gifts raceId={raceId} raceSlug={raceSlug} gifts={gifts} orders={orders} />}
 
       {edit && <ProductDrawer raceId={raceId} p={edit} sold={(opt) => (edit.id ? soldOf(edit.id, opt) : 0)} onClose={() => setEdit(null)} />}
     </div>
@@ -357,7 +359,7 @@ function Orders({ raceId, orders }: { raceId: string; orders: Order[] }) {
               <td style={{ fontSize: 13 }}>{o.items.map((i, k) => <div key={k} style={i.refunded && i.refunded >= i.qty ? { textDecoration: 'line-through', opacity: .5 } : undefined}>{i.qty - (i.refunded || 0) || i.qty}× {i.name}{i.option ? <span className="chip" style={{ marginLeft: 6 }}>{i.option}</span> : null}</div>)}</td>
               <td style={{ fontSize: 13, maxWidth: 240 }}>{o.delivery === 'ship' ? <><b>{tx('Envío', 'Ship')}</b><div className="muted">{o.address}</div></> : tx('Recoge en kits', 'Kit pickup')}
                 <input className="st-note" defaultValue={o.notes || ''} placeholder={tx('Nota / guía…', 'Note / tracking…')} onBlur={async (e) => { if (e.target.value !== (o.notes || '')) await setOrderNotes(raceId, o.id, e.target.value); }} /></td>
-              <td className="num">{money(o.total, lang)}{o.discount ? <div className="muted" style={{ fontSize: 12 }}>{o.discount_code} −{money(o.discount, lang)}</div> : null}{o.refunded ? <div style={{ fontSize: 12, color: '#e0a020' }}>−{money(o.refunded, lang)} {tx('reembolso', 'refund')}</div> : null}{o.delivered_by ? <div className="muted" style={{ fontSize: 12 }}>✓ {o.delivered_by}</div> : null}{o.shipping ? <div className="muted" style={{ fontSize: 12 }}>{tx('incl. envío', 'incl. ship')} {money(o.shipping, lang)}</div> : null}</td>
+              <td className="num">{money(o.total, lang)}{o.gift ? <div className="muted" style={{ fontSize: 12 }}>Gift card −{money(o.gift, lang)}</div> : null}{o.discount ? <div className="muted" style={{ fontSize: 12 }}>{o.discount_code} −{money(o.discount, lang)}</div> : null}{o.refunded ? <div style={{ fontSize: 12, color: '#e0a020' }}>−{money(o.refunded, lang)} {tx('reembolso', 'refund')}</div> : null}{o.delivered_by ? <div className="muted" style={{ fontSize: 12 }}>✓ {o.delivered_by}</div> : null}{o.shipping ? <div className="muted" style={{ fontSize: 12 }}>{tx('incl. envío', 'incl. ship')} {money(o.shipping, lang)}</div> : null}</td>
               <td>
                 <select value={o.status} onChange={async (e) => { await setOrderStatus(raceId, o.id, e.target.value as 'paid'); router.refresh(); }}>
                   <option value="paid">{tx('Pagado · por entregar', 'Paid · to deliver')}</option>
@@ -432,6 +434,76 @@ function Codes({ raceId, codes, orders }: { raceId: string; codes: StoreCode[]; 
             <div className="row" style={{ justifyContent: 'space-between', marginTop: 6 }}>
               {f.id ? <DeleteButton onConfirm={async () => { await deleteStoreCode(raceId, f.id!); setF(null); router.refresh(); }} /> : <span />}
               <div className="row"><button type="button" className="btn" onClick={() => setF(null)}>{tx('Cancelar', 'Cancel')}</button><button type="button" className="btn btn-primary" onClick={save}>{tx('Guardar', 'Save')}</button></div>
+            </div>
+          </div>
+        </Drawer>
+      )}
+    </>
+  );
+}
+
+function Gifts({ raceId, raceSlug, gifts, orders }: { raceId: string; raceSlug: string; gifts: StoreGift[]; orders: Order[] }) {
+  const { lang } = useT();
+  const tx = (es: string, en: string) => (lang === 'en' ? en : es);
+  const router = useRouter();
+  const toast = useToast();
+  const [f, setF] = useState<GiftInput | null>(null);
+  const [err, setErr] = useState('');
+  const [origin, setOrigin] = useState('');
+  useEffect(() => setOrigin(window.location.origin), []);
+  const save = async () => {
+    if (!f) return;
+    setErr('');
+    const r = await saveStoreGift(raceId, f);
+    if (r.error) return setErr(r.error);
+    toast(f.id ? tx('Gift card guardada', 'Gift card saved') : `${tx('Gift card creada', 'Gift card created')}: ${r.code}`); setF(null); router.refresh();
+  };
+  const msg = (g: StoreGift) => tx(
+    `${g.name ? `Hola ${g.name}, ` : ''}aquí está tu gift card para el SHOP por ${money(g.balance, lang)}.\n\nCódigo: ${g.code}\n\nEntra a ${origin}/r/${raceSlug}/store, elige tus productos y escribe el código en el carrito.`,
+    `${g.name ? `Hi ${g.name}, ` : ''}here's your SHOP gift card for ${money(g.balance, lang)}.\n\nCode: ${g.code}\n\nGo to ${origin}/r/${raceSlug}/store, pick your products and enter the code in the cart.`);
+  const usedIn = (code: string) => orders.filter((o) => o.gift_code === code && o.status !== 'pending');
+  const totals = { issued: gifts.reduce((a, g) => a + g.amount, 0), left: gifts.filter((g) => g.active).reduce((a, g) => a + g.balance, 0) };
+  return (
+    <>
+      <div className="toolbar" style={{ justifyContent: 'space-between' }}>
+        <p className="muted" style={{ fontSize: 13, margin: 0 }}>{tx('Un código con saldo para comprar en la tienda. Se escribe en el carrito y se va gastando en una o varias compras.', 'A code with a balance to spend in the store. It\'s entered in the cart and can be used across several orders.')}{gifts.length ? ` · ${tx('Emitido', 'Issued')} ${money(totals.issued, lang)} · ${tx('Saldo vivo', 'Open balance')} ${money(totals.left, lang)}` : ''}</p>
+        <button type="button" className="btn btn-primary btn-sm" onClick={() => { setErr(''); setF({ amount: 1000, name: '', note: '', active: true }); }}>+ Gift card</button>
+      </div>
+      {gifts.length === 0 ? <div className="card muted">{tx('Aún no hay gift cards.', 'No gift cards yet.')}</div> : (
+        <div className="tbl-wrap"><table>
+          <thead><tr><th>{tx('Código', 'Code')}</th><th>{tx('Para', 'For')}</th><th>{tx('Monto', 'Amount')}</th><th>{tx('Saldo', 'Balance')}</th><th>{tx('Usada en', 'Used in')}</th><th /></tr></thead>
+          <tbody>
+            {gifts.map((g) => {
+              const used = usedIn(g.code);
+              return (
+                <tr key={g.id} className="clickable" onClick={() => { setErr(''); setF({ id: g.id, code: g.code, amount: g.amount, balance: g.balance, name: g.name || '', note: g.note || '', active: g.active }); }}>
+                  <td><b className="mono" style={{ letterSpacing: '.06em' }}>{g.code}</b>{!g.active && <span className="chip" style={{ marginLeft: 6 }}>{tx('Pausada', 'Paused')}</span>}</td>
+                  <td>{g.name || '—'}{g.note && <div className="muted" style={{ fontSize: 12 }}>{g.note}</div>}</td>
+                  <td className="num">{money(g.amount, lang)}</td>
+                  <td className="num">{g.balance <= 0 ? <span className="chip">{tx('Usada', 'Used')}</span> : <b>{money(g.balance, lang)}</b>}</td>
+                  <td style={{ fontSize: 13 }}>{used.length ? used.map((o) => `#${o.order_no} (${money(o.gift, lang)})`).join(', ') : '—'}</td>
+                  <td onClick={(e) => e.stopPropagation()} style={{ whiteSpace: 'nowrap' }}>
+                    <button type="button" className="btn btn-sm" onClick={async () => { try { await navigator.clipboard.writeText(msg(g)); toast(tx('Mensaje copiado', 'Message copied')); } catch { toast(g.code); } }}>{tx('Copiar mensaje', 'Copy message')}</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table></div>
+      )}
+      {f && (
+        <Drawer title={f.id ? `Gift card ${f.code}` : tx('Nueva gift card', 'New gift card')} sub={tx('Tienda', 'Store')} onClose={() => setF(null)}>
+          <div className="stack" style={{ gap: 12 }}>
+            <div className="field"><label>{tx('Monto ($ MXN)', 'Amount ($ MXN)')}</label><input type="number" min={1} value={f.amount} onChange={(e) => setF({ ...f, amount: Number(e.target.value) })} autoFocus /></div>
+            {f.id && <div className="field"><label>{tx('Saldo disponible', 'Balance left')}</label><input type="number" min={0} value={f.balance ?? 0} onChange={(e) => setF({ ...f, balance: Number(e.target.value) })} /></div>}
+            <div className="field"><label>{tx('Para (nombre)', 'For (name)')}</label><input value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} placeholder={tx('Ej. Equipo Godspeed, premio 1er lugar', 'E.g. Godspeed team, 1st place prize')} /></div>
+            <div className="field"><label>{tx('Nota interna', 'Internal note')}</label><input value={f.note} onChange={(e) => setF({ ...f, note: e.target.value })} /></div>
+            <div className="field"><label>{tx('Código (vacío = se genera solo)', 'Code (empty = auto)')}</label><input value={f.code || ''} onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase().replace(/\s+/g, '') })} placeholder="GC-XXXX-XXXX" style={{ letterSpacing: '.08em' }} /></div>
+            <label className="chk"><input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> {tx('Activa', 'Active')}</label>
+            {err && <p className="err">{err}</p>}
+            <div className="row" style={{ justifyContent: 'space-between', marginTop: 6 }}>
+              {f.id ? <DeleteButton onConfirm={async () => { await deleteStoreGift(raceId, f.id!); setF(null); router.refresh(); }} /> : <span />}
+              <div className="row"><button type="button" className="btn" onClick={() => setF(null)}>{tx('Cancelar', 'Cancel')}</button><button type="button" className="btn btn-primary" onClick={save}>{f.id ? tx('Guardar', 'Save') : tx('Crear gift card', 'Create gift card')}</button></div>
             </div>
           </div>
         </Drawer>

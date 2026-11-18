@@ -13,8 +13,9 @@ export type Order = {
   delivery: 'pickup' | 'ship'; address: string | null; items: OrderItem[]; subtotal: number; shipping: number; total: number;
   status: 'pending' | 'paid' | 'delivered' | 'canceled'; stripe_session_id: string | null; paid_at: string | null; notes: string | null; created_at: string;
   delivered_at: string | null; delivered_by: string | null; refunded: number; history: OrderLog[];
-  discount_code: string | null; discount: number;
+  discount_code: string | null; discount: number; gift_code: string | null; gift: number;
 };
+export type StoreGift = { id: string; race_id: string; code: string; amount: number; balance: number; name: string | null; note: string | null; active: boolean; created_at: string };
 export type StoreCode = {
   id: string; race_id: string; code: string; kind: 'pct' | 'amt'; value: number; max_uses: number | null; uses: number;
   expires_at: string | null; active: boolean; created_at: string;

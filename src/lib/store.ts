@@ -1,12 +1,12 @@
 import { many, one, run, pool, ensureSchema } from '@/lib/db';
 import { newId, now } from '@/lib/ids';
 
-import { normCode, type Product, type Order, type OrderItem, type OrderLog, type StoreOption, type StoreCode } from '@/lib/store-shared';
+import { normCode, type Product, type Order, type OrderItem, type OrderLog, type StoreOption, type StoreCode, type StoreGift } from '@/lib/store-shared';
 export * from '@/lib/store-shared';
 
 const parse = <T,>(s: string | null | undefined, d: T): T => { try { return s ? JSON.parse(s) : d; } catch { return d; } };
 const toProduct = (r: any): Product => ({ ...r, options: parse<StoreOption[]>(r.options, []), images: parse<string[]>(r.images, []) });
-const toOrder = (r: any): Order => ({ ...r, refunded: Number(r.refunded || 0), discount: Number(r.discount || 0), items: parse<OrderItem[]>(r.items, []), history: parse<OrderLog[]>(r.history, []) });
+const toOrder = (r: any): Order => ({ ...r, refunded: Number(r.refunded || 0), discount: Number(r.discount || 0), gift: Number(r.gift || 0), items: parse<OrderItem[]>(r.items, []), history: parse<OrderLog[]>(r.history, []) });
 
 export async function productsOf(raceId: string, onlyActive = false) {
   const rows = await many(`SELECT * FROM store_products WHERE race_id = ? ${onlyActive ? 'AND active' : ''} ORDER BY sort, created_at`, [raceId]);
@@ -26,18 +26,32 @@ export async function findCode(raceId: string, code: string): Promise<StoreCode 
   const c = normCode(code);
   return c ? one<StoreCode>('SELECT * FROM store_codes WHERE race_id = ? AND code = ?', [raceId, c]) : null;
 }
+export async function giftsOf(raceId: string): Promise<StoreGift[]> {
+  return (await many<StoreGift>('SELECT * FROM store_gifts WHERE race_id = ? ORDER BY created_at DESC', [raceId])).map((g) => ({ ...g, amount: Number(g.amount), balance: Number(g.balance) }));
+}
+export async function findGift(raceId: string, code: string): Promise<StoreGift | null> {
+  const c = normCode(code);
+  const g = c ? await one<StoreGift>('SELECT * FROM store_gifts WHERE race_id = ? AND code = ?', [raceId, c]) : null;
+  return g ? { ...g, amount: Number(g.amount), balance: Number(g.balance) } : null;
+}
+// Balance still free to spend: minus what checkouts opened in the last 30 min are holding.
+export async function giftAvailable(g: StoreGift) {
+  const r = await one<{ n: string }>(`SELECT COALESCE(SUM(gift), 0) AS n FROM store_orders WHERE race_id = ? AND gift_code = ? AND status = 'pending' AND created_at > ?`,
+    [g.race_id, g.code, new Date(Date.now() - 30 * 60 * 1000).toISOString()]);
+  return Math.max(0, g.balance - Number(r?.n || 0));
+}
 export async function getOrder(id: string) {
   const r = await one('SELECT * FROM store_orders WHERE id = ?', [id]);
   return r ? toOrder(r) : null;
 }
 
 // Creates a pending order (prices and names come from the database, never the browser).
-export async function createOrder(o: Omit<Order, 'id' | 'order_no' | 'status' | 'stripe_session_id' | 'paid_at' | 'notes' | 'created_at' | 'delivered_at' | 'delivered_by' | 'refunded' | 'history' | 'discount_code' | 'discount'> & { discount_code?: string | null; discount?: number }) {
+export async function createOrder(o: Omit<Order, 'id' | 'order_no' | 'status' | 'stripe_session_id' | 'paid_at' | 'notes' | 'created_at' | 'delivered_at' | 'delivered_by' | 'refunded' | 'history' | 'discount_code' | 'discount' | 'gift_code' | 'gift'> & { discount_code?: string | null; discount?: number; gift_code?: string | null; gift?: number }) {
   const id = newId();
   const n = await one<{ n: number }>('SELECT COALESCE(MAX(order_no), 1000) + 1 AS n FROM store_orders WHERE race_id = ?', [o.race_id]);
-  await run(`INSERT INTO store_orders (id, race_id, order_no, name, email, phone, delivery, address, items, subtotal, shipping, total, discount_code, discount, status, created_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'pending', ?)`,
-    [id, o.race_id, Number(n?.n || 1001), o.name, o.email, o.phone, o.delivery, o.address, JSON.stringify(o.items), o.subtotal, o.shipping, o.total, o.discount_code || null, o.discount || 0, now()]);
+  await run(`INSERT INTO store_orders (id, race_id, order_no, name, email, phone, delivery, address, items, subtotal, shipping, total, discount_code, discount, gift_code, gift, status, created_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, 'pending', ?)`,
+    [id, o.race_id, Number(n?.n || 1001), o.name, o.email, o.phone, o.delivery, o.address, JSON.stringify(o.items), o.subtotal, o.shipping, o.total, o.discount_code || null, o.discount || 0, o.gift_code || null, o.gift || 0, now()]);
   return id;
 }
 
@@ -47,10 +61,11 @@ export async function markOrderPaid(orderId: string, sessionId: string | null): 
   const c = await pool.connect();
   try {
     await c.query('BEGIN');
-    const r = await c.query(`UPDATE store_orders SET status = 'paid', paid_at = $1, stripe_session_id = COALESCE($2, stripe_session_id) WHERE id = $3 AND status = 'pending' RETURNING items, race_id, discount_code`, [now(), sessionId, orderId]);
+    const r = await c.query(`UPDATE store_orders SET status = 'paid', paid_at = $1, stripe_session_id = COALESCE($2, stripe_session_id) WHERE id = $3 AND status = 'pending' RETURNING items, race_id, discount_code, gift_code, gift`, [now(), sessionId, orderId]);
     if (!r.rowCount) { await c.query('ROLLBACK'); return false; }
     const row = r.rows[0];
     if (row.discount_code) await c.query('UPDATE store_codes SET uses = uses + 1 WHERE race_id = $1 AND code = $2', [row.race_id, row.discount_code]);
+    if (row.gift_code && Number(row.gift) > 0) await c.query('UPDATE store_gifts SET balance = GREATEST(0, balance - $1) WHERE race_id = $2 AND code = $3', [Number(row.gift), row.race_id, row.gift_code]);
     for (const it of parse<OrderItem[]>(row.items, [])) {
       const p = await c.query('SELECT options, stock FROM store_products WHERE id = $1 FOR UPDATE', [it.product_id]);
       if (!p.rowCount) continue;

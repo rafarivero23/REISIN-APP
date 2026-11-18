@@ -173,7 +173,7 @@ function ManageCard({ raceId, o, products, open, onToggle }: { raceId: string; o
       <Head o={o} onToggle={onToggle} open={open} />
       {open && (
         <div className="kit-body sd-body">
-          <div className="sd-meta muted">Pedido {hhmm(o.created_at)} · Total {$(o.total)}{o.discount ? ` (código ${o.discount_code} −${$(o.discount)})` : ''}{o.shipping ? ` (envío ${$(o.shipping)})` : ''}{o.refunded ? ` · Reembolsado ${$(o.refunded)}` : ''} · {o.stripe_session_id ? 'Pagado con Stripe' : 'Pago manual / prueba'}</div>
+          <div className="sd-meta muted">Pedido {hhmm(o.created_at)} · Total {$(o.total)}{o.discount ? ` (código ${o.discount_code} −${$(o.discount)})` : ''}{o.gift ? ` · gift card ${o.gift_code} −${$(o.gift)}` : ''}{o.shipping ? ` (envío ${$(o.shipping)})` : ''}{o.refunded ? ` · Reembolsado ${$(o.refunded)}` : ''} · {o.stripe_session_id ? 'Pagado con Stripe' : 'Pago manual / prueba'}</div>
 
           <div className="label">Productos · cambiar talla o reembolsar</div>
           <ul className="sd-edit">

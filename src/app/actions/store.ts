@@ -8,7 +8,7 @@ import { newId, now } from '@/lib/ids';
 import { getRace } from '@/lib/repo';
 import { stripe } from '@/lib/stripe';
 import { signPayToken, verifyPayToken, setShopAccess, hasShopAccess } from '@/lib/team-session';
-import { createOrder, getOrder, markOrderPaid, productsOf, stockOf, findCode, normCode, discountFor, codeProblem, type OrderItem, type StoreOption } from '@/lib/store';
+import { createOrder, getOrder, markOrderPaid, productsOf, stockOf, findCode, normCode, discountFor, codeProblem, findGift, giftAvailable, type OrderItem, type StoreOption } from '@/lib/store';
 
 const staff = async () => { if (!(await getCurrentUser())) throw new Error('Not signed in'); };
 const done = () => { revalidatePath('/admin', 'layout'); revalidatePath('/r', 'layout'); };
@@ -136,10 +136,46 @@ export async function deleteStoreCode(raceId: string, id: string) {
   return {};
 }
 
-// Public: check a code in the cart (the real discount is recomputed at checkout).
-export async function checkStoreCode(raceId: string, code: string): Promise<{ error?: string; code?: string; kind?: 'pct' | 'amt'; value?: number }> {
+/* ---------- gift cards ---------- */
+const GC = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const gcCode = () => 'GC-' + Array.from({ length: 8 }, (_, i) => (i === 4 ? '-' : '') + GC[Math.floor(Math.random() * GC.length)]).join('');
+export type GiftInput = { id?: string; code?: string; amount: number; balance?: number; name: string; note: string; active: boolean };
+export async function saveStoreGift(raceId: string, g: GiftInput): Promise<{ error?: string; code?: string }> {
+  await staff();
+  const amount = Math.round(Number(g.amount) || 0);
+  if (amount <= 0) return { error: 'Escribe el monto de la gift card.' };
+  let code = normCode(g.code || '');
+  if (code && !/^[A-Z0-9_-]{4,30}$/.test(code)) return { error: 'El código debe tener de 4 a 30 letras o números, sin espacios.' };
+  if (!code && !g.id) { do { code = gcCode(); } while (await one('SELECT 1 FROM store_gifts WHERE race_id = ? AND code = ?', [raceId, code])); }
+  const dup = code ? await one<{ id: string }>('SELECT id FROM store_gifts WHERE race_id = ? AND code = ?', [raceId, code]) : null;
+  if (dup && dup.id !== g.id) return { error: `Ya existe el código ${code}.` };
+  if (await one('SELECT 1 FROM store_codes WHERE race_id = ? AND code = ?', [raceId, code])) return { error: `${code} ya es un código de descuento.` };
+  const balance = g.id && g.balance != null ? Math.max(0, Math.round(Number(g.balance) || 0)) : amount;
+  if (g.id) await run('UPDATE store_gifts SET code = COALESCE(?, code), amount = ?, balance = ?, name = ?, note = ?, active = ? WHERE id = ? AND race_id = ?',
+    [code || null, amount, balance, g.name.trim() || null, g.note.trim() || null, !!g.active, g.id, raceId]);
+  else await run('INSERT INTO store_gifts (id, race_id, code, amount, balance, name, note, active, created_at) VALUES (?,?,?,?,?,?,?,?,?)',
+    [newId(), raceId, code, amount, balance, g.name.trim() || null, g.note.trim() || null, !!g.active, now()]);
+  done();
+  return { code };
+}
+export async function deleteStoreGift(raceId: string, id: string) {
+  await staff();
+  await run('DELETE FROM store_gifts WHERE id = ? AND race_id = ?', [id, raceId]);
+  done();
+  return {};
+}
+
+// Public: check a code in the cart — a discount code or a gift card (recomputed at checkout).
+export async function checkStoreCode(raceId: string, code: string): Promise<{ error?: string; code?: string; kind?: 'pct' | 'amt' | 'gift'; value?: number }> {
   const race = await getRace(raceId);
   if (!race) return { error: 'st_codeBad' };
+  const g = await findGift(race.id, code);
+  if (g) {
+    if (!g.active) return { error: 'st_codeBad' };
+    const left = await giftAvailable(g);
+    if (left <= 0) return { error: 'st_giftEmpty' };
+    return { code: g.code, kind: 'gift', value: left };
+  }
   const c = await findCode(race.id, code);
   const bad = codeProblem(c);
   if (bad) return { error: bad };
@@ -148,7 +184,7 @@ export async function checkStoreCode(raceId: string, code: string): Promise<{ er
 
 /* ---------- public checkout ---------- */
 type CartLine = { productId: string; option: string; qty: number };
-type Buyer = { name: string; email: string; phone: string; delivery: 'pickup' | 'ship'; address: string; code?: string };
+type Buyer = { name: string; email: string; phone: string; delivery: 'pickup' | 'ship'; address: string; code?: string; gift?: string };
 
 // Units held by checkouts opened in the last 30 min (so two people can't buy the last one).
 async function heldQty(raceId: string) {
@@ -194,16 +230,30 @@ export async function storeCheckout(raceId: string, cart: CartLine[], b: Buyer):
     discount = discountFor(c!, subtotal);
     code = c!.code;
   }
-  const total = subtotal - discount + shipping;
+  // Gift card: pays part or all of the rest (products + shipping). Stripe can't charge
+  // under $10 MXN, so a tiny remainder is left at $10 instead.
+  let gift = 0, giftCode: string | null = null;
+  if (b.gift && normCode(b.gift)) {
+    const g = await findGift(race.id, b.gift);
+    if (!g || !g.active) return { error: 'st_codeBad' };
+    const left = await giftAvailable(g);
+    if (left <= 0) return { error: 'st_giftEmpty' };
+    const due = subtotal - discount + shipping;
+    gift = Math.min(left, due);
+    if (due - gift > 0 && due - gift < 10) gift = Math.max(0, due - 10);
+    giftCode = g.code;
+  }
+  const total = subtotal - discount - gift + shipping;
   const orderId = await createOrder({ race_id: race.id, name: b.name.trim(), email: b.email.trim(), phone: b.phone.trim(), delivery: ship ? 'ship' : 'pickup',
-    address: ship ? b.address.trim() : null, items, subtotal, shipping, total, discount_code: code, discount });
+    address: ship ? b.address.trim() : null, items, subtotal, shipping, total, discount_code: code, discount, gift_code: giftCode, gift });
   const s = stripe();
   const back = `/r/${race.slug || race.id}/store`;
   // 100% off and nothing to ship: nothing to charge, the order is paid right away.
   if (total <= 0) { await markOrderPaid(orderId, null); done(); return { url: `${back}/done?order=${orderId}` }; }
   if (!s) return { simulated: true, orderId, payToken: await signPayToken('store', orderId), total };
   // Stripe applies the discount as a one-time coupon for exactly this amount.
-  const coupon = discount ? await s.coupons.create({ amount_off: discount * 100, currency: 'mxn', duration: 'once', max_redemptions: 1, name: `${code}`.slice(0, 40) }) : null;
+  const off = discount + gift;
+  const coupon = off ? await s.coupons.create({ amount_off: off * 100, currency: 'mxn', duration: 'once', max_redemptions: 1, name: [code, giftCode && 'Gift card'].filter(Boolean).join(' + ').slice(0, 40) }) : null;
   const session = await s.checkout.sessions.create({
     mode: 'payment',
     customer_email: b.email.trim(),

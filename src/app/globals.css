@@ -1393,3 +1393,7 @@ body:has(.sg){background:#1B1C1D}
 .ck-dnf.on{flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px 10px}
 .ck-dnf.on .btn{margin-left:auto}
 .ck-dnf-btn{align-self:flex-start;color:var(--bad,#e5484d)}
+
+.st-applied{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.st-applied span{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid #5BD08A;color:#5BD08A;font-size:12px;letter-spacing:.06em}
+.st-applied button{all:unset;cursor:pointer;opacity:.8}

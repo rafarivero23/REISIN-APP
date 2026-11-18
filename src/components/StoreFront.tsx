@@ -158,15 +158,19 @@ function Cart({ raceId, raceSlug, raceName, cart, byId, ship, onChange, onClose 
   const shipping = f.delivery === 'ship' ? ship.fee || 0 : 0;
   const [codeIn, setCodeIn] = useState('');
   const [code, setCode] = useState<{ code: string; kind: 'pct' | 'amt'; value: number } | null>(null);
+  const [gift, setGift] = useState<{ code: string; value: number } | null>(null);
   const [codeErr, setCodeErr] = useState('');
   const discount = code ? discountFor(code, subtotal) : 0;
-  const total = subtotal - discount + shipping;
+  const giftUse = gift ? Math.min(gift.value, Math.max(0, subtotal - discount + shipping)) : 0;
+  const total = subtotal - discount - giftUse + shipping;
   const applyCode = async () => {
     setCodeErr('');
     if (!codeIn.trim()) return;
     const r = await checkStoreCode(raceId, codeIn);
-    if (r.error || !r.code) { setCode(null); return setCodeErr(errs[r.error || 'st_codeBad'] || tx('Código no válido.', 'Invalid code.')); }
-    setCode({ code: r.code, kind: r.kind!, value: r.value! }); setCodeIn(r.code);
+    if (r.error || !r.code) return setCodeErr(errs[r.error || 'st_codeBad'] || tx('Código no válido.', 'Invalid code.'));
+    if (r.kind === 'gift') setGift({ code: r.code, value: r.value! });
+    else setCode({ code: r.code, kind: r.kind as 'pct' | 'amt', value: r.value! });
+    setCodeIn('');
   };
   const setQty = (i: number, q: number) => onChange(cart.map((l, j) => (j === i ? { ...l, qty: Math.max(1, Math.min(q, stockOf(byId.get(l.productId)!, l.option))) } : l)));
   useEffect(() => {
@@ -177,12 +181,12 @@ function Cart({ raceId, raceSlug, raceName, cart, byId, ship, onChange, onClose 
     required: tx('Completa nombre, email y teléfono.', 'Fill in name, email and phone.'), st_address: tx('Escribe la dirección completa de envío.', 'Enter your full shipping address.'),
     st_stock: tx('Ya no hay suficientes piezas de', 'Not enough stock left for'), st_gone: tx('Un producto ya no está disponible. Revisa tu carrito.', 'A product is no longer available. Check your cart.'),
     st_closed: tx('La tienda está cerrada.', 'The store is closed.'), st_empty: tx('Tu carrito está vacío.', 'Your cart is empty.'),
-    st_codeBad: tx('Código no válido.', 'Invalid code.'), st_codeExpired: tx('Este código ya venció.', 'This code has expired.'), st_codeUsed: tx('Este código ya se usó el máximo de veces.', 'This code has reached its limit.'),
+    st_codeBad: tx('Código no válido.', 'Invalid code.'), st_codeExpired: tx('Este código ya venció.', 'This code has expired.'), st_codeUsed: tx('Este código ya se usó el máximo de veces.', 'This code has reached its limit.'), st_giftEmpty: tx('Esta gift card ya no tiene saldo.', 'This gift card has no balance left.'),
   };
   const pay = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(''); setBusy(true);
-    const r = await storeCheckout(raceId, cart, { ...f, code: code?.code || '' });
+    const r = await storeCheckout(raceId, cart, { ...f, code: code?.code || '', gift: gift?.code || '' });
     if ('error' in r) { setErr(`${errs[r.error] || r.error}${r.detail ? ` ${r.detail}.` : ''}`); setBusy(false); return; }
     if ('url' in r) { window.location.href = r.url; return; }
     setSim(r); setBusy(false);
@@ -234,14 +238,22 @@ function Cart({ raceId, raceSlug, raceName, cart, byId, ship, onChange, onClose 
               <div><span>Subtotal</span><span>{money(subtotal, lang)}</span></div>
               {discount > 0 && <div className="st-disc"><span>{tx('Descuento', 'Discount')} {code!.code} ({codeLabel(code!)})</span><span>−{money(discount, lang)}</span></div>}
               {f.delivery === 'ship' && <div><span>{tx('Envío', 'Shipping')}</span><span>{money(shipping, lang)}</span></div>}
+              {giftUse > 0 && <div className="st-disc"><span>Gift card {gift!.code}</span><span>−{money(giftUse, lang)}</span></div>}
               <div className="t"><span>Total</span><b>{money(total, lang)}</b></div>
             </div>
-            <div className="st-code">
-              <input value={codeIn} onChange={(e) => { setCodeIn(e.target.value.toUpperCase()); setCodeErr(''); }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyCode(); } }}
-                placeholder={tx('Código de descuento', 'Discount code')} aria-label={tx('Código de descuento', 'Discount code')} autoCapitalize="characters" disabled={!!code} />
-              {code ? <button type="button" className="mono" onClick={() => { setCode(null); setCodeIn(''); }}>{tx('Quitar', 'Remove')}</button>
-                : <button type="button" className="mono" onClick={applyCode}>{tx('Aplicar', 'Apply')}</button>}
-            </div>
+            {(code || gift) && (
+              <div className="st-applied">
+                {code && <span className="mono">{code.code} <button type="button" onClick={() => setCode(null)} aria-label={tx('Quitar', 'Remove')}>✕</button></span>}
+                {gift && <span className="mono">Gift card {gift.code} · {tx('saldo', 'balance')} {money(gift.value, lang)} <button type="button" onClick={() => setGift(null)} aria-label={tx('Quitar', 'Remove')}>✕</button></span>}
+              </div>
+            )}
+            {!(code && gift) && (
+              <div className="st-code">
+                <input value={codeIn} onChange={(e) => { setCodeIn(e.target.value.toUpperCase()); setCodeErr(''); }} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); applyCode(); } }}
+                  placeholder={tx('Código de descuento o gift card', 'Discount code or gift card')} aria-label={tx('Código de descuento o gift card', 'Discount code or gift card')} autoCapitalize="characters" />
+                <button type="button" className="mono" onClick={applyCode}>{tx('Aplicar', 'Apply')}</button>
+              </div>
+            )}
             {codeErr && <p className="st-err">{codeErr}</p>}
             {err && <p className="st-err">{err}</p>}
             <div className="st-form-act">

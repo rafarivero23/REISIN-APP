@@ -419,6 +419,21 @@ CREATE TABLE IF NOT EXISTS store_codes (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_store_codes_code ON store_codes(race_id, code);
 ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS discount_code TEXT;
 ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS discount INTEGER NOT NULL DEFAULT 0;
+-- Shop gift cards: a code with a peso balance to spend in the store (used up across orders).
+CREATE TABLE IF NOT EXISTS store_gifts (
+  id TEXT PRIMARY KEY,
+  race_id TEXT NOT NULL REFERENCES races(id) ON DELETE CASCADE,
+  code TEXT NOT NULL,
+  amount INTEGER NOT NULL DEFAULT 0,
+  balance INTEGER NOT NULL DEFAULT 0,
+  name TEXT,
+  note TEXT,
+  active BOOLEAN NOT NULL DEFAULT true,
+  created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_store_gifts_code ON store_gifts(race_id, code);
+ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS gift_code TEXT;
+ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS gift INTEGER NOT NULL DEFAULT 0;
 
 -- Solos have their own number series (S1, S2…). Races numbered before that
 -- (Solos at 46+) are shifted back to start at 1, keeping their order.
