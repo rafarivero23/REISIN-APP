@@ -26,7 +26,7 @@ import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamMarkUnpaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
-  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, teamsFromAllPayments, resolvePayment, setWaiverStaff, staffWaiverLink, saveSettleAmounts, teamMarkSettled, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
+  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, teamsFromAllPayments, resolvePayment, setWaiverStaff, staffWaiverLink, saveSettleAmounts, teamMarkSettled, setSettleOverride, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
 /* Shapes passed from server components (no password hashes). */
@@ -48,7 +48,7 @@ export type ATeam = {
   id: string; race_id: string; name: string; category: string | null; captain_name: string; captain_email: string;
   captain_phone: string | null; amount: number; payment_status: string; payment_method: string | null; paid_at: string | null;
   claim_code: string; has_password: boolean; created_at: string; team_size: number | null; extra_slots: number; notes: string | null;
-  half_avg_min: number | null; reg_type: string; logo_v: string | null; code_sent_at: string | null; team_no: number | null; is_solo: boolean; settled_at: string | null; no_race: boolean; kit_at: string | null;
+  half_avg_min: number | null; reg_type: string; logo_v: string | null; code_sent_at: string | null; team_no: number | null; is_solo: boolean; settled_at: string | null; no_race: boolean; kit_at: string | null; settle_override?: number | null;
 };
 export type ARunner = {
   id: string; race_id: string; team_id: string; bib: number | null; first_name: string; last_name: string; email: string;
@@ -428,7 +428,7 @@ function TeamsTable({ race, teams, count, open, info }: { race: ARace; teams: AT
                   <td><GroupChip g={inf.group} />{x.half_avg_min && <div className="muted num" style={{ fontSize: 12 }}>{fmtHalf(x.half_avg_min)}</div>}</td>
                   <td className="num">{n}/{sl.size}{n > sl.size && <span className="chip bad" style={{ marginLeft: 6 }}>+{n - sl.size}</span>}<div><RegChip i={inf} /></div></td>
                   {hold && <td className="num"><SlotBar paid={sl.paid} size={sl.size} /></td>}
-                  <td className="num" style={{ textAlign: 'right' }}>{x.settled_at ? <span className="chip ok">{t('st_settled')}</span> : sl.balance > 0 ? money(sl.balance, lang) : <span className="chip ok">{t('paid')}</span>}</td>
+                  <td className="num" style={{ textAlign: 'right' }}>{x.settled_at ? <span className="chip ok">{t('st_settled')}</span> : x.settle_override != null ? <span className="chip warn" title={lang === 'en' ? 'Special settlement' : 'Liquidación especial'}>{money(x.settle_override, lang)} ✎</span> : sl.balance > 0 ? money(sl.balance, lang) : <span className="chip ok">{t('paid')}</span>}</td>
                   <td><span className="chip plain">{t(x.reg_type === 'full' ? 'full' : 'presale')}</span></td>
                   <td>{lg ? <span className="chip ok">✓</span> : <span className="chip">—</span>}</td>
                   <td>{x.has_password ? <span className="chip ok">{t('set')}</span> : <span className="chip">{t('notSet')}</span>}</td>
@@ -835,6 +835,7 @@ function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, o
           <dt>{t('registered')}</dt><dd>{fmtDT(x.created_at, lang)}</dd>
         </dl>
       </div>
+      {!x.is_solo && !x.settled_at && <SettleOverride team={x} onSave={(v) => act(() => setSettleOverride(x.id, v))} />}
       <CaptainMessage team={x} race={race} />
       <div className="row">
         {x.payment_status !== 'paid' && <button type="button" className="btn btn-primary btn-sm" onClick={() => act(() => teamMarkPaid(x.id))}>{t('markPaid')}</button>}
@@ -1014,5 +1015,30 @@ function ChangePassword() {
       <Field id="cp-new" label={t('newPassword')} type="password" value={f.next} onChange={(v) => setF({ ...f, next: v })} req minLength={8} hint={t('passMin8')} autoComplete="new-password" />
       <div><button className="btn btn-primary" type="submit">{t('save')}</button></div>
     </form>
+  );
+}
+
+// Special settlement for one team: what this team still has to pay (empty = the race's normal amount).
+function SettleOverride({ team, onSave }: { team: ATeam; onSave: (v: number | null) => Promise<unknown> }) {
+  const { lang } = useT();
+  const tx = (es: string, en: string) => (lang === 'en' ? en : es);
+  const cur = team.settle_override == null ? '' : String(team.settle_override);
+  const [v, setV] = useState(cur);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => setV(cur), [cur]);
+  const save = async (val: number | null) => { setBusy(true); await onSave(val); setBusy(false); };
+  return (
+    <div className="card stack" style={{ gap: 8 }}>
+      <div className="label">{tx('Liquidación especial', 'Special settlement')}</div>
+      <p className="muted" style={{ fontSize: 13, margin: 0 }}>{tx('Lo que le queda por liquidar a este equipo. Es lo que ve y paga en su panel de capitán y lo que dice su mensaje. Vacío = monto normal de la carrera.', 'What this team still has to pay. It is what the captain sees and pays in their panel and what their message says. Empty = the race\'s normal amount.')}</p>
+      <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+        <span>$</span>
+        <input type="number" min={0} step={100} value={v} onChange={(e) => setV(e.target.value)} placeholder={tx('Monto normal', 'Normal amount')}
+          style={{ width: 160, padding: '8px 10px', borderRadius: 8, border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink)', font: 'inherit' }} />
+        <button type="button" className="btn btn-primary btn-sm" disabled={busy || v === cur || (v !== '' && !(Number(v) >= 0))} onClick={() => save(v === '' ? null : Math.round(Number(v)))}>{tx('Guardar', 'Save')}</button>
+        {team.settle_override != null && <button type="button" className="btn btn-ghost btn-sm" disabled={busy} onClick={() => save(null)}>{tx('Volver al monto normal', 'Back to normal amount')}</button>}
+      </div>
+      {team.settle_override != null && <span className="chip warn" style={{ alignSelf: 'flex-start' }}>{tx('Este equipo liquida', 'This team settles for')} {money(team.settle_override, lang)}</span>}
+    </div>
   );
 }

@@ -17,6 +17,7 @@ export type Team = {
   team_size: number | null; extra_slots: number; notes: string | null; half_avg_min: number | null; logo: string | null; reg_type: string;
   code_sent_at: string | null; is_solo: boolean; external_id: string | null; team_no: number | null; settled_at: string | null; no_race: boolean;
   kit_at: string | null; kit_by: string | null; kit_count: number | null; kit_note: string | null;
+  settle_override: number | null;
   dnf: boolean; dnf_at: string | null; dnf_km: string | number | null; dnf_note: string | null; dnf_by: string | null;
 };
 export type Runner = {
@@ -100,7 +101,7 @@ export async function listedTeamsWithCounts(raceId: string) {
   );
 }
 
-type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes' | 'half_avg_min' | 'logo' | 'reg_type' | 'code_sent_at' | 'is_solo' | 'external_id' | 'team_no' | 'settled_at' | 'no_race' | 'kit_at' | 'kit_by' | 'kit_count' | 'kit_note' | 'dnf' | 'dnf_at' | 'dnf_km' | 'dnf_note' | 'dnf_by'> &
+type NewTeam = Omit<Team, 'id' | 'created_at' | 'stripe_session_id' | 'password_hash' | 'team_size' | 'extra_slots' | 'notes' | 'half_avg_min' | 'logo' | 'reg_type' | 'code_sent_at' | 'is_solo' | 'external_id' | 'team_no' | 'settled_at' | 'no_race' | 'kit_at' | 'kit_by' | 'kit_count' | 'kit_note' | 'settle_override' | 'dnf' | 'dnf_at' | 'dnf_km' | 'dnf_note' | 'dnf_by'> &
   { is_solo?: boolean; external_id?: string | null } &
   { password_hash?: string | null; team_size?: number | null; notes?: string | null; created_at?: string; half_avg_min?: number | null; reg_type?: string };
 export async function createTeam(t: NewTeam) {
@@ -187,7 +188,10 @@ export function parseSettle(json: string | null | undefined): Record<string, num
 // already paid the full price (e.g. $35,000 instead of the $20,000 deposit)
 // owes nothing; one that paid part of the balance owes only the rest.
 export function settleAmount(team: Team, race: Race, paid?: { total: number; deposit: number }): number {
-  if (team.settled_at || team.is_solo || team.reg_type === 'full') return 0;
+  if (team.settled_at) return 0;
+  // Staff set a special amount for this team: that's what's left to pay.
+  if (team.settle_override != null) return Math.max(0, Number(team.settle_override));
+  if (team.is_solo || team.reg_type === 'full') return 0;
   const size = teamSizeOf(team, race);
   const fixed = Number(parseSettle(race.settle_amounts)[String(size)]);
   // Not paid at all (staff marked it unpaid): charge the full price = deposit + settlement.

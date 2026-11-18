@@ -396,6 +396,8 @@ ALTER TABLE teams ADD COLUMN IF NOT EXISTS dnf_km NUMERIC;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS dnf_note TEXT;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS dnf_by TEXT;
 ALTER TABLE teams ADD COLUMN IF NOT EXISTS dnf BOOLEAN NOT NULL DEFAULT false;
+-- Per-team settlement set by staff (what this team still has to pay); NULL = the race's normal amount.
+ALTER TABLE teams ADD COLUMN IF NOT EXISTS settle_override INTEGER;
 -- Store orders: who handed it out and when (staff link), cash refunded so far, change log.
 ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivered_at TEXT;
 ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivered_by TEXT;

@@ -4,7 +4,7 @@ import { teamSlots } from './stats';
 import { money } from './format';
 
 type Tr = (k: string) => string;
-type MsgTeam = { captain_name: string; name: string; claim_code: string; amount?: number; payment_status?: string; team_size?: number | null; extra_slots?: number; is_solo?: boolean; settled_at?: string | null };
+type MsgTeam = { captain_name: string; name: string; claim_code: string; amount?: number; payment_status?: string; team_size?: number | null; extra_slots?: number; is_solo?: boolean; settled_at?: string | null; settle_override?: number | null };
 type MsgRace = { id: string; name: string; slug: string | null; access_code: string | null; team_size?: number; capacity_teams?: number; hold_slots?: number; runner_fee?: number; settle_amounts?: string | null; settle_deadline?: string | null };
 
 const MONTHS: Record<string, string[]> = {
@@ -22,7 +22,9 @@ export function dayMonth(iso: string | null | undefined, lang: 'es' | 'en' = 'es
 // What the captain still owes as the team "liquidación": fixed amount per team
 // size if staff set one, else the unpaid spots. 0 once settled.
 export function settleDue(team: MsgTeam, race: MsgRace): number {
-  if (team.settled_at || team.is_solo || team.payment_status === undefined || race.team_size === undefined) return 0;
+  if (team.settled_at) return 0;
+  if (team.settle_override != null) return Math.max(0, Number(team.settle_override));
+  if (team.is_solo || team.payment_status === undefined || race.team_size === undefined) return 0;
   const size = team.team_size || race.team_size;
   let fixed = 0;
   try { fixed = Number((JSON.parse(race.settle_amounts || '{}') as Record<string, number>)[String(size)]) || 0; } catch { /* ignore */ }

@@ -279,6 +279,15 @@ export async function saveSettleAmounts(raceId: string, amounts: Record<string, 
   refresh();
   return {};
 }
+export async function setSettleOverride(id: string, amount: number | null): Promise<Result> {
+  await guard();
+  const t = await getTeam(id);
+  if (!t) return { error: 'not_found' };
+  const v = amount == null || !isFinite(Number(amount)) ? null : Math.max(0, Math.round(Number(amount)));
+  await run('UPDATE teams SET settle_override = ? WHERE id = ?', [v, id]);
+  refresh();
+  return {};
+}
 export async function teamMarkSettled(id: string): Promise<Result> {
   await guard();
   const t = await getTeam(id);
