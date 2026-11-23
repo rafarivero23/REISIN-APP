@@ -1,40 +1,32 @@
-import Link from 'next/link';
-import { listOpenRaces } from '@/lib/repo';
-import { brandKey, fmtDate } from '@/lib/format';
+import { many } from '@/lib/db';
+import type { Race } from '@/lib/repo';
 import { getT } from '@/lib/lang';
-import { PhotoHero } from '@/components/PhotoHero';
+import { fmtDate } from '@/lib/format';
 import { parsePage } from '@/lib/racepage';
-import { defaultCover, getPhoto, photoSrc, HOME_COVER } from '@/lib/photos';
+import { defaultCover, getPhoto, photoSrc } from '@/lib/photos';
+import { heroList, imgSrc } from '@/lib/store-shared';
+import { HomeLanding, type HomeRace } from '@/components/HomeLanding';
 
+export const dynamic = 'force-dynamic';
+
+// Reisin home: full-screen race photos behind two entries, RACE and SHOP,
+// each with a button per race. Published races (open or closed), never drafts.
 export default async function PortalHome() {
-  const { t, lang } = getT();
-  const races = await listOpenRaces();
-  return (
-    <>
-      <PhotoHero photo={HOME_COVER} size="lg">
-        <div className="label">{t('p_pick')}</div>
-        <h1>{t('p_title')}</h1>
-        <p>{t('p_sub')}</p>
-      </PhotoHero>
-      {races.length ? (
-        <div className="race-grid">
-          {races.map((r) => {
-            const bk = brandKey(r.brand);
-            const cover = getPhoto(parsePage(r.page).cover || defaultCover(r.brand));
-            return (
-              <Link key={r.id} href={`/r/${r.id}`} className={'race-card ' + brandKey(r.brand)} style={{ textDecoration: 'none' }}>
-                {cover ? <div className="cover"><img src={photoSrc(cover.id, true)} alt="" style={{ objectPosition: cover.pos }} loading="lazy" /></div> : <div className={'band b-' + bk} />}
-                <div className="in">
-                  <span className={'brand-chip ' + bk}>{r.brand}</span>
-                  <h3>{r.name}</h3>
-                  <div className="muted" style={{ fontSize: 14 }}>{fmtDate(r.race_date, lang)}{r.location ? ' · ' + r.location : ''}</div>
-                  <div className="row">{r.teams_left > 0 ? <span className="chip ok num">{r.teams_left} {t('slotsLeft')}</span> : <span className="chip bad">{t('raceFull')}</span>}</div>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      ) : <div className="card empty">{t('p_noRaces')}</div>}
-    </>
-  );
+  const { lang } = getT();
+  const races = await many<Race & { products: string }>(
+    `SELECT r.*, (SELECT count(*) FROM store_products p WHERE p.race_id = r.id AND p.active) AS products
+     FROM races r WHERE r.status IN ('open', 'closed') ORDER BY r.race_date NULLS LAST`);
+  const list: HomeRace[] = races.map((r) => {
+    const page = parsePage(r.page);
+    const ids = [page.cover || defaultCover(r.brand), ...page.photos].filter(Boolean);
+    const imgs = Array.from(new Set(ids)).map((id) => getPhoto(id)).filter((p): p is NonNullable<typeof p> => !!p).slice(0, 3).map((p) => ({ src: photoSrc(p.id), pos: p.pos }));
+    const shopImgs = heroList(r.store_hero).slice(0, 3).map((id) => ({ src: imgSrc(id), pos: 'center' }));
+    const slug = r.slug || r.id;
+    return {
+      id: r.id, name: r.name, brand: r.brand, when: [fmtDate(r.race_date, lang), r.location].filter(Boolean).join(' · '),
+      race: `/r/${slug}`, shop: r.store_on && Number(r.products) > 0 ? `/r/${slug}/store` : null,
+      imgs, shopImgs: shopImgs.length ? shopImgs : imgs, closed: r.status === 'closed',
+    };
+  });
+  return <HomeLanding races={list} />;
 }
