@@ -26,7 +26,7 @@ import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamMarkUnpaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
-  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, teamsFromAllPayments, resolvePayment, setWaiverStaff, staffWaiverLink, saveSettleAmounts, teamMarkSettled, setSettleOverride, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
+  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, teamsFromAllPayments, resolvePayment, setWaiverStaff, staffWaiverLink, saveSettleAmounts, teamMarkSettled, setSettleOverride, emailCaptain, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
 /* Shapes passed from server components (no password hashes). */
@@ -773,6 +773,7 @@ function CaptainMessage({ team, race }: { team: ATeam; race: ARace }) {
         <button type="button" className="btn btn-sm btn-primary" onClick={() => copy(msg)}>{t('copy')}</button>
         {wa && <a className="btn btn-sm" href={wa} target="_blank" rel="noreferrer">WhatsApp ↗</a>}
         {mail && <a className="btn btn-sm" href={mail}>{t('email')} ↗</a>}
+        {team.captain_email && <SendEmailBtn id={team.id} />}
       </div>
     </div>
   );
@@ -1040,5 +1041,22 @@ function SettleOverride({ team, onSave }: { team: ATeam; onSave: (v: number | nu
       </div>
       {team.settle_override != null && <span className="chip warn" style={{ alignSelf: 'flex-start' }}>{tx('Este equipo liquida', 'This team settles for')} {money(team.settle_override, lang)}</span>}
     </div>
+  );
+}
+
+// Sends the captain message from hola@reisin.mx (Resend) instead of the admin's own mail app.
+function SendEmailBtn({ id }: { id: string }) {
+  const { lang } = useT();
+  const toast = useToast();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  return (
+    <button type="button" className="btn btn-sm" disabled={busy} onClick={async () => {
+      setBusy(true);
+      const r = await emailCaptain(id);
+      setBusy(false);
+      toast(r.error || (lang === 'en' ? 'Email sent' : 'Correo enviado'));
+      router.refresh();
+    }}>{busy ? '…' : lang === 'en' ? 'Send email' : 'Enviar correo'}</button>
   );
 }

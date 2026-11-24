@@ -11,6 +11,7 @@ import {
 } from '@/lib/repo';
 import { newClaimCode, now } from '@/lib/ids';
 import { stripe } from '@/lib/stripe';
+import { sendTeamWelcome } from '@/lib/mail';
 import { splitCats } from '@/lib/format';
 import { parseHalf } from '@/lib/groups';
 import { cleanLogo } from '@/lib/logo';
@@ -61,7 +62,10 @@ export async function settle(kind: Kind, id: string, qty: number, amount: number
     const t = await getTeam(id);
     if (!t) return false;
     if (!amount) amount = t.amount;
-    return recordPayment({ race_id: t.race_id, team_id: t.id, kind, source, external_id: externalId, quantity: 1, amount, payer_name: payer?.name || t.captain_name, payer_email: payer?.email || t.captain_email });
+    const first = await recordPayment({ race_id: t.race_id, team_id: t.id, kind, source, external_id: externalId, quantity: 1, amount, payer_name: payer?.name || t.captain_name, payer_email: payer?.email || t.captain_email });
+    // First time this payment lands (redirect or webhook, whichever is first): email the code.
+    if (first) await sendTeamWelcome(t.id).catch((e) => console.error('[mail] team', e));
+    return first;
   }
   if (kind === 'runner') {
     const r = await getRunner(id);

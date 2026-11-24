@@ -407,3 +407,13 @@ export async function removeRunner(id: string): Promise<Result> {
   refresh();
   return {};
 }
+
+// Send (or resend) the captain / Solo code by email through Resend.
+export async function emailCaptain(id: string): Promise<{ error?: string }> {
+  await guard();
+  const { sendTeamWelcome, mailOn } = await import('@/lib/mail');
+  if (!mailOn()) return { error: 'Falta configurar RESEND_API_KEY en Vercel.' };
+  const r = await sendTeamWelcome(id);
+  refresh();
+  return r.ok ? {} : { error: r.error === 'bad_email' ? 'El correo del capitán no es válido.' : `No se pudo enviar: ${r.error || ''}` };
+}

@@ -76,6 +76,8 @@ export async function markOrderPaid(orderId: string, sessionId: string | null): 
       } else await c.query('UPDATE store_products SET stock = stock - $1 WHERE id = $2', [it.qty, it.product_id]);
     }
     await c.query('COMMIT');
+    // Confirmation email (first time only — this function returns true once per order).
+    try { const o = await getOrder(orderId); if (o) await (await import('./mail')).sendOrderConfirmation(o); } catch (e) { console.error('[mail] order', e); }
     return true;
   } catch (e) {
     await c.query('ROLLBACK');
