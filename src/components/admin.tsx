@@ -26,7 +26,7 @@ import { parsePage } from '@/lib/racepage';
 import { staffSetAgentStatus, staffAgentNotes, staffDeleteAgent } from '@/app/actions/agents';
 import {
   saveRace, removeRace, saveTeam, teamMarkPaid, teamMarkUnpaid, teamNewCode, teamClearPassword, removeTeam, saveRunner, runnerMarkPaid,
-  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, teamsFromAllPayments, resolvePayment, setWaiverStaff, staffWaiverLink, saveSettleAmounts, teamMarkSettled, setSettleOverride, emailCaptain, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
+  removeRunner, addTeammate, removeTeammate, teamAddSlots, savePaymentNotes, saveRunnerNotes, saveTeamNotes, teamFromPayment, teamsFromAllPayments, resolvePayment, setWaiverStaff, staffWaiverLink, saveSettleAmounts, teamMarkSettled, setSettleOverride, emailCaptain, teamToSolo, soloFromPayment, setTeamLogoAdmin, saveGroups, setPaymentTeam, removePayment, importCsv, rematchPayments, changePassword,
 } from '@/app/actions/admin';
 
 /* Shapes passed from server components (no password hashes). */
@@ -579,7 +579,8 @@ function Payments({ race, teams, solos = [], payments, stats, openTeam }: { race
                 <td className="num">{fmtDate(p.paid_at, lang)}</td>
                 <td><b>{p.payer_name || '—'}</b><div className="muted" style={{ fontSize: 12 }}>{p.payer_email}</div>{p.comment && <div style={{ fontSize: 12, marginTop: 2 }}>“{p.comment}”</div>}</td>
                 <td>{concept(p)}</td><td className="num" style={{ textAlign: 'right' }}>{money(p.amount, lang)}</td>
-                <td><TeamSelect p={p} />{p.kind !== 'runner' && <div style={{ marginTop: 6 }}><button type="button" className="btn btn-sm" onClick={() => makeTeam(p)}>+ {t('fromPay')}</button></div>}
+                <td><TeamSelect p={p} />{p.kind !== 'runner' && <div className="row" style={{ marginTop: 6, gap: 6 }}><button type="button" className="btn btn-sm" onClick={() => makeTeam(p)}>+ {t('fromPay')}</button>
+                  <button type="button" className="btn btn-sm" onClick={async () => { if (!confirm(lang === 'en' ? `Create a Solo runner for ${p.payer_name || p.payer_email} with this payment?` : `¿Crear un Solo runner para ${p.payer_name || p.payer_email} con este pago?`)) return; const r = await act(() => soloFromPayment(p.id)); if (r && 'id' in r && r.id) openTeam(r.id as string); }}>+ Solo runner</button></div>}
                   <div style={{ marginTop: 6 }}>
                     <select value="" aria-label={t('res_mark')} onChange={(e) => e.target.value && act(() => resolvePayment(p.id, e.target.value))} style={{ maxWidth: 220, padding: '6px 8px', borderRadius: 6, border: '1px solid var(--line)', background: 'var(--surface)', fontSize: 13 }}>
                       <option value="">{t('res_mark')}</option>
@@ -841,6 +842,7 @@ function TeamDrawer({ team: x, race, runners, payments, info, onClose, onEdit, o
       <div className="row">
         {x.payment_status !== 'paid' && <button type="button" className="btn btn-primary btn-sm" onClick={() => act(() => teamMarkPaid(x.id))}>{t('markPaid')}</button>}
         {x.payment_status === 'paid' && !x.is_solo && <button type="button" className="btn btn-sm" onClick={() => { if (confirm(t('markUnpaidConfirm'))) act(() => teamMarkUnpaid(x.id)); }}>{t('markUnpaid')}</button>}
+        {!x.is_solo && runners.length <= 1 && <button type="button" className="btn btn-sm" onClick={() => { if (confirm(lang === 'en' ? `Turn "${x.name}" into a Solo runner? It moves to the Solos tab with size 1.` : `¿Convertir "${x.name}" en Solo runner? Pasa a la pestaña Solos con 1 integrante y queda pagado si tiene pagos.`)) act(() => teamToSolo(x.id)).then(() => onClose()); }}>{lang === 'en' ? 'Make Solo runner' : 'Convertir en Solo'}</button>}
         <button type="button" className={'btn btn-sm' + (x.no_race ? ' btn-primary' : '')} onClick={() => { if (x.no_race || confirm(t('noRaceConfirm'))) act(() => setNoRace(x.id, !x.no_race)); }}>{x.no_race ? t('noRaceUndo') : t('noRaceSet')}</button>
         {!x.settled_at && !x.is_solo && <button type="button" className="btn btn-sm" onClick={() => confirm(t('st_markConfirm')) && act(() => teamMarkSettled(x.id))}>{t('st_markDone')}</button>}
         <button type="button" className="btn btn-sm" onClick={onEdit}>{t('edit')}</button>

@@ -16,7 +16,7 @@ import { importCsvText, rematch, importSolos } from '@/lib/importers';
 import { parseHalf } from '@/lib/groups';
 import { cleanLogo } from '@/lib/logo';
 import { newClaimCode, newId, now } from '@/lib/ids';
-import { run } from '@/lib/db';
+import { run, one } from '@/lib/db';
 import { waiverToken } from '@/lib/team-session';
 
 type Result = { error?: string; id?: string };
@@ -416,4 +416,30 @@ export async function emailCaptain(id: string): Promise<{ error?: string }> {
   const r = await sendTeamWelcome(id);
   refresh();
   return r.ok ? {} : { error: r.error === 'bad_email' ? 'El correo del capitán no es válido.' : `No se pudo enviar: ${r.error || ''}` };
+}
+
+// A team created from a payment (or by mistake) that is really one Solo runner.
+// Becomes a Solo: size 1, named after the captain, paid if it has payments.
+export async function teamToSolo(id: string): Promise<Result> {
+  await guard();
+  const t = await getTeam(id);
+  if (!t) return { error: 'not_found' };
+  const n = await one<{ n: string }>('SELECT count(*) AS n FROM runners WHERE team_id = ?', [id]);
+  if (Number(n?.n || 0) > 1) return { error: 'Este equipo tiene más de un corredor; no se puede convertir en Solo.' };
+  const paid = await one<{ s: string }>(`SELECT COALESCE(SUM(amount), 0) AS s FROM payments WHERE team_id = ? AND kind <> 'store'`, [id]);
+  const total = Number(paid?.s || 0);
+  const notes = (t.notes || '').replace(/\s*Falta que el capitán ponga nombre y tamaño\.?/, '').trim() || null;
+  await run(`UPDATE teams SET is_solo = true, team_size = 1, name = ?, team_no = NULL, notes = ?,
+    amount = CASE WHEN ? > 0 THEN ? ELSE amount END,
+    payment_status = CASE WHEN ? > 0 THEN 'paid' ELSE payment_status END,
+    paid_at = CASE WHEN ? > 0 THEN COALESCE(paid_at, ?) ELSE paid_at END WHERE id = ?`,
+    [t.captain_name || t.name, notes, total, total, total, total, now(), id]);
+  refresh();
+  return {};
+}
+export async function soloFromPayment(paymentId: string): Promise<Result> {
+  await guard();
+  const r = await makeTeamFromPayment(paymentId);
+  if (!r.id) return r;
+  return teamToSolo(r.id).then((x) => (x.error ? x : { id: r.id }));
 }
