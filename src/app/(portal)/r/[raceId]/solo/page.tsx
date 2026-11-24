@@ -15,7 +15,7 @@ export default async function SoloLoginPage({ params }: { params: { raceId: stri
     <>
       <Back href={`/r/${race.id}`} />
       <RaceHeader race={race} lang={lang} />
-      {selling && <SoloBuyForm raceId={race.id} raceName={race.name} price={race.solo_price} left={left} />}
+      {selling && <SoloBuyForm raceId={race.id} raceName={race.name} price={race.solo_price} left={left == null ? null : left > 0 ? 1 : 0} />}
       {selling && <h2 style={{ fontSize: 22, marginTop: 8 }}>{t('so_haveCode')}</h2>}
       <CaptainLoginForm raceId={race.id} brand={race.brand} solo />
     </>

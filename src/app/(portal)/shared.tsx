@@ -31,7 +31,7 @@ export async function loadOpenRace(raceId: string, opts: { allowClosed?: boolean
   if (race.status !== 'open' && !isClosed) return { closed: race.name };
   const live = await liveTeamCount(race.id);
   const { id, name, brand, race_date, location, team_price, runner_fee, team_size, categories, waiver, hold_slots } = race;
-  return { race: { id, name, brand, race_date, location, team_price, runner_fee, team_size, categories, waiver, hold_slots, sizes: sizeOptions(race), teams_left: Math.max(0, race.capacity_teams - live), closed: isClosed } };
+  return { race: { id, name, brand, race_date, location, team_price, runner_fee, team_size, categories, waiver, hold_slots, sizes: sizeOptions(race), teams_left: race.capacity_teams - live > 0 ? 1 : 0 /* sold out or not; the count stays internal */, closed: isClosed } };
 }
 
 export function Closed({ name }: { name: string }) {

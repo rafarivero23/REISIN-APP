@@ -164,7 +164,7 @@ export function SoloBuyForm({ raceId, raceName, price, left }: { raceId: string;
         <div className="full row" style={{ justifyContent: 'space-between' }}>
           <div>
             <b className="num" style={{ fontFamily: 'var(--f-display)', fontSize: 28 }}>{money(price, lang)}</b>
-            {left != null && <div className="muted" style={{ fontSize: 13 }}>{full ? t('so_full') : t('so_left').replace('{n}', String(left))}</div>}
+            {full && <div className="muted" style={{ fontSize: 13 }}>{t('so_full')}</div>}
           </div>
           <button className="btn btn-primary btn-lg" type="submit" disabled={busy || full}>
             {busy ? <><span className="spin" /> {t('p_redirect')}</> : `${t('p_continuePay')} →`}
